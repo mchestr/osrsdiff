@@ -268,10 +268,14 @@ class TaskScheduler:
         if not self._redis_client:
             return None
 
-        last_run_str = await self._redis_client.get(self._last_run_key)
-        if last_run_str is None:
+        try:
+            last_run_str = await self._redis_client.get(self._last_run_key)
+            if last_run_str is None:
+                return None
+            return datetime.fromisoformat(last_run_str.decode())
+        except Exception as e:
+            logger.error(f"Failed to get last run from Redis: {e}")
             return None
-        return datetime.fromisoformat(last_run_str.decode())
 
 
 # Global scheduler instance
