@@ -1,0 +1,422 @@
+"""Hiscore data fetching worker tasks."""
+
+import asyncio
+import logging
+from datetime import datetime, UTC, timedelta
+from typing import Dict, Any, List, Optional
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.workers.main import broker, get_task_defaults
+from src.models.base import AsyncSessionLocal
+from src.models.player import Player
+from src.models.hiscore import HiscoreRecord
+from src.services.osrs_api import (
+    OSRSAPIClient,
+    PlayerNotFoundError,
+    RateLimitError,
+    APIUnavailableError,
+    OSRSAPIError,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class FetchWorkerError(Exception):
+    """Base exception for fetch worker errors."""
+    pass
+
+
+class PlayerNotInDatabaseError(FetchWorkerError):
+    """Raised when a player is not found in the database."""
+    pass
+
+
+async def _fetch_player_hiscores(username: str) -> Dict[str, Any]:
+    """
+    Fetch and store hiscore data for a specific player.
+
+    This task retrieves current hiscore data from the OSRS API and stores
+    it as a new HiscoreRecord in the database. It handles various error
+    conditions gracefully and provides detailed status information.
+
+    Args:
+        username: OSRS player username to fetch data for
+
+    Returns:
+        Dict containing task execution results with status, data, and metadata
+
+    Raises:
+        RateLimitError: If OSRS API rate limit is exceeded (will trigger retry)
+        APIUnavailableError: If OSRS API is unavailable (will trigger retry)
+        Exception: For database or other unexpected errors (will trigger retry)
+    """
+    logger.info(f"Starting hiscore fetch for player: {username}")
+    start_time = datetime.now(UTC)
+    
+    async with AsyncSessionLocal() as db_session:
+        try:
+            # Get player from database
+            stmt = select(Player).where(Player.username.ilike(username))
+            result = await db_session.execute(stmt)
+            player = result.scalar_one_or_none()
+            
+            if not player:
+                error_msg = f"Player '{username}' not found in database"
+                logger.error(error_msg)
+                return {
+                    "status": "error",
+                    "error_type": "player_not_found",
+                    "username": username,
+                    "error": error_msg,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "duration_seconds": (datetime.now(UTC) - start_time).total_seconds(),
+                }
+            
+            if not player.is_active:
+                info_msg = f"Player '{username}' is inactive, skipping fetch"
+                logger.info(info_msg)
+                return {
+                    "status": "skipped",
+                    "username": username,
+                    "player_id": player.id,
+                    "message": info_msg,
+                    "reason": "player_inactive",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "duration_seconds": (datetime.now(UTC) - start_time).total_seconds(),
+                }
+            
+            # Fetch hiscore data from OSRS API
+            async with OSRSAPIClient() as osrs_client:
+                try:
+                    logger.debug(f"Fetching hiscore data from OSRS API for {username}")
+                    hiscore_data = await osrs_client.fetch_player_hiscores(username)
+                    logger.debug(f"Successfully fetched hiscore data for {username}")
+                    
+                except PlayerNotFoundError as e:
+                    logger.warning(f"Player {username} not found in OSRS hiscores: {e}")
+                    # Player might have been renamed or deleted from hiscores
+                    # This is not a retry-able error, just log and return warning status
+                    return {
+                        "status": "warning",
+                        "error_type": "osrs_player_not_found",
+                        "username": username,
+                        "player_id": player.id,
+                        "error": str(e),
+                        "message": "Player not found in OSRS hiscores - may have been renamed or deleted",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "duration_seconds": (datetime.now(UTC) - start_time).total_seconds(),
+                    }
+                
+                except RateLimitError as e:
+                    logger.error(f"OSRS API rate limit exceeded for {username}: {e}")
+                    # Rate limit errors should trigger task retry
+                    raise
+                
+                except APIUnavailableError as e:
+                    logger.error(f"OSRS API unavailable for {username}: {e}")
+                    # API unavailable errors should trigger task retry
+                    raise
+                
+                except OSRSAPIError as e:
+                    logger.error(f"OSRS API error for {username}: {e}")
+                    # Other API errors are not retry-able
+                    return {
+                        "status": "error",
+                        "error_type": "osrs_api_error",
+                        "username": username,
+                        "player_id": player.id,
+                        "error": str(e),
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "duration_seconds": (datetime.now(UTC) - start_time).total_seconds(),
+                    }
+            
+            # Create new hiscore record
+            hiscore_record = HiscoreRecord(
+                player_id=player.id,
+                fetched_at=hiscore_data.fetched_at,
+                overall_rank=hiscore_data.overall.get("rank"),
+                overall_level=hiscore_data.overall.get("level"),
+                overall_experience=hiscore_data.overall.get("experience"),
+                skills_data=hiscore_data.skills,
+                bosses_data=hiscore_data.bosses,
+            )
+            
+            # Save to database
+            db_session.add(hiscore_record)
+            
+            # Update player's last_fetched timestamp
+            player.last_fetched = hiscore_data.fetched_at
+            
+            await db_session.commit()
+            await db_session.refresh(hiscore_record)
+            
+            duration = (datetime.now(UTC) - start_time).total_seconds()
+            
+            logger.info(
+                f"Successfully stored hiscore data for {username} "
+                f"(record ID: {hiscore_record.id}, duration: {duration:.2f}s)"
+            )
+            
+            return {
+                "status": "success",
+                "username": username,
+                "player_id": player.id,
+                "record_id": hiscore_record.id,
+                "overall_rank": hiscore_record.overall_rank,
+                "overall_level": hiscore_record.overall_level,
+                "overall_experience": hiscore_record.overall_experience,
+                "skills_count": len(hiscore_data.skills),
+                "bosses_count": len(hiscore_data.bosses),
+                "fetched_at": hiscore_data.fetched_at.isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
+                "duration_seconds": duration,
+            }
+            
+        except (RateLimitError, APIUnavailableError):
+            # Re-raise these for task retry
+            raise
+            
+        except Exception as e:
+            await db_session.rollback()
+            logger.error(f"Unexpected error fetching hiscores for {username}: {e}")
+            # Unexpected errors should also trigger retry
+            raise
+
+
+async def _process_scheduled_fetches() -> Dict[str, Any]:
+    """
+    Process scheduled hiscore fetches for all active players.
+
+    This task queries all active players and determines which ones need
+    their hiscore data updated based on their fetch_interval_minutes setting.
+    It then enqueues individual fetch tasks for each player that needs updating.
+
+    The task respects each player's individual fetch interval and only enqueues
+    tasks for players whose data is stale according to their settings.
+
+    Returns:
+        Dict containing processing results and statistics
+    """
+    logger.info("Starting scheduled fetch processing")
+    start_time = datetime.now(UTC)
+    
+    async with AsyncSessionLocal() as db_session:
+        try:
+            # Get all active players
+            stmt = select(Player).where(Player.is_active == True).order_by(Player.username)
+            result = await db_session.execute(stmt)
+            active_players = result.scalars().all()
+            
+            if not active_players:
+                logger.info("No active players found for scheduled fetching")
+                return {
+                    "status": "success",
+                    "message": "No active players to process",
+                    "players_processed": 0,
+                    "players_needing_fetch": 0,
+                    "tasks_enqueued": 0,
+                    "failed_enqueues": 0,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "duration_seconds": (datetime.now(UTC) - start_time).total_seconds(),
+                }
+            
+            logger.info(f"Found {len(active_players)} active players")
+            
+            # Determine which players need fetching
+            current_time = datetime.now(UTC)
+            players_to_fetch = []
+            
+            for player in active_players:
+                # Check if player needs fetching based on interval
+                if player.last_fetched is None:
+                    # Never fetched before, definitely needs fetching
+                    players_to_fetch.append(player)
+                    logger.debug(f"Player {player.username} never fetched, queuing")
+                else:
+                    # Check if enough time has passed since last fetch
+                    time_since_fetch = current_time - player.last_fetched
+                    fetch_interval = timedelta(minutes=player.fetch_interval_minutes)
+                    
+                    if time_since_fetch >= fetch_interval:
+                        players_to_fetch.append(player)
+                        logger.debug(
+                            f"Player {player.username} last fetched "
+                            f"{time_since_fetch} ago, queuing (interval: {fetch_interval})"
+                        )
+                    else:
+                        time_remaining = fetch_interval - time_since_fetch
+                        logger.debug(
+                            f"Player {player.username} fetched recently, "
+                            f"next fetch in {time_remaining}"
+                        )
+            
+            if not players_to_fetch:
+                logger.info("No players need fetching at this time")
+                return {
+                    "status": "success",
+                    "message": "No players need fetching",
+                    "players_processed": len(active_players),
+                    "players_needing_fetch": 0,
+                    "tasks_enqueued": 0,
+                    "failed_enqueues": 0,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "duration_seconds": (datetime.now(UTC) - start_time).total_seconds(),
+                }
+            
+            # Enqueue fetch tasks for players that need updating
+            tasks_enqueued = 0
+            failed_enqueues = 0
+            enqueue_errors = []
+            
+            for player in players_to_fetch:
+                try:
+                    # Import the task here to avoid circular imports
+                    from src.workers.tasks import fetch_player_hiscores_task
+                    
+                    # Enqueue individual fetch task
+                    await fetch_player_hiscores_task.kiq(player.username)
+                    tasks_enqueued += 1
+                    logger.debug(f"Enqueued fetch task for {player.username}")
+                    
+                except Exception as e:
+                    failed_enqueues += 1
+                    error_msg = f"Failed to enqueue fetch task for {player.username}: {e}"
+                    enqueue_errors.append(error_msg)
+                    logger.error(error_msg)
+            
+            duration = (datetime.now(UTC) - start_time).total_seconds()
+            
+            logger.info(
+                f"Scheduled fetch processing complete: {tasks_enqueued} tasks enqueued, "
+                f"{failed_enqueues} failed (duration: {duration:.2f}s)"
+            )
+            
+            result = {
+                "status": "success",
+                "players_processed": len(active_players),
+                "players_needing_fetch": len(players_to_fetch),
+                "tasks_enqueued": tasks_enqueued,
+                "failed_enqueues": failed_enqueues,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "duration_seconds": duration,
+            }
+            
+            if enqueue_errors:
+                result["enqueue_errors"] = enqueue_errors
+            
+            return result
+            
+        except Exception as e:
+            duration = (datetime.now(UTC) - start_time).total_seconds()
+            logger.error(f"Error in scheduled fetch processing: {e}")
+            raise
+
+
+async def _fetch_all_players() -> Dict[str, Any]:
+    """
+    Fetch hiscore data for all active players immediately.
+
+    This is a utility task for manual triggering of fetches for all players,
+    regardless of their last fetch time or interval settings. Useful for
+    administrative purposes or initial data population.
+
+    Returns:
+        Dict containing processing results and statistics
+    """
+    logger.info("Starting fetch for all active players")
+    start_time = datetime.now(UTC)
+    
+    async with AsyncSessionLocal() as db_session:
+        try:
+            # Get all active players
+            stmt = select(Player).where(Player.is_active == True).order_by(Player.username)
+            result = await db_session.execute(stmt)
+            active_players = result.scalars().all()
+            
+            if not active_players:
+                logger.info("No active players found")
+                return {
+                    "status": "success",
+                    "message": "No active players to fetch",
+                    "players_processed": 0,
+                    "tasks_enqueued": 0,
+                    "failed_enqueues": 0,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "duration_seconds": (datetime.now(UTC) - start_time).total_seconds(),
+                }
+            
+            logger.info(f"Enqueuing fetch tasks for {len(active_players)} active players")
+            
+            # Enqueue fetch tasks for all active players
+            tasks_enqueued = 0
+            failed_enqueues = 0
+            enqueue_errors = []
+            
+            for player in active_players:
+                try:
+                    # Import the task here to avoid circular imports
+                    from src.workers.tasks import fetch_player_hiscores_task
+                    
+                    await fetch_player_hiscores_task.kiq(player.username)
+                    tasks_enqueued += 1
+                    logger.debug(f"Enqueued fetch task for {player.username}")
+                    
+                except Exception as e:
+                    failed_enqueues += 1
+                    error_msg = f"Failed to enqueue fetch task for {player.username}: {e}"
+                    enqueue_errors.append(error_msg)
+                    logger.error(error_msg)
+            
+            duration = (datetime.now(UTC) - start_time).total_seconds()
+            
+            logger.info(
+                f"Fetch all players complete: {tasks_enqueued} tasks enqueued, "
+                f"{failed_enqueues} failed (duration: {duration:.2f}s)"
+            )
+            
+            result = {
+                "status": "success",
+                "players_processed": len(active_players),
+                "tasks_enqueued": tasks_enqueued,
+                "failed_enqueues": failed_enqueues,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "duration_seconds": duration,
+            }
+            
+            if enqueue_errors:
+                result["enqueue_errors"] = enqueue_errors
+            
+            return result
+            
+        except Exception as e:
+            duration = (datetime.now(UTC) - start_time).total_seconds()
+            logger.error(f"Error in fetch all players: {e}")
+            raise
+
+
+# Task decorators and exports
+fetch_player_hiscores_task = broker.task(
+    **get_task_defaults(
+        retry_count=5,  # More retries for API calls
+        retry_delay=5.0,  # Longer delay between retries for rate limiting
+        task_timeout=120.0,  # 2 minutes timeout for individual fetch
+    )
+)(_fetch_player_hiscores)
+
+process_scheduled_fetches_task = broker.task(
+    **get_task_defaults(
+        retry_count=3,
+        retry_delay=10.0,
+        task_timeout=300.0,  # 5 minutes for processing all players
+    )
+)(_process_scheduled_fetches)
+
+fetch_all_players_task = broker.task(
+    **get_task_defaults(
+        retry_count=2,
+        retry_delay=15.0,
+        task_timeout=600.0,  # 10 minutes for fetching all players
+    )
+)(_fetch_all_players)

@@ -1,0 +1,125 @@
+[tasks.help]
+description = "Show available tasks"
+run = """
+echo "Available tasks:"
+echo ""
+echo "Development:"
+echo "  mise run install      - Install production dependencies"
+echo "  mise run dev-install  - Install development dependencies"
+echo "  mise run dev          - Start development server"
+echo "  mise run worker       - Start background worker"
+echo ""
+echo "Code Quality:"
+echo "  mise run test         - Run tests"
+echo "  mise run test:cov     - Run tests with coverage"
+echo "  mise run lint         - Run linting"
+echo "  mise run format       - Format code"
+echo "  mise run typecheck    - Run type checking"
+echo ""
+echo "Docker:"
+echo "  mise run docker:up    - Start development environment"
+echo "  mise run docker:down  - Stop development environment"
+echo "  mise run docker:logs  - View logs from all services"
+echo "  mise run docker:build - Build Docker images"
+echo ""
+echo "Database:"
+echo "  mise run db:upgrade   - Run database migrations"
+echo "  mise run db:downgrade - Rollback database migration"
+echo "  mise run db:revision  - Create new database migration"
+echo "  mise run db:init      - Initialize database with tables"
+echo "  mise run db:reset     - Reset database (drop and recreate)"
+echo ""
+echo "Utilities:"
+echo "  mise run clean        - Clean up build artifacts"
+"""
+
+[tasks.install]
+description = "Install production dependencies"
+run = "pip install -e ."
+
+[tasks.dev-install]
+description = "Install development dependencies"
+run = "pip install -e .[dev]"
+
+[tasks.dev]
+description = "Start development server"
+run = "uvicorn src.main:app --reload"
+
+[tasks.worker]
+description = "Start background worker"
+run = "taskiq worker src.workers.main:broker"
+
+[tasks.test]
+description = "Run tests"
+run = "pytest"
+
+[tasks."test:cov"]
+description = "Run tests with coverage"
+run = "pytest --cov=src --cov-report=html --cov-report=term"
+
+[tasks.lint]
+description = "Run linting"
+run = """
+flake8 src/ tests/
+mypy src/
+"""
+
+[tasks.format]
+description = "Format code"
+run = """
+black src/ tests/
+isort src/ tests/
+"""
+
+[tasks.typecheck]
+description = "Run type checking"
+run = "mypy src/"
+
+[tasks.clean]
+description = "Clean up build artifacts"
+run = """
+rm -rf build/
+rm -rf dist/
+rm -rf *.egg-info/
+find . -type d -name __pycache__ -delete
+find . -type f -name "*.pyc" -delete
+"""
+
+[tasks."docker:up"]
+description = "Start development environment"
+run = "docker-compose up -d"
+
+[tasks."docker:down"]
+description = "Stop development environment"
+run = "docker-compose down"
+
+[tasks."docker:logs"]
+description = "View logs from all services"
+run = "docker-compose logs -f"
+
+[tasks."docker:build"]
+description = "Build Docker images"
+run = "docker-compose build"
+
+[tasks."db:upgrade"]
+description = "Run database migrations"
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff alembic upgrade head"
+
+[tasks."db:downgrade"]
+description = "Rollback database migration"
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff alembic downgrade -1"
+
+[tasks."db:revision"]
+description = "Create new database migration"
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff alembic revision --autogenerate -m \"${MESSAGE:-New migration}\""
+
+[tasks."db:init"]
+description = "Initialize database with tables (alternative to migrations)"
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff python scripts/manage_db.py create"
+
+[tasks."db:reset"]
+description = "Reset database (drop and recreate tables)"
+run = """
+DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff python scripts/manage_db.py drop
+DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff python scripts/manage_db.py create
+"""
