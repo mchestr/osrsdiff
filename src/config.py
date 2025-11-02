@@ -178,7 +178,7 @@ class Settings(BaseSettings):
             # If it's some other format, ensure asyncpg is used
             if "postgresql" in url and "+asyncpg" not in url:
                 url = url.replace("postgresql", "postgresql+asyncpg", 1)
-        
+
         return DatabaseSettings(
             url=url,
             echo=self.database_echo,
