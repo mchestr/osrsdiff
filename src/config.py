@@ -170,8 +170,17 @@ class Settings(BaseSettings):
     @property
     def database(self) -> DatabaseSettings:
         """Get database settings."""
+        # Ensure we use asyncpg driver for async SQLAlchemy
+        url = self.database_url
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif not url.startswith("postgresql+asyncpg://"):
+            # If it's some other format, ensure asyncpg is used
+            if "postgresql" in url and "+asyncpg" not in url:
+                url = url.replace("postgresql", "postgresql+asyncpg", 1)
+        
         return DatabaseSettings(
-            url=self.database_url,
+            url=url,
             echo=self.database_echo,
             pool_size=self.database_pool_size,
             max_overflow=self.database_max_overflow,

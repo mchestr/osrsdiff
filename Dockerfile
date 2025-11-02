@@ -12,6 +12,7 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
@@ -84,6 +85,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
