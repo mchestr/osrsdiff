@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   create-release:
@@ -23,7 +23,7 @@ jobs:
         run: |
           # Get the previous tag
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          
+
           # Generate changelog
           if [ -n "$PREVIOUS_TAG" ]; then
             echo "## Changes since $PREVIOUS_TAG" > CHANGELOG.md
@@ -32,7 +32,7 @@ jobs:
             echo "## Initial Release" > CHANGELOG.md
             git log --pretty=format:"- %s (%h)" >> CHANGELOG.md
           fi
-          
+
           # Set output for GitHub release
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           cat CHANGELOG.md >> $GITHUB_OUTPUT

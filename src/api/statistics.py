@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.auth import require_auth
 from src.models.base import get_db_session
 from src.services.statistics import (
+    NoDataAvailableError,
+    PlayerNotFoundError,
     StatisticsService,
     StatisticsServiceError,
-    PlayerNotFoundError,
-    NoDataAvailableError,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,19 +47,36 @@ class PlayerStatsResponse(BaseModel):
     """Response model for individual player statistics."""
 
     username: str = Field(description="Player username")
-    fetched_at: Optional[str] = Field(None, description="When the data was last fetched (ISO format)")
-    overall: Optional[OverallStatsResponse] = Field(None, description="Overall statistics")
-    combat_level: Optional[int] = Field(None, description="Calculated combat level")
-    skills: Dict[str, Any] = Field(default_factory=dict, description="Skills data with levels and experience")
-    bosses: Dict[str, Any] = Field(default_factory=dict, description="Boss kill counts and ranks")
-    metadata: StatsMetadataResponse = Field(description="Additional metadata about the record")
-    error: Optional[str] = Field(None, description="Error message if data unavailable")
+    fetched_at: Optional[str] = Field(
+        None, description="When the data was last fetched (ISO format)"
+    )
+    overall: Optional[OverallStatsResponse] = Field(
+        None, description="Overall statistics"
+    )
+    combat_level: Optional[int] = Field(
+        None, description="Calculated combat level"
+    )
+    skills: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Skills data with levels and experience",
+    )
+    bosses: Dict[str, Any] = Field(
+        default_factory=dict, description="Boss kill counts and ranks"
+    )
+    metadata: StatsMetadataResponse = Field(
+        description="Additional metadata about the record"
+    )
+    error: Optional[str] = Field(
+        None, description="Error message if data unavailable"
+    )
 
 
 class MultipleStatsMetadataResponse(BaseModel):
     """Response model for multiple stats query metadata."""
 
-    total_requested: int = Field(description="Total number of players requested")
+    total_requested: int = Field(
+        description="Total number of players requested"
+    )
     total_found: int = Field(description="Number of players with data found")
     total_missing: int = Field(description="Number of players without data")
 
@@ -67,8 +84,12 @@ class MultipleStatsMetadataResponse(BaseModel):
 class MultipleStatsResponse(BaseModel):
     """Response model for multiple player statistics."""
 
-    players: Dict[str, PlayerStatsResponse] = Field(description="Statistics for each requested player")
-    metadata: MultipleStatsMetadataResponse = Field(description="Query metadata")
+    players: Dict[str, PlayerStatsResponse] = Field(
+        description="Statistics for each requested player"
+    )
+    metadata: MultipleStatsMetadataResponse = Field(
+        description="Query metadata"
+    )
 
 
 # Router
@@ -127,17 +148,24 @@ async def get_player_stats(
             )
 
         # Format the response
-        formatted_data = await statistics_service.format_stats_response(record, username)
+        formatted_data = await statistics_service.format_stats_response(
+            record, username
+        )
 
         # Convert to response model
         response = PlayerStatsResponse(
             username=formatted_data["username"],
             fetched_at=formatted_data["fetched_at"],
-            overall=OverallStatsResponse(**formatted_data["overall"]) if formatted_data["overall"] else None,
+            overall=(
+                OverallStatsResponse(**formatted_data["overall"])
+                if formatted_data["overall"]
+                else None
+            ),
             combat_level=formatted_data["combat_level"],
             skills=formatted_data["skills"],
             bosses=formatted_data["bosses"],
             metadata=StatsMetadataResponse(**formatted_data["metadata"]),
+            error=None,
         )
 
         logger.debug(f"Successfully retrieved stats for player: {username}")
@@ -215,10 +243,14 @@ async def get_multiple_player_stats(
         unique_usernames = list(dict.fromkeys(usernames))
 
         # Get stats for all players
-        stats_map = await statistics_service.get_multiple_stats(unique_usernames)
+        stats_map = await statistics_service.get_multiple_stats(
+            unique_usernames
+        )
 
         # Format the response
-        formatted_data = await statistics_service.format_multiple_stats_response(stats_map)
+        formatted_data = (
+            await statistics_service.format_multiple_stats_response(stats_map)
+        )
 
         # Convert to response models
         players_response = {}
@@ -240,16 +272,23 @@ async def get_multiple_player_stats(
                 players_response[username] = PlayerStatsResponse(
                     username=player_data["username"],
                     fetched_at=player_data["fetched_at"],
-                    overall=OverallStatsResponse(**player_data["overall"]) if player_data["overall"] else None,
+                    overall=(
+                        OverallStatsResponse(**player_data["overall"])
+                        if player_data["overall"]
+                        else None
+                    ),
                     combat_level=player_data["combat_level"],
                     skills=player_data["skills"],
                     bosses=player_data["bosses"],
                     metadata=StatsMetadataResponse(**player_data["metadata"]),
+                    error=None,
                 )
 
         response = MultipleStatsResponse(
             players=players_response,
-            metadata=MultipleStatsMetadataResponse(**formatted_data["metadata"]),
+            metadata=MultipleStatsMetadataResponse(
+                **formatted_data["metadata"]
+            ),
         )
 
         logger.debug(

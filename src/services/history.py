@@ -4,12 +4,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.player import Player
 from src.models.hiscore import HiscoreRecord
+from src.models.player import Player
 
 logger = logging.getLogger(__name__)
 
@@ -117,13 +117,18 @@ class ProgressAnalysis:
     def daily_experience_rates(self) -> Dict[str, float]:
         """Calculate daily experience rates."""
         exp_gains = self.experience_gained
-        return {skill: gain / self.days_elapsed for skill, gain in exp_gains.items()}
+        return {
+            skill: gain / self.days_elapsed
+            for skill, gain in exp_gains.items()
+        }
 
     @property
     def daily_boss_rates(self) -> Dict[str, float]:
         """Calculate daily boss kill rates."""
         boss_gains = self.boss_kills_gained
-        return {boss: gain / self.days_elapsed for boss, gain in boss_gains.items()}
+        return {
+            boss: gain / self.days_elapsed for boss, gain in boss_gains.items()
+        }
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert progress analysis to dictionary format."""
@@ -135,13 +140,21 @@ class ProgressAnalysis:
                 "days_elapsed": self.days_elapsed,
             },
             "records": {
-                "start_record_id": self.start_record.id if self.start_record else None,
-                "end_record_id": self.end_record.id if self.end_record else None,
+                "start_record_id": (
+                    self.start_record.id if self.start_record else None
+                ),
+                "end_record_id": (
+                    self.end_record.id if self.end_record else None
+                ),
                 "start_fetched_at": (
-                    self.start_record.fetched_at.isoformat() if self.start_record else None
+                    self.start_record.fetched_at.isoformat()
+                    if self.start_record
+                    else None
                 ),
                 "end_fetched_at": (
-                    self.end_record.fetched_at.isoformat() if self.end_record else None
+                    self.end_record.fetched_at.isoformat()
+                    if self.end_record
+                    else None
                 ),
             },
             "progress": {
@@ -393,7 +406,9 @@ class HistoryService:
         skill = skill.lower().strip()
 
         try:
-            logger.debug(f"Getting {skill} progress for {username} over {days} days")
+            logger.debug(
+                f"Getting {skill} progress for {username} over {days} days"
+            )
 
             # Verify player exists
             player_stmt = select(Player).where(Player.username.ilike(username))
@@ -405,7 +420,9 @@ class HistoryService:
 
             # Get records from the last N days
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
-            records = await self._get_records_since_date(player.id, cutoff_date)
+            records = await self._get_records_since_date(
+                player.id, cutoff_date
+            )
 
             if len(records) < 2:
                 raise InsufficientDataError(
@@ -414,7 +431,8 @@ class HistoryService:
 
             # Filter records that have data for this skill
             skill_records = [
-                record for record in records
+                record
+                for record in records
                 if record.get_skill_data(skill) is not None
             ]
 
@@ -476,7 +494,9 @@ class HistoryService:
         boss = boss.lower().strip()
 
         try:
-            logger.debug(f"Getting {boss} progress for {username} over {days} days")
+            logger.debug(
+                f"Getting {boss} progress for {username} over {days} days"
+            )
 
             # Verify player exists
             player_stmt = select(Player).where(Player.username.ilike(username))
@@ -488,7 +508,9 @@ class HistoryService:
 
             # Get records from the last N days
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
-            records = await self._get_records_since_date(player.id, cutoff_date)
+            records = await self._get_records_since_date(
+                player.id, cutoff_date
+            )
 
             if len(records) < 2:
                 raise InsufficientDataError(
@@ -497,7 +519,8 @@ class HistoryService:
 
             # Filter records that have data for this boss
             boss_records = [
-                record for record in records
+                record
+                for record in records
                 if record.get_boss_data(boss) is not None
             ]
 

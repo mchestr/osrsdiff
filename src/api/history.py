@@ -13,8 +13,8 @@ from src.models.base import get_db_session
 from src.services.history import (
     HistoryService,
     HistoryServiceError,
-    PlayerNotFoundError,
     InsufficientDataError,
+    PlayerNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,40 +31,64 @@ async def get_history_service(
 class ProgressPeriodResponse(BaseModel):
     """Response model for progress period information."""
 
-    start_date: str = Field(description="Start date of the analysis period (ISO format)")
-    end_date: str = Field(description="End date of the analysis period (ISO format)")
-    days_elapsed: int = Field(description="Number of days in the analysis period")
+    start_date: str = Field(
+        description="Start date of the analysis period (ISO format)"
+    )
+    end_date: str = Field(
+        description="End date of the analysis period (ISO format)"
+    )
+    days_elapsed: int = Field(
+        description="Number of days in the analysis period"
+    )
 
 
 class ProgressRecordsResponse(BaseModel):
     """Response model for progress record information."""
 
-    start_record_id: Optional[int] = Field(None, description="ID of the starting hiscore record")
-    end_record_id: Optional[int] = Field(None, description="ID of the ending hiscore record")
-    start_fetched_at: Optional[str] = Field(None, description="When the start record was fetched (ISO format)")
-    end_fetched_at: Optional[str] = Field(None, description="When the end record was fetched (ISO format)")
+    start_record_id: Optional[int] = Field(
+        None, description="ID of the starting hiscore record"
+    )
+    end_record_id: Optional[int] = Field(
+        None, description="ID of the ending hiscore record"
+    )
+    start_fetched_at: Optional[str] = Field(
+        None, description="When the start record was fetched (ISO format)"
+    )
+    end_fetched_at: Optional[str] = Field(
+        None, description="When the end record was fetched (ISO format)"
+    )
 
 
 class ProgressDataResponse(BaseModel):
     """Response model for progress data."""
 
-    experience_gained: Dict[str, int] = Field(description="Experience gained per skill")
-    levels_gained: Dict[str, int] = Field(description="Levels gained per skill")
+    experience_gained: Dict[str, int] = Field(
+        description="Experience gained per skill"
+    )
+    levels_gained: Dict[str, int] = Field(
+        description="Levels gained per skill"
+    )
     boss_kills_gained: Dict[str, int] = Field(description="Boss kills gained")
 
 
 class ProgressRatesResponse(BaseModel):
     """Response model for progress rates."""
 
-    daily_experience: Dict[str, float] = Field(description="Daily experience rates per skill")
-    daily_boss_kills: Dict[str, float] = Field(description="Daily boss kill rates")
+    daily_experience: Dict[str, float] = Field(
+        description="Daily experience rates per skill"
+    )
+    daily_boss_kills: Dict[str, float] = Field(
+        description="Daily boss kill rates"
+    )
 
 
 class ProgressAnalysisResponse(BaseModel):
     """Response model for progress analysis."""
 
     username: str = Field(description="Player username")
-    period: ProgressPeriodResponse = Field(description="Analysis period information")
+    period: ProgressPeriodResponse = Field(
+        description="Analysis period information"
+    )
     records: ProgressRecordsResponse = Field(description="Record information")
     progress: ProgressDataResponse = Field(description="Progress data")
     rates: ProgressRatesResponse = Field(description="Progress rates")
@@ -75,7 +99,9 @@ class SkillTimelineEntry(BaseModel):
 
     date: str = Field(description="Date of the record (ISO format)")
     level: Optional[int] = Field(None, description="Skill level at this date")
-    experience: Optional[int] = Field(None, description="Skill experience at this date")
+    experience: Optional[int] = Field(
+        None, description="Skill experience at this date"
+    )
 
 
 class SkillProgressDataResponse(BaseModel):
@@ -92,16 +118,22 @@ class SkillProgressResponse(BaseModel):
     username: str = Field(description="Player username")
     skill: str = Field(description="Skill name")
     period_days: int = Field(description="Number of days analyzed")
-    total_records: int = Field(description="Number of records used in analysis")
+    total_records: int = Field(
+        description="Number of records used in analysis"
+    )
     progress: SkillProgressDataResponse = Field(description="Progress data")
-    timeline: List[SkillTimelineEntry] = Field(description="Timeline of skill progress")
+    timeline: List[SkillTimelineEntry] = Field(
+        description="Timeline of skill progress"
+    )
 
 
 class BossTimelineEntry(BaseModel):
     """Response model for boss timeline entry."""
 
     date: str = Field(description="Date of the record (ISO format)")
-    kill_count: Optional[int] = Field(None, description="Boss kill count at this date")
+    kill_count: Optional[int] = Field(
+        None, description="Boss kill count at this date"
+    )
 
 
 class BossProgressDataResponse(BaseModel):
@@ -117,9 +149,13 @@ class BossProgressResponse(BaseModel):
     username: str = Field(description="Player username")
     boss: str = Field(description="Boss name")
     period_days: int = Field(description="Number of days analyzed")
-    total_records: int = Field(description="Number of records used in analysis")
+    total_records: int = Field(
+        description="Number of records used in analysis"
+    )
     progress: BossProgressDataResponse = Field(description="Progress data")
-    timeline: List[BossTimelineEntry] = Field(description="Timeline of boss progress")
+    timeline: List[BossTimelineEntry] = Field(
+        description="Timeline of boss progress"
+    )
 
 
 # Router
@@ -132,19 +168,19 @@ async def get_player_history(
     start_date: Optional[str] = Query(
         None,
         description="Start date for analysis (ISO format, e.g., '2024-01-01T00:00:00Z'). "
-                   "If not provided, defaults to 30 days ago."
+        "If not provided, defaults to 30 days ago.",
     ),
     end_date: Optional[str] = Query(
         None,
         description="End date for analysis (ISO format, e.g., '2024-01-31T23:59:59Z'). "
-                   "If not provided, defaults to current time."
+        "If not provided, defaults to current time.",
     ),
     days: Optional[int] = Query(
         None,
         description="Number of days to look back from end_date (alternative to start_date). "
-                   "If provided, overrides start_date.",
+        "If provided, overrides start_date.",
         ge=1,
-        le=365
+        le=365,
     ),
     history_service: HistoryService = Depends(get_history_service),
     current_user: Dict[str, Any] = Depends(require_auth),
@@ -179,14 +215,16 @@ async def get_player_history(
 
         # Parse and validate dates
         now = datetime.now(timezone.utc)
-        
+
         if end_date:
             try:
-                parsed_end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                parsed_end_date = datetime.fromisoformat(
+                    end_date.replace("Z", "+00:00")
+                )
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid end_date format. Use ISO format like '2024-01-31T23:59:59Z'"
+                    detail="Invalid end_date format. Use ISO format like '2024-01-31T23:59:59Z'",
                 )
         else:
             parsed_end_date = now
@@ -196,11 +234,13 @@ async def get_player_history(
             parsed_start_date = parsed_end_date - timedelta(days=days)
         elif start_date:
             try:
-                parsed_start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                parsed_start_date = datetime.fromisoformat(
+                    start_date.replace("Z", "+00:00")
+                )
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid start_date format. Use ISO format like '2024-01-01T00:00:00Z'"
+                    detail="Invalid start_date format. Use ISO format like '2024-01-01T00:00:00Z'",
                 )
         else:
             # Default to 30 days ago
@@ -210,14 +250,14 @@ async def get_player_history(
         if parsed_start_date >= parsed_end_date:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Start date must be before end date"
+                detail="Start date must be before end date",
             )
 
         # Check if date range is reasonable (not more than 1 year)
         if (parsed_end_date - parsed_start_date).days > 365:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Date range cannot exceed 365 days"
+                detail="Date range cannot exceed 365 days",
             )
 
         # Get progress analysis
@@ -227,7 +267,7 @@ async def get_player_history(
 
         # Convert to response format
         progress_dict = progress.to_dict()
-        
+
         response = ProgressAnalysisResponse(
             username=progress_dict["username"],
             period=ProgressPeriodResponse(**progress_dict["period"]),
@@ -268,15 +308,14 @@ async def get_player_history(
         )
 
 
-@router.get("/{username}/history/skills/{skill}", response_model=SkillProgressResponse)
+@router.get(
+    "/{username}/history/skills/{skill}", response_model=SkillProgressResponse
+)
 async def get_skill_progress(
     username: str,
     skill: str,
     days: int = Query(
-        30,
-        description="Number of days to analyze",
-        ge=1,
-        le=365
+        30, description="Number of days to analyze", ge=1, le=365
     ),
     history_service: HistoryService = Depends(get_history_service),
     current_user: Dict[str, Any] = Depends(require_auth),
@@ -315,15 +354,17 @@ async def get_skill_progress(
         if not skill:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Skill name cannot be empty"
+                detail="Skill name cannot be empty",
             )
 
         # Get skill progress
-        progress = await history_service.get_skill_progress(username, skill, days)
+        progress = await history_service.get_skill_progress(
+            username, skill, days
+        )
 
         # Convert to response format
         progress_dict = progress.to_dict()
-        
+
         response = SkillProgressResponse(
             username=progress_dict["username"],
             skill=progress_dict["skill"],
@@ -331,7 +372,8 @@ async def get_skill_progress(
             total_records=progress_dict["total_records"],
             progress=SkillProgressDataResponse(**progress_dict["progress"]),
             timeline=[
-                SkillTimelineEntry(**entry) for entry in progress_dict["timeline"]
+                SkillTimelineEntry(**entry)
+                for entry in progress_dict["timeline"]
             ],
         )
 
@@ -362,22 +404,23 @@ async def get_skill_progress(
             detail="Internal server error occurred while analyzing skill progress",
         )
     except Exception as e:
-        logger.error(f"Unexpected error getting {skill} progress for {username}: {e}")
+        logger.error(
+            f"Unexpected error getting {skill} progress for {username}: {e}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error occurred while analyzing skill progress",
         )
 
 
-@router.get("/{username}/history/bosses/{boss}", response_model=BossProgressResponse)
+@router.get(
+    "/{username}/history/bosses/{boss}", response_model=BossProgressResponse
+)
 async def get_boss_progress(
     username: str,
     boss: str,
     days: int = Query(
-        30,
-        description="Number of days to analyze",
-        ge=1,
-        le=365
+        30, description="Number of days to analyze", ge=1, le=365
     ),
     history_service: HistoryService = Depends(get_history_service),
     current_user: Dict[str, Any] = Depends(require_auth),
@@ -415,15 +458,17 @@ async def get_boss_progress(
         if not boss:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Boss name cannot be empty"
+                detail="Boss name cannot be empty",
             )
 
         # Get boss progress
-        progress = await history_service.get_boss_progress(username, boss, days)
+        progress = await history_service.get_boss_progress(
+            username, boss, days
+        )
 
         # Convert to response format
         progress_dict = progress.to_dict()
-        
+
         response = BossProgressResponse(
             username=progress_dict["username"],
             boss=progress_dict["boss"],
@@ -431,7 +476,8 @@ async def get_boss_progress(
             total_records=progress_dict["total_records"],
             progress=BossProgressDataResponse(**progress_dict["progress"]),
             timeline=[
-                BossTimelineEntry(**entry) for entry in progress_dict["timeline"]
+                BossTimelineEntry(**entry)
+                for entry in progress_dict["timeline"]
             ],
         )
 
@@ -462,7 +508,9 @@ async def get_boss_progress(
             detail="Internal server error occurred while analyzing boss progress",
         )
     except Exception as e:
-        logger.error(f"Unexpected error getting {boss} progress for {username}: {e}")
+        logger.error(
+            f"Unexpected error getting {boss} progress for {username}: {e}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error occurred while analyzing boss progress",

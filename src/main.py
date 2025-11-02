@@ -1,15 +1,15 @@
 """FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.auth_endpoints import router as auth_router
+from src.api.history import router as history_router
 from src.api.players import router as players_router
 from src.api.statistics import router as statistics_router
-from src.api.history import router as history_router
 from src.config import settings
 from src.models.base import init_db
 from src.services.startup import startup_service
@@ -74,12 +74,16 @@ app = create_app()
 
 
 @app.get("/")
-async def root():
+async def root() -> Dict[str, str]:
     """Root endpoint for health check."""
-    return {"message": "OSRS Diff API", "version": "1.0.0", "status": "running"}
+    return {
+        "message": "OSRS Diff API",
+        "version": "1.0.0",
+        "status": "running",
+    }
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy"}

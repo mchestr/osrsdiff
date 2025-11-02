@@ -3,15 +3,17 @@
 import logging
 from typing import List, Optional
 
-from sqlalchemy import select, delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.player import Player
 from src.services.osrs_api import (
     OSRSAPIClient,
-    PlayerNotFoundError as OSRSPlayerNotFoundError,
     OSRSAPIError,
+)
+from src.services.osrs_api import (
+    PlayerNotFoundError as OSRSPlayerNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,7 +46,9 @@ class InvalidUsernameError(PlayerServiceError):
 class PlayerService:
     """Service for managing OSRS players in the tracking system."""
 
-    def __init__(self, db_session: AsyncSession, osrs_api_client: OSRSAPIClient):
+    def __init__(
+        self, db_session: AsyncSession, osrs_api_client: OSRSAPIClient
+    ):
         """
         Initialize the player service.
 
@@ -100,8 +104,12 @@ class PlayerService:
                 )
 
             # Verify player exists in OSRS hiscores
-            logger.debug(f"Checking if player {username} exists in OSRS hiscores")
-            player_exists = await self.osrs_api_client.check_player_exists(username)
+            logger.debug(
+                f"Checking if player {username} exists in OSRS hiscores"
+            )
+            player_exists = await self.osrs_api_client.check_player_exists(
+                username
+            )
             if not player_exists:
                 raise OSRSPlayerNotFoundError(
                     f"Player '{username}' not found in OSRS hiscores"
@@ -122,7 +130,9 @@ class PlayerService:
             except IntegrityError as e:
                 await self.db_session.rollback()
                 # This could happen if another process added the same player concurrently
-                logger.warning(f"Integrity error adding player {username}: {e}")
+                logger.warning(
+                    f"Integrity error adding player {username}: {e}"
+                )
                 raise PlayerAlreadyExistsError(
                     f"Player '{username}' was already added by another process"
                 )
@@ -194,7 +204,7 @@ class PlayerService:
             # Build query
             stmt = select(Player).order_by(Player.username)
             if active_only:
-                stmt = stmt.where(Player.is_active == True)
+                stmt = stmt.where(Player.is_active.is_(True))
 
             result = await self.db_session.execute(stmt)
             players = result.scalars().all()
@@ -241,7 +251,7 @@ class PlayerService:
             result = await self.db_session.execute(stmt)
             await self.db_session.commit()
 
-            removed = result.rowcount > 0
+            removed = bool(getattr(result, "rowcount", 0) > 0)
             if removed:
                 logger.info(f"Successfully removed player: {username}")
             else:
@@ -254,7 +264,9 @@ class PlayerService:
         except Exception as e:
             await self.db_session.rollback()
             logger.error(f"Error removing player {username}: {e}")
-            raise PlayerServiceError(f"Failed to remove player '{username}': {e}")
+            raise PlayerServiceError(
+                f"Failed to remove player '{username}': {e}"
+            )
 
     async def deactivate_player(self, username: str) -> bool:
         """
@@ -298,7 +310,9 @@ class PlayerService:
         except Exception as e:
             await self.db_session.rollback()
             logger.error(f"Error deactivating player {username}: {e}")
-            raise PlayerServiceError(f"Failed to deactivate player '{username}': {e}")
+            raise PlayerServiceError(
+                f"Failed to deactivate player '{username}': {e}"
+            )
 
     async def reactivate_player(self, username: str) -> bool:
         """
@@ -339,7 +353,9 @@ class PlayerService:
         except Exception as e:
             await self.db_session.rollback()
             logger.error(f"Error reactivating player {username}: {e}")
-            raise PlayerServiceError(f"Failed to reactivate player '{username}': {e}")
+            raise PlayerServiceError(
+                f"Failed to reactivate player '{username}': {e}"
+            )
 
 
 async def get_player_service(

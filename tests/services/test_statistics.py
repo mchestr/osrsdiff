@@ -1,16 +1,17 @@
 """Tests for statistics service."""
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
-from src.models.player import Player
+import pytest
+
 from src.models.hiscore import HiscoreRecord
+from src.models.player import Player
 from src.services.statistics import (
+    NoDataAvailableError,
+    PlayerNotFoundError,
     StatisticsService,
     StatisticsServiceError,
-    PlayerNotFoundError,
-    NoDataAvailableError,
 )
 
 
@@ -49,7 +50,11 @@ class TestStatisticsService:
                 "attack": {"rank": 500, "level": 99, "experience": 13034431},
                 "defence": {"rank": 600, "level": 90, "experience": 5346332},
                 "strength": {"rank": 400, "level": 99, "experience": 13034431},
-                "hitpoints": {"rank": 300, "level": 99, "experience": 13034431},
+                "hitpoints": {
+                    "rank": 300,
+                    "level": 99,
+                    "experience": 13034431,
+                },
                 "prayer": {"rank": 800, "level": 70, "experience": 737627},
                 "ranged": {"rank": 200, "level": 99, "experience": 13034431},
                 "magic": {"rank": 100, "level": 99, "experience": 13034431},
@@ -70,7 +75,11 @@ class TestStatisticsService:
                 "attack": {"rank": 500, "level": 99, "experience": 13034431},
                 "defence": {"rank": 580, "level": 91, "experience": 5902831},
                 "strength": {"rank": 400, "level": 99, "experience": 13034431},
-                "hitpoints": {"rank": 300, "level": 99, "experience": 13034431},
+                "hitpoints": {
+                    "rank": 300,
+                    "level": 99,
+                    "experience": 13034431,
+                },
                 "prayer": {"rank": 800, "level": 70, "experience": 737627},
                 "ranged": {"rank": 200, "level": 99, "experience": 13034431},
                 "magic": {"rank": 100, "level": 99, "experience": 13034431},
@@ -87,7 +96,9 @@ class TestStatisticsService:
         return player
 
     @pytest.mark.asyncio
-    async def test_get_current_stats_success(self, statistics_service, test_player_with_stats):
+    async def test_get_current_stats_success(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test successfully getting current stats for a player."""
         result = await statistics_service.get_current_stats("playerWithStats")
 
@@ -100,32 +111,44 @@ class TestStatisticsService:
         assert result.overall_level == 1520
 
     @pytest.mark.asyncio
-    async def test_get_current_stats_player_not_found(self, statistics_service):
+    async def test_get_current_stats_player_not_found(
+        self, statistics_service
+    ):
         """Test getting stats for non-existent player."""
-        with pytest.raises(PlayerNotFoundError, match="Player 'nonexistent' not found"):
+        with pytest.raises(
+            PlayerNotFoundError, match="Player 'nonexistent' not found"
+        ):
             await statistics_service.get_current_stats("nonexistent")
 
     @pytest.mark.asyncio
     async def test_get_current_stats_empty_username(self, statistics_service):
         """Test getting stats with empty username."""
-        with pytest.raises(PlayerNotFoundError, match="Username cannot be empty"):
+        with pytest.raises(
+            PlayerNotFoundError, match="Username cannot be empty"
+        ):
             await statistics_service.get_current_stats("")
 
     @pytest.mark.asyncio
-    async def test_get_current_stats_no_data(self, statistics_service, test_player):
+    async def test_get_current_stats_no_data(
+        self, statistics_service, test_player
+    ):
         """Test getting stats for player with no hiscore records."""
         result = await statistics_service.get_current_stats("testplayer")
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_current_stats_case_insensitive(self, statistics_service, test_player_with_stats):
+    async def test_get_current_stats_case_insensitive(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test getting stats with different case."""
         result = await statistics_service.get_current_stats("PLAYERWITHSTATS")
         assert result is not None
         assert result.player.username == "playerWithStats"
 
     @pytest.mark.asyncio
-    async def test_get_multiple_stats_success(self, statistics_service, test_player_with_stats, test_player):
+    async def test_get_multiple_stats_success(
+        self, statistics_service, test_player_with_stats, test_player
+    ):
         """Test getting stats for multiple players."""
         usernames = ["playerWithStats", "testplayer", "nonexistent"]
         result = await statistics_service.get_multiple_stats(usernames)
@@ -152,7 +175,9 @@ class TestStatisticsService:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_get_multiple_stats_whitespace_usernames(self, statistics_service, test_player_with_stats):
+    async def test_get_multiple_stats_whitespace_usernames(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test getting stats with whitespace in usernames."""
         usernames = ["  playerWithStats  ", "", "   "]
         result = await statistics_service.get_multiple_stats(usernames)
@@ -163,11 +188,15 @@ class TestStatisticsService:
         assert result["playerWithStats"] is not None
 
     @pytest.mark.asyncio
-    async def test_get_stats_at_date_success(self, statistics_service, test_player_with_stats):
+    async def test_get_stats_at_date_success(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test getting stats at a specific date."""
         # Get stats at 2024-01-01 15:00 (should return first record)
         target_date = datetime(2024, 1, 1, 15, 0, 0, tzinfo=timezone.utc)
-        result = await statistics_service.get_stats_at_date("playerWithStats", target_date)
+        result = await statistics_service.get_stats_at_date(
+            "playerWithStats", target_date
+        )
 
         assert result is not None
         assert result.fetched_at.day == 1
@@ -175,31 +204,47 @@ class TestStatisticsService:
 
         # Get stats at 2024-01-02 15:00 (should return second record)
         target_date = datetime(2024, 1, 2, 15, 0, 0, tzinfo=timezone.utc)
-        result = await statistics_service.get_stats_at_date("playerWithStats", target_date)
+        result = await statistics_service.get_stats_at_date(
+            "playerWithStats", target_date
+        )
 
         assert result is not None
         assert result.fetched_at.day == 2
         assert result.overall_rank == 950
 
     @pytest.mark.asyncio
-    async def test_get_stats_at_date_before_any_records(self, statistics_service, test_player_with_stats):
+    async def test_get_stats_at_date_before_any_records(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test getting stats at date before any records exist."""
         target_date = datetime(2023, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
-        result = await statistics_service.get_stats_at_date("playerWithStats", target_date)
+        result = await statistics_service.get_stats_at_date(
+            "playerWithStats", target_date
+        )
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_stats_at_date_player_not_found(self, statistics_service):
+    async def test_get_stats_at_date_player_not_found(
+        self, statistics_service
+    ):
         """Test getting stats at date for non-existent player."""
         target_date = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-        with pytest.raises(PlayerNotFoundError, match="Player 'nonexistent' not found"):
-            await statistics_service.get_stats_at_date("nonexistent", target_date)
+        with pytest.raises(
+            PlayerNotFoundError, match="Player 'nonexistent' not found"
+        ):
+            await statistics_service.get_stats_at_date(
+                "nonexistent", target_date
+            )
 
     @pytest.mark.asyncio
-    async def test_format_stats_response_success(self, statistics_service, test_player_with_stats):
+    async def test_format_stats_response_success(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test formatting a stats response."""
         record = await statistics_service.get_current_stats("playerWithStats")
-        result = await statistics_service.format_stats_response(record, "playerWithStats")
+        result = await statistics_service.format_stats_response(
+            record, "playerWithStats"
+        )
 
         assert "username" in result
         assert result["username"] == "playerWithStats"
@@ -217,7 +262,9 @@ class TestStatisticsService:
         assert overall["experience"] == 52000000
 
         # Check combat level calculation
-        assert result["combat_level"] == 133  # Should calculate to 133 with these stats
+        assert (
+            result["combat_level"] == 133
+        )  # Should calculate to 133 with these stats
 
         # Check skills data
         assert "attack" in result["skills"]
@@ -234,21 +281,31 @@ class TestStatisticsService:
         assert metadata["record_id"] == record.id
 
     @pytest.mark.asyncio
-    async def test_format_stats_response_empty_record(self, statistics_service):
+    async def test_format_stats_response_empty_record(
+        self, statistics_service
+    ):
         """Test formatting response for empty record."""
-        result = await statistics_service.format_stats_response(None, "test_user")
+        result = await statistics_service.format_stats_response(
+            None, "test_user"
+        )
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_format_multiple_stats_response_success(self, statistics_service, test_player_with_stats, test_player):
+    async def test_format_multiple_stats_response_success(
+        self, statistics_service, test_player_with_stats, test_player
+    ):
         """Test formatting multiple stats response."""
         stats_map = {
-            "playerWithStats": await statistics_service.get_current_stats("playerWithStats"),
+            "playerWithStats": await statistics_service.get_current_stats(
+                "playerWithStats"
+            ),
             "testplayer": None,
             "nonexistent": None,
         }
 
-        result = await statistics_service.format_multiple_stats_response(stats_map)
+        result = await statistics_service.format_multiple_stats_response(
+            stats_map
+        )
 
         assert "players" in result
         assert "metadata" in result
@@ -272,15 +329,21 @@ class TestStatisticsService:
         assert metadata["total_missing"] == 2
 
     @pytest.mark.asyncio
-    async def test_username_normalization(self, statistics_service, test_player_with_stats):
+    async def test_username_normalization(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test that usernames are properly normalized (trimmed)."""
         username_with_spaces = "  playerWithStats  "
-        result = await statistics_service.get_current_stats(username_with_spaces)
+        result = await statistics_service.get_current_stats(
+            username_with_spaces
+        )
         assert result is not None
         assert result.player.username == "playerWithStats"
 
     @pytest.mark.asyncio
-    async def test_get_current_stats_with_relationship_loading(self, statistics_service, test_player_with_stats):
+    async def test_get_current_stats_with_relationship_loading(
+        self, statistics_service, test_player_with_stats
+    ):
         """Test that player relationship is properly loaded."""
         result = await statistics_service.get_current_stats("playerWithStats")
         assert result is not None

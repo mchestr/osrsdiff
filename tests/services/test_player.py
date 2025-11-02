@@ -1,21 +1,24 @@
 """Tests for player service."""
 
-import pytest
 from unittest.mock import AsyncMock, Mock
 
+import pytest
+
 from src.models.player import Player
-from src.services.player import (
-    PlayerService,
-    PlayerServiceError,
-    PlayerAlreadyExistsError,
-    PlayerNotFoundServiceError,
-    InvalidUsernameError,
+from src.services.osrs_api import (
+    APIUnavailableError,
+    OSRSAPIClient,
+    OSRSAPIError,
 )
 from src.services.osrs_api import (
-    OSRSAPIClient,
     PlayerNotFoundError as OSRSPlayerNotFoundError,
-    OSRSAPIError,
-    APIUnavailableError,
+)
+from src.services.player import (
+    InvalidUsernameError,
+    PlayerAlreadyExistsError,
+    PlayerNotFoundServiceError,
+    PlayerService,
+    PlayerServiceError,
 )
 
 
@@ -50,7 +53,9 @@ class TestPlayerService:
     @pytest.mark.asyncio
     async def test_add_player_invalid_username_empty(self, player_service):
         """Test adding player with empty username."""
-        with pytest.raises(InvalidUsernameError, match="Username cannot be empty"):
+        with pytest.raises(
+            InvalidUsernameError, match="Username cannot be empty"
+        ):
             await player_service.add_player("")
 
     @pytest.mark.asyncio
@@ -69,7 +74,9 @@ class TestPlayerService:
                 await player_service.add_player(username)
 
     @pytest.mark.asyncio
-    async def test_add_player_not_found_in_osrs(self, player_service, mock_osrs_client):
+    async def test_add_player_not_found_in_osrs(
+        self, player_service, mock_osrs_client
+    ):
         """Test adding player that doesn't exist in OSRS hiscores."""
         username = "nonexistent"
         mock_osrs_client.check_player_exists.return_value = False
@@ -78,7 +85,9 @@ class TestPlayerService:
             await player_service.add_player(username)
 
     @pytest.mark.asyncio
-    async def test_add_player_already_exists(self, player_service, mock_osrs_client):
+    async def test_add_player_already_exists(
+        self, player_service, mock_osrs_client
+    ):
         """Test adding player that already exists in database."""
         username = "existing"
         mock_osrs_client.check_player_exists.return_value = True
@@ -91,10 +100,14 @@ class TestPlayerService:
             await player_service.add_player(username)
 
     @pytest.mark.asyncio
-    async def test_add_player_osrs_api_error(self, player_service, mock_osrs_client):
+    async def test_add_player_osrs_api_error(
+        self, player_service, mock_osrs_client
+    ):
         """Test adding player when OSRS API is unavailable."""
         username = "testplayer"
-        mock_osrs_client.check_player_exists.side_effect = APIUnavailableError("API down")
+        mock_osrs_client.check_player_exists.side_effect = APIUnavailableError(
+            "API down"
+        )
 
         with pytest.raises(APIUnavailableError):
             await player_service.add_player(username)
@@ -128,7 +141,9 @@ class TestPlayerService:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_player_case_insensitive(self, player_service, mock_osrs_client):
+    async def test_get_player_case_insensitive(
+        self, player_service, mock_osrs_client
+    ):
         """Test getting player with different case."""
         username = "TestPlayer"
         mock_osrs_client.check_player_exists.return_value = True
@@ -148,7 +163,9 @@ class TestPlayerService:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_list_players_with_data(self, player_service, mock_osrs_client):
+    async def test_list_players_with_data(
+        self, player_service, mock_osrs_client
+    ):
         """Test listing players with data."""
         usernames = ["player1", "player2", "player3"]
         mock_osrs_client.check_player_exists.return_value = True
@@ -165,7 +182,9 @@ class TestPlayerService:
         assert sorted(result_usernames) == sorted(usernames)
 
     @pytest.mark.asyncio
-    async def test_list_players_active_only(self, player_service, mock_osrs_client):
+    async def test_list_players_active_only(
+        self, player_service, mock_osrs_client
+    ):
         """Test listing only active players."""
         mock_osrs_client.check_player_exists.return_value = True
 
@@ -186,7 +205,9 @@ class TestPlayerService:
         assert len(result_all) == 2
 
     @pytest.mark.asyncio
-    async def test_remove_player_success(self, player_service, mock_osrs_client):
+    async def test_remove_player_success(
+        self, player_service, mock_osrs_client
+    ):
         """Test successfully removing a player."""
         username = "testplayer"
         mock_osrs_client.check_player_exists.return_value = True
@@ -215,7 +236,9 @@ class TestPlayerService:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_deactivate_player_success(self, player_service, mock_osrs_client):
+    async def test_deactivate_player_success(
+        self, player_service, mock_osrs_client
+    ):
         """Test successfully deactivating a player."""
         username = "testplayer"
         mock_osrs_client.check_player_exists.return_value = True
@@ -239,7 +262,9 @@ class TestPlayerService:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_deactivate_player_already_inactive(self, player_service, mock_osrs_client):
+    async def test_deactivate_player_already_inactive(
+        self, player_service, mock_osrs_client
+    ):
         """Test deactivating an already inactive player."""
         username = "testplayer"
         mock_osrs_client.check_player_exists.return_value = True
@@ -253,7 +278,9 @@ class TestPlayerService:
         assert result is True  # Should still return True
 
     @pytest.mark.asyncio
-    async def test_reactivate_player_success(self, player_service, mock_osrs_client):
+    async def test_reactivate_player_success(
+        self, player_service, mock_osrs_client
+    ):
         """Test successfully reactivating a player."""
         username = "testplayer"
         mock_osrs_client.check_player_exists.return_value = True
@@ -278,7 +305,9 @@ class TestPlayerService:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_reactivate_player_already_active(self, player_service, mock_osrs_client):
+    async def test_reactivate_player_already_active(
+        self, player_service, mock_osrs_client
+    ):
         """Test reactivating an already active player."""
         username = "testplayer"
         mock_osrs_client.check_player_exists.return_value = True
@@ -291,7 +320,9 @@ class TestPlayerService:
         assert result is True  # Should still return True
 
     @pytest.mark.asyncio
-    async def test_username_normalization(self, player_service, mock_osrs_client):
+    async def test_username_normalization(
+        self, player_service, mock_osrs_client
+    ):
         """Test that usernames are properly normalized (trimmed)."""
         username = "  testplayer  "
         normalized = "testplayer"
@@ -307,7 +338,9 @@ class TestPlayerService:
         assert player.username == normalized
 
     @pytest.mark.asyncio
-    async def test_add_player_username_with_internal_spaces(self, player_service, mock_osrs_client):
+    async def test_add_player_username_with_internal_spaces(
+        self, player_service, mock_osrs_client
+    ):
         """Test adding player with internal spaces (should be valid)."""
         username = "test player"
         mock_osrs_client.check_player_exists.return_value = True

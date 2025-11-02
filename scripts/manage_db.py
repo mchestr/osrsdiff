@@ -30,9 +30,9 @@ async def main():
     if len(sys.argv) != 2:
         print("Usage: python scripts/manage_db.py [create|drop]")
         sys.exit(1)
-    
+
     command = sys.argv[1].lower()
-    
+
     try:
         if command == "create":
             await create_all_tables()

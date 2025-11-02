@@ -1,7 +1,8 @@
 """Tests for User model."""
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 
 from src.models.user import User
 
@@ -16,7 +17,7 @@ class TestUserModel:
             email="test@example.com",
             hashed_password="hashed_password_123",
             is_active=True,
-            is_admin=False
+            is_admin=False,
         )
 
         assert user.username == "testuser"
@@ -33,7 +34,7 @@ class TestUserModel:
             email="test@example.com",
             hashed_password="hashed_password_123",
             is_active=True,
-            is_admin=True
+            is_admin=True,
         )
 
         expected = "<User(id=1, username='testuser', is_admin=True)>"
@@ -45,7 +46,7 @@ class TestUserModel:
             username="testuser",
             hashed_password="hashed_password_123",
             is_active=True,  # Need to explicitly set since we're not using database defaults
-            is_admin=False
+            is_admin=False,
         )
 
         # Test defaults
@@ -61,7 +62,7 @@ class TestUserModel:
             email="admin@example.com",
             hashed_password="admin_password_hash",
             is_active=True,
-            is_admin=True
+            is_admin=True,
         )
 
         assert user.username == "admin"

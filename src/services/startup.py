@@ -29,9 +29,11 @@ class StartupService:
                 existing_admin = await user_service.get_user_by_username(
                     db, settings.admin_username
                 )
-                
+
                 if existing_admin:
-                    logger.info(f"Admin user '{settings.admin_username}' already exists")
+                    logger.info(
+                        f"Admin user '{settings.admin_username}' already exists"
+                    )
                     return
 
                 # Create admin user
@@ -42,11 +44,11 @@ class StartupService:
                     email=settings.admin_email,
                     is_admin=True,
                 )
-                
+
                 logger.info(
                     f"Created admin user '{admin_user.username}' with ID {admin_user.id}"
                 )
-                
+
             except Exception as e:
                 logger.error(f"Failed to create admin user: {e}")
                 raise
@@ -54,13 +56,13 @@ class StartupService:
     async def startup(self) -> None:
         """Run all startup tasks."""
         logger.info("Starting application initialization...")
-        
+
         # Initialize database
         await self.initialize_database()
-        
+
         # Create admin user
         await self.create_admin_user()
-        
+
         logger.info("Application initialization completed")
 
 

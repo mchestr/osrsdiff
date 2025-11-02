@@ -8,8 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.models.player import Player
 from src.models.hiscore import HiscoreRecord
+from src.models.player import Player
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,9 @@ class StatisticsService:
         """
         self.db_session = db_session
 
-    async def get_current_stats(self, username: str) -> Optional[HiscoreRecord]:
+    async def get_current_stats(
+        self, username: str
+    ) -> Optional[HiscoreRecord]:
         """
         Get the most recent hiscore record for a player.
 
@@ -80,7 +82,7 @@ class StatisticsService:
 
             # Get the latest hiscore record (already ordered by fetched_at desc)
             latest_record = player.latest_hiscore
-            
+
             if latest_record:
                 logger.debug(
                     f"Found current stats for {username}: "
@@ -88,7 +90,9 @@ class StatisticsService:
                     f"overall level {latest_record.overall_level}"
                 )
             else:
-                logger.debug(f"No hiscore data available for player: {username}")
+                logger.debug(
+                    f"No hiscore data available for player: {username}"
+                )
 
             return latest_record
 
@@ -121,8 +125,10 @@ class StatisticsService:
             return {}
 
         # Normalize usernames
-        usernames = [username.strip() for username in usernames if username.strip()]
-        
+        usernames = [
+            username.strip() for username in usernames if username.strip()
+        ]
+
         if not usernames:
             return {}
 
@@ -189,7 +195,9 @@ class StatisticsService:
         username = username.strip()
 
         try:
-            logger.debug(f"Getting stats at date {date} for player: {username}")
+            logger.debug(
+                f"Getting stats at date {date} for player: {username}"
+            )
 
             # First verify player exists
             player_stmt = select(Player).where(Player.username.ilike(username))
@@ -219,7 +227,9 @@ class StatisticsService:
                     f"overall level {record.overall_level}"
                 )
             else:
-                logger.debug(f"No stats found for {username} at or before {date}")
+                logger.debug(
+                    f"No stats found for {username} at or before {date}"
+                )
 
             return record
 
@@ -278,7 +288,9 @@ class StatisticsService:
 
         except Exception as e:
             logger.error(f"Error formatting stats response: {e}")
-            raise StatisticsServiceError(f"Failed to format stats response: {e}")
+            raise StatisticsServiceError(
+                f"Failed to format stats response: {e}"
+            )
 
     async def format_multiple_stats_response(
         self, stats_map: Dict[str, Optional[HiscoreRecord]]
@@ -297,7 +309,9 @@ class StatisticsService:
 
             for username, record in stats_map.items():
                 if record:
-                    formatted_data[username] = await self.format_stats_response(record, username)
+                    formatted_data[username] = (
+                        await self.format_stats_response(record, username)
+                    )
                 else:
                     formatted_data[username] = {
                         "username": username,
@@ -318,17 +332,25 @@ class StatisticsService:
                 "players": formatted_data,
                 "metadata": {
                     "total_requested": len(stats_map),
-                    "total_found": sum(1 for record in stats_map.values() if record),
-                    "total_missing": sum(1 for record in stats_map.values() if not record),
+                    "total_found": sum(
+                        1 for record in stats_map.values() if record
+                    ),
+                    "total_missing": sum(
+                        1 for record in stats_map.values() if not record
+                    ),
                 },
             }
 
         except Exception as e:
             logger.error(f"Error formatting multiple stats response: {e}")
-            raise StatisticsServiceError(f"Failed to format multiple stats response: {e}")
+            raise StatisticsServiceError(
+                f"Failed to format multiple stats response: {e}"
+            )
 
 
-async def get_statistics_service(db_session: AsyncSession) -> StatisticsService:
+async def get_statistics_service(
+    db_session: AsyncSession,
+) -> StatisticsService:
     """
     Dependency injection function for FastAPI.
 

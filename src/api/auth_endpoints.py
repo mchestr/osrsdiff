@@ -3,7 +3,10 @@
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    OAuth2PasswordRequestForm,
+)
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,8 +71,10 @@ async def login(
     Compatible with OAuth2 password flow for OpenAPI docs integration.
     """
     # Authenticate user against database
-    user = await auth_service.authenticate_user(db, form_data.username, form_data.password)
-    
+    user = await auth_service.authenticate_user(
+        db, form_data.username, form_data.password
+    )
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -84,19 +89,20 @@ async def login(
 
 @router.post("/login-json", response_model=TokenResponse)
 async def login_json(
-    request: LoginRequest, 
-    db: AsyncSession = Depends(get_db_session)
+    request: LoginRequest, db: AsyncSession = Depends(get_db_session)
 ) -> TokenResponse:
     """
     Alternative login endpoint that accepts JSON payload.
     """
     # Authenticate user against database
-    user = await auth_service.authenticate_user(db, request.username, request.password)
-    
+    user = await auth_service.authenticate_user(
+        db, request.username, request.password
+    )
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Invalid username or password"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
         )
 
     user_data = auth_service.create_user_token_data(user)
@@ -113,10 +119,13 @@ async def refresh_token(request: TokenRefreshRequest) -> TokenRefreshResponse:
         new_access_token = await auth_service.refresh_access_token(
             request.refresh_token
         )
-        return TokenRefreshResponse(access_token=new_access_token, token_type="bearer")
+        return TokenRefreshResponse(
+            access_token=new_access_token, token_type="bearer"
+        )
     except HTTPException:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
         )
 
 
@@ -156,7 +165,9 @@ async def logout_all_devices(
     """
     Logout from all devices by blacklisting all user tokens.
     """
-    user_id = str(current_user.get("sub") or current_user.get("user_id", "unknown"))
+    user_id = str(
+        current_user.get("sub") or current_user.get("user_id", "unknown")
+    )
     await auth_service.logout_user_all_tokens(user_id)
 
     return {"message": "Successfully logged out from all devices"}

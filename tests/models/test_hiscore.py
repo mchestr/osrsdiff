@@ -1,8 +1,9 @@
 """Tests for HiscoreRecord model."""
 
+from datetime import datetime
+
 import pytest
 import pytest_asyncio
-from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -68,11 +69,19 @@ class TestHiscoreRecordModel:
 
         # Test existing skill
         attack_data = record.get_skill_data("attack")
-        assert attack_data == {"rank": 500, "level": 99, "experience": 13034431}
+        assert attack_data == {
+            "rank": 500,
+            "level": 99,
+            "experience": 13034431,
+        }
 
         # Test case insensitive
         attack_data_upper = record.get_skill_data("ATTACK")
-        assert attack_data_upper == {"rank": 500, "level": 99, "experience": 13034431}
+        assert attack_data_upper == {
+            "rank": 500,
+            "level": 99,
+            "experience": 13034431,
+        }
 
         # Test non-existing skill
         missing_data = record.get_skill_data("cooking")
@@ -339,7 +348,9 @@ class TestHiscoreRecordDatabaseOperations:
         # Verify relationship
         assert sample_hiscore_record.player is not None
         assert sample_hiscore_record.player.username == "test_player"
-        assert sample_hiscore_record.player.id == sample_hiscore_record.player_id
+        assert (
+            sample_hiscore_record.player.id == sample_hiscore_record.player_id
+        )
 
     @pytest.mark.asyncio
     async def test_update_hiscore_record_in_database(
@@ -450,7 +461,10 @@ class TestHiscoreRecordDatabaseOperations:
                 overall_level=1000 + (i * 100),
                 overall_experience=10000000 + (i * 5000000),
                 skills_data={
-                    "attack": {"level": 80 + i, "experience": 2000000 + (i * 500000)}
+                    "attack": {
+                        "level": 80 + i,
+                        "experience": 2000000 + (i * 500000),
+                    }
                 },
             )
             records.append(record)
@@ -459,7 +473,9 @@ class TestHiscoreRecordDatabaseOperations:
         await test_session.commit()
 
         # Verify all records were created
-        stmt = select(HiscoreRecord).where(HiscoreRecord.player_id == sample_player.id)
+        stmt = select(HiscoreRecord).where(
+            HiscoreRecord.player_id == sample_player.id
+        )
         result = await test_session.execute(stmt)
         found_records = result.scalars().all()
 
@@ -486,7 +502,9 @@ class TestHiscoreRecordDatabaseOperations:
             "magic": {"rank": 1100, "level": 85, "experience": 3258594},
         }
 
-        record = HiscoreRecord(player_id=sample_player.id, skills_data=skills_data)
+        record = HiscoreRecord(
+            player_id=sample_player.id, skills_data=skills_data
+        )
         test_session.add(record)
         await test_session.commit()
         await test_session.refresh(record)

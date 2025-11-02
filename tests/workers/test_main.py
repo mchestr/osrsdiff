@@ -25,14 +25,14 @@ class TestTaskIQBroker:
             if isinstance(middleware, SimpleRetryMiddleware):
                 retry_middleware = middleware
                 break
-        
+
         assert retry_middleware is not None
         assert retry_middleware.default_retry_count == 3
 
     def test_get_task_defaults(self):
         """Test task defaults configuration."""
         defaults = get_task_defaults()
-        
+
         assert defaults["retry_count"] == 3
         assert defaults["retry_delay"] == 2.0
         assert defaults["task_timeout"] == 300.0
@@ -41,10 +41,9 @@ class TestTaskIQBroker:
     def test_get_task_defaults_with_overrides(self):
         """Test task defaults with custom overrides."""
         defaults = get_task_defaults(
-            retry_count=5,
-            custom_setting="test_value"
+            retry_count=5, custom_setting="test_value"
         )
-        
+
         assert defaults["retry_count"] == 5  # Overridden
         assert defaults["retry_delay"] == 2.0  # Default
         assert defaults["custom_setting"] == "test_value"  # Custom

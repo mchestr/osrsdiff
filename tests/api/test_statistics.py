@@ -1,41 +1,41 @@
 """Tests for statistics API endpoints."""
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.statistics import router, get_statistics_service
 from src.api.auth import require_auth
-from src.models.player import Player
+from src.api.statistics import get_statistics_service, router
 from src.models.hiscore import HiscoreRecord
+from src.models.player import Player
 from src.services.statistics import (
+    NoDataAvailableError,
+    PlayerNotFoundError,
     StatisticsService,
     StatisticsServiceError,
-    PlayerNotFoundError,
-    NoDataAvailableError,
 )
 
 
 def create_test_player(id: int, username: str):
     """Create a test player with proper datetime fields."""
     player = Player(
-        id=id,
-        username=username,
-        is_active=True,
-        fetch_interval_minutes=60
+        id=id, username=username, is_active=True, fetch_interval_minutes=60
     )
     player.created_at = datetime.now(timezone.utc)
     player.last_fetched = None
     return player
 
 
-def create_test_hiscore_record(id: int, player: Player, fetched_at: datetime = None):
+def create_test_hiscore_record(
+    id: int, player: Player, fetched_at: datetime = None
+):
     """Create a test hiscore record."""
     if fetched_at is None:
         fetched_at = datetime.now(timezone.utc)
-    
+
     record = HiscoreRecord(
         id=id,
         player_id=player.id,
@@ -85,21 +85,23 @@ def app():
 def client(app, mock_statistics_service, mock_auth_user):
     """Create test client with dependency overrides."""
     # Override dependencies
-    app.dependency_overrides[get_statistics_service] = lambda: mock_statistics_service
+    app.dependency_overrides[get_statistics_service] = (
+        lambda: mock_statistics_service
+    )
     app.dependency_overrides[require_auth] = lambda: mock_auth_user
-    
+
     return TestClient(app)
 
 
 class TestStatisticsEndpoints:
     """Test cases for statistics API endpoints."""
-    
+
     def test_get_player_stats_success(self, client, mock_statistics_service):
         """Test successful retrieval of player statistics."""
         # Create test data
         player = create_test_player(1, "test_player")
         record = create_test_hiscore_record(1, player)
-        
+
         # Mock service responses
         mock_statistics_service.get_current_stats.return_value = record
         mock_statistics_service.format_stats_response.return_value = {
@@ -125,15 +127,15 @@ class TestStatisticsEndpoints:
                 "record_id": 1,
             },
         }
-        
+
         response = client.get(
             "/players/test_player/stats",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["username"] == "test_player"
         assert data["fetched_at"] is not None
         assert data["overall"]["rank"] == 1000
@@ -145,24 +147,28 @@ class TestStatisticsEndpoints:
         assert data["metadata"]["total_skills"] == 7
         assert data["metadata"]["total_bosses"] == 2
         assert data["error"] is None
-        
+
         # Verify service was called correctly
-        mock_statistics_service.get_current_stats.assert_called_once_with("test_player")
-        mock_statistics_service.format_stats_response.assert_called_once_with(record, "test_player")
-    
+        mock_statistics_service.get_current_stats.assert_called_once_with(
+            "test_player"
+        )
+        mock_statistics_service.format_stats_response.assert_called_once_with(
+            record, "test_player"
+        )
+
     def test_get_player_stats_no_data(self, client, mock_statistics_service):
         """Test getting stats for player with no data."""
         # Mock service to return None (no data)
         mock_statistics_service.get_current_stats.return_value = None
-        
+
         response = client.get(
             "/players/test_player/stats",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert data["username"] == "test_player"
         assert data["fetched_at"] is None
         assert data["overall"] is None
@@ -173,42 +179,48 @@ class TestStatisticsEndpoints:
         assert data["metadata"]["total_skills"] == 0
         assert data["metadata"]["total_bosses"] == 0
         assert data["metadata"]["record_id"] is None
-    
-    def test_get_player_stats_player_not_found(self, client, mock_statistics_service):
+
+    def test_get_player_stats_player_not_found(
+        self, client, mock_statistics_service
+    ):
         """Test getting stats for non-existent player."""
-        mock_statistics_service.get_current_stats.side_effect = PlayerNotFoundError(
-            "Player 'nonexistent' not found"
+        mock_statistics_service.get_current_stats.side_effect = (
+            PlayerNotFoundError("Player 'nonexistent' not found")
         )
-        
+
         response = client.get(
             "/players/nonexistent/stats",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 404
         assert "not found in tracking system" in response.json()["detail"]
-    
-    def test_get_player_stats_service_error(self, client, mock_statistics_service):
+
+    def test_get_player_stats_service_error(
+        self, client, mock_statistics_service
+    ):
         """Test handling of statistics service errors."""
-        mock_statistics_service.get_current_stats.side_effect = StatisticsServiceError(
-            "Database connection failed"
+        mock_statistics_service.get_current_stats.side_effect = (
+            StatisticsServiceError("Database connection failed")
         )
-        
+
         response = client.get(
             "/players/test_player/stats",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 500
         assert "Internal server error" in response.json()["detail"]
-    
-    def test_get_multiple_player_stats_success(self, client, mock_statistics_service):
+
+    def test_get_multiple_player_stats_success(
+        self, client, mock_statistics_service
+    ):
         """Test successful retrieval of multiple player statistics."""
         # Create test data
         player1 = create_test_player(1, "player1")
         player2 = create_test_player(2, "player2")
         record1 = create_test_hiscore_record(1, player1)
-        
+
         # Mock service responses
         stats_map = {
             "player1": record1,
@@ -221,11 +233,25 @@ class TestStatisticsEndpoints:
                 "player1": {
                     "username": "player1",
                     "fetched_at": record1.fetched_at.isoformat(),
-                    "overall": {"rank": 1000, "level": 1500, "experience": 50000000},
+                    "overall": {
+                        "rank": 1000,
+                        "level": 1500,
+                        "experience": 50000000,
+                    },
                     "combat_level": 133,
-                    "skills": {"attack": {"rank": 500, "level": 99, "experience": 13034431}},
+                    "skills": {
+                        "attack": {
+                            "rank": 500,
+                            "level": 99,
+                            "experience": 13034431,
+                        }
+                    },
                     "bosses": {"zulrah": {"rank": 1000, "kill_count": 500}},
-                    "metadata": {"total_skills": 7, "total_bosses": 2, "record_id": 1},
+                    "metadata": {
+                        "total_skills": 7,
+                        "total_bosses": 2,
+                        "record_id": 1,
+                    },
                 },
                 "player2": {
                     "username": "player2",
@@ -234,7 +260,11 @@ class TestStatisticsEndpoints:
                     "combat_level": None,
                     "skills": {},
                     "bosses": {},
-                    "metadata": {"total_skills": 0, "total_bosses": 0, "record_id": None},
+                    "metadata": {
+                        "total_skills": 0,
+                        "total_bosses": 0,
+                        "record_id": None,
+                    },
                     "error": "No data available",
                 },
                 "nonexistent": {
@@ -244,7 +274,11 @@ class TestStatisticsEndpoints:
                     "combat_level": None,
                     "skills": {},
                     "bosses": {},
-                    "metadata": {"total_skills": 0, "total_bosses": 0, "record_id": None},
+                    "metadata": {
+                        "total_skills": 0,
+                        "total_bosses": 0,
+                        "record_id": None,
+                    },
                     "error": "No data available",
                 },
             },
@@ -254,81 +288,92 @@ class TestStatisticsEndpoints:
                 "total_missing": 2,
             },
         }
-        
+
         response = client.get(
             "/players/stats?usernames=player1&usernames=player2&usernames=nonexistent",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "players" in data
         assert "metadata" in data
-        
+
         # Check players data
         players = data["players"]
         assert len(players) == 3
-        
+
         # Player with data
         assert players["player1"]["username"] == "player1"
         assert players["player1"]["overall"]["level"] == 1500
         assert players["player1"]["error"] is None
-        
+
         # Players without data
         assert players["player2"]["error"] == "No data available"
         assert players["nonexistent"]["error"] == "No data available"
-        
+
         # Check metadata
         metadata = data["metadata"]
         assert metadata["total_requested"] == 3
         assert metadata["total_found"] == 1
         assert metadata["total_missing"] == 2
-        
+
         # Verify service was called correctly
         mock_statistics_service.get_multiple_stats.assert_called_once_with(
             ["player1", "player2", "nonexistent"]
         )
-        mock_statistics_service.format_multiple_stats_response.assert_called_once_with(stats_map)
-    
-    def test_get_multiple_player_stats_empty_list(self, client, mock_statistics_service):
+        mock_statistics_service.format_multiple_stats_response.assert_called_once_with(
+            stats_map
+        )
+
+    def test_get_multiple_player_stats_empty_list(
+        self, client, mock_statistics_service
+    ):
         """Test getting stats with empty usernames list."""
         response = client.get(
-            "/players/stats",
-            headers={"Authorization": "Bearer fake_token"}
+            "/players/stats", headers={"Authorization": "Bearer fake_token"}
         )
-        
+
         assert response.status_code == 422  # Validation error - min_items=1
-    
-    def test_get_multiple_player_stats_too_many_usernames(self, client, mock_statistics_service):
+
+    def test_get_multiple_player_stats_too_many_usernames(
+        self, client, mock_statistics_service
+    ):
         """Test getting stats with too many usernames."""
         # Create 51 usernames (exceeds limit of 50)
         usernames = [f"player{i}" for i in range(51)]
-        query_params = "&".join([f"usernames={username}" for username in usernames])
-        
+        query_params = "&".join(
+            [f"usernames={username}" for username in usernames]
+        )
+
         response = client.get(
             f"/players/stats?{query_params}",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 400
         assert "Maximum 50 usernames allowed" in response.json()["detail"]
-    
-    def test_get_multiple_player_stats_service_error(self, client, mock_statistics_service):
+
+    def test_get_multiple_player_stats_service_error(
+        self, client, mock_statistics_service
+    ):
         """Test handling of statistics service errors in multiple stats endpoint."""
-        mock_statistics_service.get_multiple_stats.side_effect = StatisticsServiceError(
-            "Database connection failed"
+        mock_statistics_service.get_multiple_stats.side_effect = (
+            StatisticsServiceError("Database connection failed")
         )
-        
+
         response = client.get(
             "/players/stats?usernames=player1",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 500
         assert "Internal server error" in response.json()["detail"]
-    
-    def test_get_multiple_player_stats_duplicate_usernames(self, client, mock_statistics_service):
+
+    def test_get_multiple_player_stats_duplicate_usernames(
+        self, client, mock_statistics_service
+    ):
         """Test getting stats with duplicate usernames (should be deduplicated)."""
         # Mock service responses
         stats_map = {"player1": None}
@@ -342,7 +387,11 @@ class TestStatisticsEndpoints:
                     "combat_level": None,
                     "skills": {},
                     "bosses": {},
-                    "metadata": {"total_skills": 0, "total_bosses": 0, "record_id": None},
+                    "metadata": {
+                        "total_skills": 0,
+                        "total_bosses": 0,
+                        "record_id": None,
+                    },
                     "error": "No data available",
                 },
             },
@@ -352,35 +401,41 @@ class TestStatisticsEndpoints:
                 "total_missing": 1,
             },
         }
-        
+
         response = client.get(
             "/players/stats?usernames=player1&usernames=player1&usernames=player1",
-            headers={"Authorization": "Bearer fake_token"}
+            headers={"Authorization": "Bearer fake_token"},
         )
-        
+
         assert response.status_code == 200
-        
+
         # Verify service was called with deduplicated list
-        mock_statistics_service.get_multiple_stats.assert_called_once_with(["player1"])
-    
-    def test_authentication_required_single_player(self, client, mock_statistics_service):
+        mock_statistics_service.get_multiple_stats.assert_called_once_with(
+            ["player1"]
+        )
+
+    def test_authentication_required_single_player(
+        self, client, mock_statistics_service
+    ):
         """Test that authentication is required for single player stats endpoint."""
         # Remove auth override to test without authentication
         app = client.app
         del app.dependency_overrides[require_auth]
-        
+
         response = client.get("/players/test_player/stats")
-        
+
         # Without auth, FastAPI should return 401 for missing dependency
         assert response.status_code == 401
-    
-    def test_authentication_required_multiple_players(self, client, mock_statistics_service):
+
+    def test_authentication_required_multiple_players(
+        self, client, mock_statistics_service
+    ):
         """Test that authentication is required for multiple players stats endpoint."""
         # Remove auth override to test without authentication
         app = client.app
         del app.dependency_overrides[require_auth]
-        
+
         response = client.get("/players/stats?usernames=player1")
-        
+
         # Without auth, FastAPI should return 401 for missing dependency
         assert response.status_code == 401

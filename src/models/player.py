@@ -1,13 +1,18 @@
 """Player model for tracking OSRS characters."""
 
+from __future__ import annotations
+
 import re
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
-from sqlalchemy import String, Boolean, Integer, DateTime, func
+from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .hiscore import HiscoreRecord
 
 
 class Player(Base):
@@ -61,7 +66,7 @@ class Player(Base):
     )
 
     # Relationships
-    hiscore_records: Mapped[List["HiscoreRecord"]] = relationship(
+    hiscore_records: Mapped[List[HiscoreRecord]] = relationship(
         "HiscoreRecord",
         back_populates="player",
         cascade="all, delete-orphan",
@@ -69,7 +74,7 @@ class Player(Base):
         doc="Historical hiscore records for this player",
     )
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize Player with proper defaults."""
         # Set defaults if not provided
         if "is_active" not in kwargs:
@@ -112,8 +117,10 @@ class Player(Base):
         return True
 
     @property
-    def latest_hiscore(self) -> Optional["HiscoreRecord"]:
+    def latest_hiscore(self) -> Optional[HiscoreRecord]:
         """Get the most recent hiscore record for this player."""
         if self.hiscore_records:
-            return self.hiscore_records[0]  # Already ordered by fetched_at desc
+            return self.hiscore_records[
+                0
+            ]  # Already ordered by fetched_at desc
         return None

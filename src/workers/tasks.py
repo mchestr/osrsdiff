@@ -2,8 +2,8 @@
 
 import asyncio
 import logging
-from datetime import datetime, UTC
-from typing import Dict, Any
+from datetime import UTC, datetime
+from typing import Any, Dict
 
 from src.workers.main import broker, get_task_defaults
 
@@ -72,11 +72,13 @@ health_check_task = broker.task(**get_task_defaults())(_health_check_task)
 retry_task = broker.task(**get_task_defaults(retry_count=5, retry_delay=1.0))(
     _test_retry_task
 )
-timeout_task = broker.task(**get_task_defaults(task_timeout=10.0))(_test_timeout_task)
+timeout_task = broker.task(**get_task_defaults(task_timeout=10.0))(
+    _test_timeout_task
+)
 
 # Import fetch tasks from fetch module
 from src.workers.fetch import (
+    fetch_all_players_task,
     fetch_player_hiscores_task,
     process_scheduled_fetches_task,
-    fetch_all_players_task,
 )

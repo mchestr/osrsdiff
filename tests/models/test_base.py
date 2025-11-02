@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import Base, AsyncSessionLocal, engine, get_db_session
+from src.models.base import AsyncSessionLocal, Base, engine, get_db_session
 
 
 class TestDatabaseConfiguration:
@@ -13,7 +13,7 @@ class TestDatabaseConfiguration:
         """Test that Base model has proper metadata configuration."""
         assert Base.metadata is not None
         assert Base.metadata.naming_convention is not None
-        
+
         # Check naming convention keys
         expected_keys = {"ix", "uq", "ck", "fk", "pk"}
         assert set(Base.metadata.naming_convention.keys()) == expected_keys
@@ -31,17 +31,17 @@ class TestDatabaseConfiguration:
         assert AsyncSessionLocal is not None
         assert AsyncSessionLocal.class_ == AsyncSession
         # Access session configuration through kw dict
-        assert AsyncSessionLocal.kw.get('expire_on_commit') is False
-        assert AsyncSessionLocal.kw.get('autoflush') is False
-        assert AsyncSessionLocal.kw.get('autocommit') is False
+        assert AsyncSessionLocal.kw.get("expire_on_commit") is False
+        assert AsyncSessionLocal.kw.get("autoflush") is False
+        assert AsyncSessionLocal.kw.get("autocommit") is False
 
     @pytest.mark.asyncio
     async def test_get_db_session_generator(self):
         """Test that get_db_session returns an async generator."""
         session_gen = get_db_session()
-        assert hasattr(session_gen, '__aiter__')
-        assert hasattr(session_gen, '__anext__')
-        
+        assert hasattr(session_gen, "__aiter__")
+        assert hasattr(session_gen, "__anext__")
+
         # Clean up the generator
         await session_gen.aclose()
 

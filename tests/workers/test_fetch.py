@@ -1,23 +1,24 @@
 """Tests for hiscore fetch worker tasks."""
 
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 import pytest_asyncio
-from datetime import datetime, UTC, timedelta
-from unittest.mock import AsyncMock, patch, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.workers.fetch import (
-    fetch_player_hiscores_task,
-    process_scheduled_fetches_task,
-    fetch_all_players_task,
-)
-from src.models.player import Player
 from src.models.hiscore import HiscoreRecord
+from src.models.player import Player
 from src.services.osrs_api import (
+    APIUnavailableError,
     HiscoreData,
     PlayerNotFoundError,
     RateLimitError,
-    APIUnavailableError,
+)
+from src.workers.fetch import (
+    fetch_all_players_task,
+    fetch_player_hiscores_task,
+    process_scheduled_fetches_task,
 )
 
 
@@ -34,7 +35,9 @@ class TestFetchPlayerHiscores:
         return player
 
     @pytest.mark.asyncio
-    async def test_fetch_player_hiscores_success(self, test_session, sample_player):
+    async def test_fetch_player_hiscores_success(
+        self, test_session, sample_player
+    ):
         """Test successful hiscore fetch for a player."""
         # Mock OSRS API response
         mock_hiscore_data = HiscoreData(
@@ -52,12 +55,18 @@ class TestFetchPlayerHiscores:
 
         with patch("src.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_client
+            )
             mock_client.fetch_player_hiscores.return_value = mock_hiscore_data
 
             # Execute the task (player already in database from fixture)
-            with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = test_session
+            with patch(
+                "src.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local:
+                mock_session_local.return_value.__aenter__.return_value = (
+                    test_session
+                )
                 result = await fetch_player_hiscores_task.original_func(
                     sample_player.username
                 )
@@ -80,18 +89,24 @@ class TestFetchPlayerHiscores:
     async def test_fetch_player_not_in_database(self):
         """Test fetch for player not in database."""
         # Mock the entire AsyncSessionLocal context manager
-        with patch('src.workers.fetch.AsyncSessionLocal') as mock_session_local:
+        with patch(
+            "src.workers.fetch.AsyncSessionLocal"
+        ) as mock_session_local:
             # Create a mock session
             mock_session = AsyncMock()
-            mock_session_local.return_value.__aenter__.return_value = mock_session
-            
+            mock_session_local.return_value.__aenter__.return_value = (
+                mock_session
+            )
+
             # Create a mock result that returns None for scalar_one_or_none
             mock_result = AsyncMock()
             # Make scalar_one_or_none a regular method that returns None
             mock_result.scalar_one_or_none = lambda: None
             mock_session.execute = AsyncMock(return_value=mock_result)
-            
-            result = await fetch_player_hiscores_task.original_func("nonexistent_player")
+
+            result = await fetch_player_hiscores_task.original_func(
+                "nonexistent_player"
+            )
 
             assert result["status"] == "error"
             assert result["error_type"] == "player_not_found"
@@ -105,8 +120,12 @@ class TestFetchPlayerHiscores:
         sample_player.is_active = False
         await test_session.commit()
 
-        with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-            mock_session_local.return_value.__aenter__.return_value = test_session
+        with patch(
+            "src.workers.fetch.AsyncSessionLocal"
+        ) as mock_session_local:
+            mock_session_local.return_value.__aenter__.return_value = (
+                test_session
+            )
             result = await fetch_player_hiscores_task.original_func(
                 sample_player.username
             )
@@ -116,17 +135,25 @@ class TestFetchPlayerHiscores:
         assert result["username"] == sample_player.username
 
     @pytest.mark.asyncio
-    async def test_fetch_player_not_found_in_osrs(self, test_session, sample_player):
+    async def test_fetch_player_not_found_in_osrs(
+        self, test_session, sample_player
+    ):
         """Test fetch when player not found in OSRS hiscores."""
         with patch("src.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.fetch_player_hiscores.side_effect = PlayerNotFoundError(
-                "Player not found"
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_client
+            )
+            mock_client.fetch_player_hiscores.side_effect = (
+                PlayerNotFoundError("Player not found")
             )
 
-            with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = test_session
+            with patch(
+                "src.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local:
+                mock_session_local.return_value.__aenter__.return_value = (
+                    test_session
+                )
                 result = await fetch_player_hiscores_task.original_func(
                     sample_player.username
                 )
@@ -140,13 +167,19 @@ class TestFetchPlayerHiscores:
         """Test fetch with rate limit error (should raise for retry)."""
         with patch("src.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_client
+            )
             mock_client.fetch_player_hiscores.side_effect = RateLimitError(
                 "Rate limit exceeded"
             )
 
-            with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = test_session
+            with patch(
+                "src.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local:
+                mock_session_local.return_value.__aenter__.return_value = (
+                    test_session
+                )
                 # Should raise the exception for task retry
                 with pytest.raises(RateLimitError):
                     await fetch_player_hiscores_task.original_func(
@@ -154,17 +187,25 @@ class TestFetchPlayerHiscores:
                     )
 
     @pytest.mark.asyncio
-    async def test_fetch_api_unavailable_error(self, test_session, sample_player):
+    async def test_fetch_api_unavailable_error(
+        self, test_session, sample_player
+    ):
         """Test fetch with API unavailable error (should raise for retry)."""
         with patch("src.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_client_class.return_value.__aenter__.return_value = mock_client
-            mock_client.fetch_player_hiscores.side_effect = APIUnavailableError(
-                "API unavailable"
+            mock_client_class.return_value.__aenter__.return_value = (
+                mock_client
+            )
+            mock_client.fetch_player_hiscores.side_effect = (
+                APIUnavailableError("API unavailable")
             )
 
-            with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = test_session
+            with patch(
+                "src.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local:
+                mock_session_local.return_value.__aenter__.return_value = (
+                    test_session
+                )
                 # Should raise the exception for task retry
                 with pytest.raises(APIUnavailableError):
                     await fetch_player_hiscores_task.original_func(
@@ -178,8 +219,12 @@ class TestProcessScheduledFetches:
     @pytest.mark.asyncio
     async def test_process_no_active_players(self, test_session):
         """Test processing when no active players exist."""
-        with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-            mock_session_local.return_value.__aenter__.return_value = test_session
+        with patch(
+            "src.workers.fetch.AsyncSessionLocal"
+        ) as mock_session_local:
+            mock_session_local.return_value.__aenter__.return_value = (
+                test_session
+            )
             result = await process_scheduled_fetches_task.original_func()
 
         assert result["status"] == "success"
@@ -191,7 +236,9 @@ class TestProcessScheduledFetches:
     async def test_process_players_needing_fetch(self, test_session):
         """Test processing players that need fetching."""
         # Create players with different fetch needs
-        player1 = Player(username="player1", last_fetched=None)  # Never fetched
+        player1 = Player(
+            username="player1", last_fetched=None
+        )  # Never fetched
         player2 = Player(
             username="player2",
             last_fetched=datetime.now(UTC) - timedelta(hours=2),  # Needs fetch
@@ -199,18 +246,25 @@ class TestProcessScheduledFetches:
         )
         player3 = Player(
             username="player3",
-            last_fetched=datetime.now(UTC) - timedelta(minutes=30),  # Recent fetch
+            last_fetched=datetime.now(UTC)
+            - timedelta(minutes=30),  # Recent fetch
             fetch_interval_minutes=60,
         )
 
         test_session.add_all([player1, player2, player3])
         await test_session.commit()
 
-        with patch("src.workers.fetch.fetch_player_hiscores_task") as mock_task:
+        with patch(
+            "src.workers.fetch.fetch_player_hiscores_task"
+        ) as mock_task:
             mock_task.kiq = AsyncMock()
 
-            with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = test_session
+            with patch(
+                "src.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local:
+                mock_session_local.return_value.__aenter__.return_value = (
+                    test_session
+                )
                 result = await process_scheduled_fetches_task.original_func()
 
             assert result["status"] == "success"
@@ -233,8 +287,12 @@ class TestProcessScheduledFetches:
         test_session.add(player)
         await test_session.commit()
 
-        with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-            mock_session_local.return_value.__aenter__.return_value = test_session
+        with patch(
+            "src.workers.fetch.AsyncSessionLocal"
+        ) as mock_session_local:
+            mock_session_local.return_value.__aenter__.return_value = (
+                test_session
+            )
             result = await process_scheduled_fetches_task.original_func()
 
         assert result["status"] == "success"
@@ -250,8 +308,12 @@ class TestFetchAllPlayers:
     @pytest.mark.asyncio
     async def test_fetch_all_no_players(self, test_session):
         """Test fetch all when no active players exist."""
-        with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-            mock_session_local.return_value.__aenter__.return_value = test_session
+        with patch(
+            "src.workers.fetch.AsyncSessionLocal"
+        ) as mock_session_local:
+            mock_session_local.return_value.__aenter__.return_value = (
+                test_session
+            )
             result = await fetch_all_players_task.original_func()
 
         assert result["status"] == "success"
@@ -271,11 +333,17 @@ class TestFetchAllPlayers:
         await test_session.commit()
 
         # Mock the task import to avoid circular import issues
-        with patch("src.workers.fetch.fetch_player_hiscores_task") as mock_task:
+        with patch(
+            "src.workers.fetch.fetch_player_hiscores_task"
+        ) as mock_task:
             mock_task.kiq = AsyncMock()
 
-            with patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = test_session
+            with patch(
+                "src.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local:
+                mock_session_local.return_value.__aenter__.return_value = (
+                    test_session
+                )
                 result = await fetch_all_players_task.original_func()
 
             assert result["status"] == "success"

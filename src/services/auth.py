@@ -13,10 +13,10 @@ Features implemented:
 Usage:
     from src.services.auth import auth_service
     from src.api.auth import require_auth
-    
+
     # Create tokens
     tokens = auth_service.create_token_pair({"sub": "user", "username": "test"})
-    
+
     # Use in FastAPI endpoints
     @app.get("/protected")
     async def protected_endpoint(user = Depends(require_auth)):
@@ -38,12 +38,14 @@ from src.services.user import user_service
 
 class AuthService:
     """JWT authentication service for token generation and validation."""
-    
+
     def __init__(self) -> None:
         """Initialize the authentication service."""
         self.secret_key = settings.jwt.secret_key
         self.algorithm = settings.jwt.algorithm
-        self.access_token_expire_minutes = settings.jwt.access_token_expire_minutes
+        self.access_token_expire_minutes = (
+            settings.jwt.access_token_expire_minutes
+        )
         self.refresh_token_expire_days = settings.jwt.refresh_token_expire_days
 
     async def authenticate_user(
@@ -60,77 +62,81 @@ class AuthService:
             "user_id": user.id,
             "is_admin": user.is_admin,
         }
-    
+
     def create_access_token(self, data: Dict[str, Any]) -> str:
         """
         Create a JWT access token.
-        
+
         Args:
             data: The payload data to encode in the token
-            
+
         Returns:
             The encoded JWT token string
         """
         to_encode = data.copy()
-        expire = datetime.now(timezone.utc) + timedelta(minutes=self.access_token_expire_minutes)
-        to_encode.update({
-            "exp": expire,
-            "type": "access"
-        })
-        
-        encoded_token: str = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=self.access_token_expire_minutes
+        )
+        to_encode.update({"exp": expire, "type": "access"})
+
+        encoded_token: str = jwt.encode(
+            to_encode, self.secret_key, algorithm=self.algorithm
+        )
         return encoded_token
-    
+
     def create_refresh_token(self, data: Dict[str, Any]) -> str:
         """
         Create a JWT refresh token.
-        
+
         Args:
             data: The payload data to encode in the token
-            
+
         Returns:
             The encoded JWT refresh token string
         """
         to_encode = data.copy()
-        expire = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
-        to_encode.update({
-            "exp": expire,
-            "type": "refresh"
-        })
-        
-        encoded_token: str = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+        expire = datetime.now(timezone.utc) + timedelta(
+            days=self.refresh_token_expire_days
+        )
+        to_encode.update({"exp": expire, "type": "refresh"})
+
+        encoded_token: str = jwt.encode(
+            to_encode, self.secret_key, algorithm=self.algorithm
+        )
         return encoded_token
-    
+
     def create_token_pair(self, user_data: Dict[str, Any]) -> Dict[str, str]:
         """
         Create both access and refresh tokens.
-        
+
         Args:
             user_data: The user data to encode in the tokens
-            
+
         Returns:
             Dictionary containing access_token and refresh_token
         """
         access_token = self.create_access_token(user_data)
         refresh_token = self.create_refresh_token(user_data)
-        
+
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "token_type": "bearer"
+            "token_type": "bearer",
         }
-    
-    async def validate_token(self, token: str, token_type: str = "access") -> Dict[str, Any]:
+
+    async def validate_token(
+        self, token: str, token_type: str = "access"
+    ) -> Dict[str, Any]:
         """
         Validate and decode a JWT token.
-        
+
         Args:
             token: The JWT token to validate
             token_type: Expected token type ("access" or "refresh")
-            
+
         Returns:
             The decoded token payload
-            
+
         Raises:
             HTTPException: If token is invalid, expired, or wrong type
         """
@@ -139,7 +145,7 @@ class AuthService:
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
         try:
             # Check if token is blacklisted first
             if await token_blacklist_service.is_token_blacklisted(token):
@@ -148,21 +154,25 @@ class AuthService:
                     detail="Token has been revoked",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
-            payload: Dict[str, Any] = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-            
+
+            payload: Dict[str, Any] = jwt.decode(
+                token, self.secret_key, algorithms=[self.algorithm]
+            )
+
             # Check if token has expired
             exp = payload.get("exp")
             if exp is None:
                 raise credentials_exception
-            
-            if datetime.now(timezone.utc) > datetime.fromtimestamp(exp, tz=timezone.utc):
+
+            if datetime.now(timezone.utc) > datetime.fromtimestamp(
+                exp, tz=timezone.utc
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Token has expired",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             # Check token type
             if payload.get("type") != token_type:
                 raise HTTPException(
@@ -170,52 +180,53 @@ class AuthService:
                     detail=f"Invalid token type. Expected {token_type}",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            
+
             return payload
-            
+
         except JWTError:
             raise credentials_exception
-    
+
     async def refresh_access_token(self, refresh_token: str) -> str:
         """
         Create a new access token using a valid refresh token.
-        
+
         Args:
             refresh_token: The refresh token to use
-            
+
         Returns:
             New access token
-            
+
         Raises:
             HTTPException: If refresh token is invalid or expired
         """
-        payload = await self.validate_token(refresh_token, token_type="refresh")
-        
+        payload = await self.validate_token(
+            refresh_token, token_type="refresh"
+        )
+
         # Extract user data (excluding token metadata)
-        user_data = {k: v for k, v in payload.items() 
-                    if k not in ["exp", "type", "iat"]}
-        
+        user_data = {
+            k: v for k, v in payload.items() if k not in ["exp", "type", "iat"]
+        }
+
         return self.create_access_token(user_data)
-    
+
     async def logout_token(self, token: str) -> None:
         """
         Logout by blacklisting the provided token.
-        
+
         Args:
             token: The access token to blacklist
         """
         await token_blacklist_service.blacklist_token(token)
-    
+
     async def logout_user_all_tokens(self, user_id: str) -> None:
         """
         Logout user from all devices by blacklisting all their tokens.
-        
+
         Args:
             user_id: The user ID whose tokens should be blacklisted
         """
         await token_blacklist_service.blacklist_user_tokens(user_id)
-    
-
 
 
 # Global auth service instance

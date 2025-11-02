@@ -1,7 +1,8 @@
 """Tests for JWT authentication service."""
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 from fastapi import HTTPException
 
 from src.services.auth import AuthService
@@ -31,7 +32,9 @@ class TestAuthService:
         assert len(token) > 0
 
         # Validate the token
-        payload = await self.auth_service.validate_token(token, token_type="access")
+        payload = await self.auth_service.validate_token(
+            token, token_type="access"
+        )
         assert payload["sub"] == "test_user"
         assert payload["username"] == "testuser"
         assert payload["user_id"] == 123
@@ -45,7 +48,9 @@ class TestAuthService:
         assert len(token) > 0
 
         # Validate the token
-        payload = await self.auth_service.validate_token(token, token_type="refresh")
+        payload = await self.auth_service.validate_token(
+            token, token_type="refresh"
+        )
         assert payload["sub"] == "test_user"
         assert payload["username"] == "testuser"
         assert payload["user_id"] == 123
@@ -81,18 +86,26 @@ class TestAuthService:
 
     async def test_validate_token_wrong_type(self):
         """Test validation with wrong token type."""
-        access_token = self.auth_service.create_access_token(self.test_user_data)
+        access_token = self.auth_service.create_access_token(
+            self.test_user_data
+        )
 
         with pytest.raises(HTTPException) as exc_info:
-            await self.auth_service.validate_token(access_token, token_type="refresh")
+            await self.auth_service.validate_token(
+                access_token, token_type="refresh"
+            )
 
         assert exc_info.value.status_code == 401
         assert "Invalid token type" in exc_info.value.detail
 
     async def test_refresh_access_token(self):
         """Test refreshing access token using refresh token."""
-        refresh_token = self.auth_service.create_refresh_token(self.test_user_data)
-        new_access_token = await self.auth_service.refresh_access_token(refresh_token)
+        refresh_token = self.auth_service.create_refresh_token(
+            self.test_user_data
+        )
+        new_access_token = await self.auth_service.refresh_access_token(
+            refresh_token
+        )
 
         assert isinstance(new_access_token, str)
         assert len(new_access_token) > 0
@@ -108,7 +121,9 @@ class TestAuthService:
 
     async def test_refresh_access_token_with_access_token_fails(self):
         """Test that refresh fails when using access token instead of refresh token."""
-        access_token = self.auth_service.create_access_token(self.test_user_data)
+        access_token = self.auth_service.create_access_token(
+            self.test_user_data
+        )
 
         with pytest.raises(HTTPException) as exc_info:
             await self.auth_service.refresh_access_token(access_token)
@@ -128,7 +143,9 @@ class TestAuthService:
             token = self.auth_service.create_access_token(self.test_user_data)
 
             with pytest.raises(HTTPException) as exc_info:
-                await self.auth_service.validate_token(token, token_type="access")
+                await self.auth_service.validate_token(
+                    token, token_type="access"
+                )
 
             assert exc_info.value.status_code == 401
             # The error could be either "Token has expired" or "Could not validate credentials"
@@ -136,4 +153,6 @@ class TestAuthService:
             assert exc_info.value.status_code == 401
         finally:
             # Restore original expiration time
-            self.auth_service.access_token_expire_minutes = original_expire_minutes
+            self.auth_service.access_token_expire_minutes = (
+                original_expire_minutes
+            )

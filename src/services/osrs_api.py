@@ -3,11 +3,11 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 from urllib.parse import quote
 
 import aiohttp
-from aiohttp import ClientTimeout, ClientSession, ClientError
+from aiohttp import ClientError, ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -44,14 +44,20 @@ class HiscoreData(BaseModel):
     skills: Dict[str, Dict[str, Optional[int]]] = Field(
         description="Individual skill stats"
     )
-    bosses: Dict[str, Dict[str, Optional[int]]] = Field(description="Boss kill counts")
-    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    bosses: Dict[str, Dict[str, Optional[int]]] = Field(
+        description="Boss kill counts"
+    )
+    fetched_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
 class OSRSAPIClient:
     """Async HTTP client for OSRS Hiscores API."""
 
-    BASE_URL = "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json"
+    BASE_URL = (
+        "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json"
+    )
 
     # OSRS API rate limiting: 1 request per 2 seconds to be safe
     RATE_LIMIT_DELAY = 2.0
@@ -78,7 +84,9 @@ class OSRSAPIClient:
         await self._ensure_session()
         return self
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    async def __aexit__(
+        self, exc_type: Any, exc_val: Any, exc_tb: Any
+    ) -> None:
         """Async context manager exit."""
         await self.close()
 
@@ -118,9 +126,13 @@ class OSRSAPIClient:
         """Enforce rate limiting between requests."""
         async with self._rate_limit_lock:
             if self._last_request_time is not None:
-                time_since_last = datetime.now(timezone.utc) - self._last_request_time
+                time_since_last = (
+                    datetime.now(timezone.utc) - self._last_request_time
+                )
                 if time_since_last.total_seconds() < self.RATE_LIMIT_DELAY:
-                    sleep_time = self.RATE_LIMIT_DELAY - time_since_last.total_seconds()
+                    sleep_time = (
+                        self.RATE_LIMIT_DELAY - time_since_last.total_seconds()
+                    )
                     logger.debug(
                         f"Rate limiting: sleeping for {sleep_time:.2f} seconds"
                     )
@@ -153,10 +165,14 @@ class OSRSAPIClient:
                                 )
                             return json_data
                         except Exception as e:
-                            raise OSRSAPIError(f"Failed to parse JSON response: {e}")
+                            raise OSRSAPIError(
+                                f"Failed to parse JSON response: {e}"
+                            )
 
                     elif response.status == 404:
-                        raise PlayerNotFoundError(f"Player '{username}' not found")
+                        raise PlayerNotFoundError(
+                            f"Player '{username}' not found"
+                        )
 
                     elif response.status == 429:
                         raise RateLimitError("Rate limit exceeded")
@@ -193,12 +209,16 @@ class OSRSAPIClient:
         # This should never be reached due to the loop logic above
         raise APIUnavailableError("Unexpected error in retry logic")
 
-    def _parse_skill_data(self, skill_data: Dict[str, Any]) -> Dict[str, Optional[int]]:
+    def _parse_skill_data(
+        self, skill_data: Dict[str, Any]
+    ) -> Dict[str, Optional[int]]:
         """Parse skill data from JSON format."""
         try:
             return {
                 "rank": (
-                    skill_data.get("rank") if skill_data.get("rank", -1) != -1 else None
+                    skill_data.get("rank")
+                    if skill_data.get("rank", -1) != -1
+                    else None
                 ),
                 "level": (
                     skill_data.get("level")
@@ -206,7 +226,9 @@ class OSRSAPIClient:
                     else None
                 ),
                 "experience": (
-                    skill_data.get("xp") if skill_data.get("xp", -1) != -1 else None
+                    skill_data.get("xp")
+                    if skill_data.get("xp", -1) != -1
+                    else None
                 ),
             }
         except (ValueError, TypeError):
@@ -235,7 +257,9 @@ class OSRSAPIClient:
     def _parse_hiscore_data(self, json_data: Dict[str, Any]) -> HiscoreData:
         """Parse OSRS hiscore JSON data into structured format."""
         if not isinstance(json_data, dict):
-            raise OSRSAPIError("Invalid hiscore data format: expected JSON object")
+            raise OSRSAPIError(
+                "Invalid hiscore data format: expected JSON object"
+            )
 
         # Parse skills (list format)
         skills_list = json_data.get("skills", [])
@@ -256,7 +280,9 @@ class OSRSAPIClient:
             skill_name = skill_data.get("name", "").lower().replace(" ", "_")
             parsed_skill = {
                 "rank": (
-                    skill_data.get("rank") if skill_data.get("rank", -1) != -1 else None
+                    skill_data.get("rank")
+                    if skill_data.get("rank", -1) != -1
+                    else None
                 ),
                 "level": (
                     skill_data.get("level")
@@ -264,7 +290,9 @@ class OSRSAPIClient:
                     else None
                 ),
                 "experience": (
-                    skill_data.get("xp") if skill_data.get("xp", -1) != -1 else None
+                    skill_data.get("xp")
+                    if skill_data.get("xp", -1) != -1
+                    else None
                 ),
             }
 
@@ -337,7 +365,9 @@ class OSRSAPIClient:
             raise
 
         except Exception as e:
-            logger.error(f"Unexpected error fetching hiscores for {username}: {e}")
+            logger.error(
+                f"Unexpected error fetching hiscores for {username}: {e}"
+            )
             raise OSRSAPIError(f"Failed to fetch hiscores: {e}")
 
     async def check_player_exists(self, username: str) -> bool:

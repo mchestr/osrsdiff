@@ -3,7 +3,11 @@
 from typing import AsyncGenerator
 
 from sqlalchemy import MetaData, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
 from src.config import settings
@@ -11,7 +15,7 @@ from src.config import settings
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
-    
+
     # Use consistent naming convention for constraints
     metadata = MetaData(
         naming_convention={
@@ -47,10 +51,10 @@ AsyncSessionLocal = async_sessionmaker(
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency function to get database session.
-    
+
     This function is designed to be used with FastAPI's dependency injection
     system to provide database sessions to API endpoints.
-    
+
     Yields:
         AsyncSession: Database session for the request
     """

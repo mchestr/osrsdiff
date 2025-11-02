@@ -1,18 +1,19 @@
 """Tests for history service."""
 
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from src.models.player import Player
+import pytest
+
 from src.models.hiscore import HiscoreRecord
+from src.models.player import Player
 from src.services.history import (
+    BossProgress,
     HistoryService,
     HistoryServiceError,
-    PlayerNotFoundError,
     InsufficientDataError,
+    PlayerNotFoundError,
     ProgressAnalysis,
     SkillProgress,
-    BossProgress,
 )
 
 
@@ -54,7 +55,8 @@ class TestHistoryService:
                 fetched_at=record_date,
                 overall_rank=1000 - (i * 10),  # Rank improves
                 overall_level=1500 + (i * 5),  # Total level increases
-                overall_experience=50000000 + (i * 150000),  # Overall XP increases
+                overall_experience=50000000
+                + (i * 150000),  # Overall XP increases
                 skills_data={
                     "attack": {
                         "rank": 500 - i,
@@ -66,15 +68,37 @@ class TestHistoryService:
                         "level": defence_level,
                         "experience": defence_exp,
                     },
-                    "strength": {"rank": 400, "level": 99, "experience": 13034431},
-                    "hitpoints": {"rank": 300, "level": 99, "experience": 13034431},
+                    "strength": {
+                        "rank": 400,
+                        "level": 99,
+                        "experience": 13034431,
+                    },
+                    "hitpoints": {
+                        "rank": 300,
+                        "level": 99,
+                        "experience": 13034431,
+                    },
                     "prayer": {"rank": 800, "level": 70, "experience": 737627},
-                    "ranged": {"rank": 200, "level": 99, "experience": 13034431},
-                    "magic": {"rank": 100, "level": 99, "experience": 13034431},
+                    "ranged": {
+                        "rank": 200,
+                        "level": 99,
+                        "experience": 13034431,
+                    },
+                    "magic": {
+                        "rank": 100,
+                        "level": 99,
+                        "experience": 13034431,
+                    },
                 },
                 bosses_data={
-                    "zulrah": {"rank": 1000 - (i * 5), "kill_count": zulrah_kc},
-                    "vorkath": {"rank": 2000 - (i * 3), "kill_count": vorkath_kc},
+                    "zulrah": {
+                        "rank": 1000 - (i * 5),
+                        "kill_count": zulrah_kc,
+                    },
+                    "vorkath": {
+                        "rank": 2000 - (i * 3),
+                        "kill_count": vorkath_kc,
+                    },
                 },
             )
             records.append(record)
@@ -130,12 +154,16 @@ class TestHistoryService:
         assert daily_boss["vorkath"] == 5.0
 
     @pytest.mark.asyncio
-    async def test_get_progress_between_dates_player_not_found(self, history_service):
+    async def test_get_progress_between_dates_player_not_found(
+        self, history_service
+    ):
         """Test progress calculation for non-existent player."""
         start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
         end_date = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
-        with pytest.raises(PlayerNotFoundError, match="Player 'nonexistent' not found"):
+        with pytest.raises(
+            PlayerNotFoundError, match="Player 'nonexistent' not found"
+        ):
             await history_service.get_progress_between_dates(
                 "nonexistent", start_date, end_date
             )
@@ -166,7 +194,8 @@ class TestHistoryService:
         end_date = datetime.now(timezone.utc) - timedelta(days=29)
 
         with pytest.raises(
-            InsufficientDataError, match="Insufficient data for progress analysis"
+            InsufficientDataError,
+            match="Insufficient data for progress analysis",
         ):
             await history_service.get_progress_between_dates(
                 "progressPlayer", start_date, end_date
@@ -177,7 +206,9 @@ class TestHistoryService:
         self, history_service, test_player_with_history
     ):
         """Test getting skill-specific progress."""
-        result = await history_service.get_skill_progress("progressPlayer", "attack", 7)
+        result = await history_service.get_skill_progress(
+            "progressPlayer", "attack", 7
+        )
 
         assert isinstance(result, SkillProgress)
         assert result.username == "progressPlayer"
@@ -186,7 +217,9 @@ class TestHistoryService:
         assert len(result.records) == 5  # All records have attack data
 
         # Check progress calculations
-        assert result.total_experience_gained == 400000  # 4 days * 100k per day
+        assert (
+            result.total_experience_gained == 400000
+        )  # 4 days * 100k per day
         assert result.levels_gained == 0  # Already at 99
         assert result.daily_experience_rate == 400000 / 7  # Total gain / days
 
@@ -207,8 +240,12 @@ class TestHistoryService:
     @pytest.mark.asyncio
     async def test_get_skill_progress_player_not_found(self, history_service):
         """Test skill progress for non-existent player."""
-        with pytest.raises(PlayerNotFoundError, match="Player 'nonexistent' not found"):
-            await history_service.get_skill_progress("nonexistent", "attack", 7)
+        with pytest.raises(
+            PlayerNotFoundError, match="Player 'nonexistent' not found"
+        ):
+            await history_service.get_skill_progress(
+                "nonexistent", "attack", 7
+            )
 
     @pytest.mark.asyncio
     async def test_get_skill_progress_invalid_parameters(
@@ -216,19 +253,25 @@ class TestHistoryService:
     ):
         """Test skill progress with invalid parameters."""
         # Empty skill name
-        with pytest.raises(HistoryServiceError, match="Skill name cannot be empty"):
+        with pytest.raises(
+            HistoryServiceError, match="Skill name cannot be empty"
+        ):
             await history_service.get_skill_progress("progressPlayer", "", 7)
 
         # Invalid days
         with pytest.raises(HistoryServiceError, match="Days must be positive"):
-            await history_service.get_skill_progress("progressPlayer", "attack", 0)
+            await history_service.get_skill_progress(
+                "progressPlayer", "attack", 0
+            )
 
     @pytest.mark.asyncio
     async def test_get_boss_progress_success(
         self, history_service, test_player_with_history
     ):
         """Test getting boss-specific progress."""
-        result = await history_service.get_boss_progress("progressPlayer", "zulrah", 7)
+        result = await history_service.get_boss_progress(
+            "progressPlayer", "zulrah", 7
+        )
 
         assert isinstance(result, BossProgress)
         assert result.username == "progressPlayer"
@@ -243,7 +286,9 @@ class TestHistoryService:
     @pytest.mark.asyncio
     async def test_get_boss_progress_player_not_found(self, history_service):
         """Test boss progress for non-existent player."""
-        with pytest.raises(PlayerNotFoundError, match="Player 'nonexistent' not found"):
+        with pytest.raises(
+            PlayerNotFoundError, match="Player 'nonexistent' not found"
+        ):
             await history_service.get_boss_progress("nonexistent", "zulrah", 7)
 
     @pytest.mark.asyncio
@@ -252,12 +297,16 @@ class TestHistoryService:
     ):
         """Test boss progress with invalid parameters."""
         # Empty boss name
-        with pytest.raises(HistoryServiceError, match="Boss name cannot be empty"):
+        with pytest.raises(
+            HistoryServiceError, match="Boss name cannot be empty"
+        ):
             await history_service.get_boss_progress("progressPlayer", "", 7)
 
         # Invalid days
         with pytest.raises(HistoryServiceError, match="Days must be positive"):
-            await history_service.get_boss_progress("progressPlayer", "zulrah", -1)
+            await history_service.get_boss_progress(
+                "progressPlayer", "zulrah", -1
+            )
 
     @pytest.mark.asyncio
     async def test_progress_analysis_to_dict(
@@ -302,7 +351,9 @@ class TestHistoryService:
         self, history_service, test_player_with_history
     ):
         """Test converting skill progress to dictionary."""
-        result = await history_service.get_skill_progress("progressPlayer", "attack", 7)
+        result = await history_service.get_skill_progress(
+            "progressPlayer", "attack", 7
+        )
         data = result.to_dict()
 
         assert data["username"] == "progressPlayer"
@@ -328,7 +379,9 @@ class TestHistoryService:
         self, history_service, test_player_with_history
     ):
         """Test converting boss progress to dictionary."""
-        result = await history_service.get_boss_progress("progressPlayer", "vorkath", 7)
+        result = await history_service.get_boss_progress(
+            "progressPlayer", "vorkath", 7
+        )
         data = result.to_dict()
 
         assert data["username"] == "progressPlayer"
@@ -383,9 +436,15 @@ class TestHistoryService:
         assert result3.skill_name == "attack"
 
         # Test boss with different cases
-        boss1 = await history_service.get_boss_progress("progressPlayer", "ZULRAH", 7)
-        boss2 = await history_service.get_boss_progress("progressPlayer", "Zulrah", 7)
-        boss3 = await history_service.get_boss_progress("progressPlayer", "zulrah", 7)
+        boss1 = await history_service.get_boss_progress(
+            "progressPlayer", "ZULRAH", 7
+        )
+        boss2 = await history_service.get_boss_progress(
+            "progressPlayer", "Zulrah", 7
+        )
+        boss3 = await history_service.get_boss_progress(
+            "progressPlayer", "zulrah", 7
+        )
 
         assert boss1.boss_name == "zulrah"
         assert boss2.boss_name == "zulrah"
@@ -397,13 +456,21 @@ class TestHistoryService:
         start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
         end_date = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
-        with pytest.raises(PlayerNotFoundError, match="Username cannot be empty"):
-            await history_service.get_progress_between_dates("", start_date, end_date)
+        with pytest.raises(
+            PlayerNotFoundError, match="Username cannot be empty"
+        ):
+            await history_service.get_progress_between_dates(
+                "", start_date, end_date
+            )
 
-        with pytest.raises(PlayerNotFoundError, match="Username cannot be empty"):
+        with pytest.raises(
+            PlayerNotFoundError, match="Username cannot be empty"
+        ):
             await history_service.get_skill_progress("", "attack", 7)
 
-        with pytest.raises(PlayerNotFoundError, match="Username cannot be empty"):
+        with pytest.raises(
+            PlayerNotFoundError, match="Username cannot be empty"
+        ):
             await history_service.get_boss_progress("", "zulrah", 7)
 
     @pytest.mark.asyncio
@@ -413,7 +480,9 @@ class TestHistoryService:
         """Test edge cases in progress analysis calculations."""
         # Test with same start and end record (should raise error)
         base_date = datetime.now(timezone.utc) - timedelta(days=4)
-        start_date = base_date + timedelta(hours=12)  # Exact time of first record
+        start_date = base_date + timedelta(
+            hours=12
+        )  # Exact time of first record
         end_date = base_date + timedelta(hours=12, seconds=1)  # 1 second later
 
         with pytest.raises(
@@ -424,7 +493,9 @@ class TestHistoryService:
             )
 
     @pytest.mark.asyncio
-    async def test_insufficient_skill_data(self, history_service, test_session):
+    async def test_insufficient_skill_data(
+        self, history_service, test_session
+    ):
         """Test skill progress with insufficient skill-specific data."""
         # Create player with records that don't have the requested skill
         player = Player(username="limitedPlayer")
@@ -436,20 +507,28 @@ class TestHistoryService:
         record1 = HiscoreRecord(
             player_id=player.id,
             fetched_at=base_date,
-            skills_data={"attack": {"rank": 500, "level": 99, "experience": 13034431}},
+            skills_data={
+                "attack": {"rank": 500, "level": 99, "experience": 13034431}
+            },
         )
         record2 = HiscoreRecord(
             player_id=player.id,
             fetched_at=base_date + timedelta(days=1),
-            skills_data={"attack": {"rank": 500, "level": 99, "experience": 13034431}},
+            skills_data={
+                "attack": {"rank": 500, "level": 99, "experience": 13034431}
+            },
         )
 
         test_session.add_all([record1, record2])
         await test_session.commit()
 
         # Should raise error for skill not in data
-        with pytest.raises(InsufficientDataError, match="Insufficient cooking data"):
-            await history_service.get_skill_progress("limitedPlayer", "cooking", 7)
+        with pytest.raises(
+            InsufficientDataError, match="Insufficient cooking data"
+        ):
+            await history_service.get_skill_progress(
+                "limitedPlayer", "cooking", 7
+            )
 
     @pytest.mark.asyncio
     async def test_insufficient_boss_data(self, history_service, test_session):
@@ -476,5 +555,9 @@ class TestHistoryService:
         await test_session.commit()
 
         # Should raise error for boss not in data
-        with pytest.raises(InsufficientDataError, match="Insufficient bandos data"):
-            await history_service.get_boss_progress("limitedBossPlayer", "bandos", 7)
+        with pytest.raises(
+            InsufficientDataError, match="Insufficient bandos data"
+        ):
+            await history_service.get_boss_progress(
+                "limitedBossPlayer", "bandos", 7
+            )

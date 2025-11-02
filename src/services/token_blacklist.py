@@ -84,7 +84,9 @@ class TokenBlacklistService:
                 await redis_client.setex(token_key, ttl, "blacklisted")
 
                 # Also add to user's token set for bulk operations
-                user_id = payload.get("sub") or payload.get("user_id", "unknown")
+                user_id = payload.get("sub") or payload.get(
+                    "user_id", "unknown"
+                )
                 user_tokens_key = self._get_user_tokens_key(str(user_id))
                 await redis_client.sadd(user_tokens_key, token)
                 await redis_client.expire(user_tokens_key, ttl)

@@ -37,7 +37,9 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
     op.create_index(op.f("ix_users_id"), "users", ["id"], unique=False)
-    op.create_index(op.f("ix_users_username"), "users", ["username"], unique=True)
+    op.create_index(
+        op.f("ix_users_username"), "users", ["username"], unique=True
+    )
 
     # Create players table
     op.create_table(
@@ -55,7 +57,9 @@ def upgrade() -> None:
         sa.Column("fetch_interval_minutes", sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_players")),
     )
-    op.create_index(op.f("ix_players_username"), "players", ["username"], unique=True)
+    op.create_index(
+        op.f("ix_players_username"), "players", ["username"], unique=True
+    )
 
     # Create hiscore_records table
     op.create_table(
@@ -98,8 +102,12 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     # Drop hiscore_records table
-    op.drop_index(op.f("ix_hiscore_records_player_id"), table_name="hiscore_records")
-    op.drop_index(op.f("ix_hiscore_records_fetched_at"), table_name="hiscore_records")
+    op.drop_index(
+        op.f("ix_hiscore_records_player_id"), table_name="hiscore_records"
+    )
+    op.drop_index(
+        op.f("ix_hiscore_records_fetched_at"), table_name="hiscore_records"
+    )
     op.drop_table("hiscore_records")
 
     # Drop players table

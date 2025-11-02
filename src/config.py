@@ -14,9 +14,15 @@ class DatabaseSettings(BaseModel):
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/osrsdiff",
         description="Database connection URL",
     )
-    echo: bool = Field(default=False, description="Enable SQLAlchemy query logging")
-    pool_size: int = Field(default=10, description="Database connection pool size")
-    max_overflow: int = Field(default=20, description="Maximum overflow connections")
+    echo: bool = Field(
+        default=False, description="Enable SQLAlchemy query logging"
+    )
+    pool_size: int = Field(
+        default=10, description="Database connection pool size"
+    )
+    max_overflow: int = Field(
+        default=20, description="Maximum overflow connections"
+    )
     pool_recycle: int = Field(
         default=3600, description="Connection recycle time in seconds"
     )
@@ -40,7 +46,9 @@ class JWTSettings(BaseModel):
         default="your-secret-key-change-in-production",
         description="Secret key for JWT token signing",
     )
-    algorithm: str = Field(default="HS256", description="JWT signing algorithm")
+    algorithm: str = Field(
+        default="HS256", description="JWT signing algorithm"
+    )
     access_token_expire_minutes: int = Field(
         default=15, description="Access token expiration time in minutes"
     )
@@ -64,7 +72,9 @@ class TaskIQSettings(BaseModel):
     task_timeout: float = Field(
         default=300.0, description="Default task timeout in seconds"
     )
-    result_ttl: int = Field(default=3600, description="Task result TTL in seconds")
+    result_ttl: int = Field(
+        default=3600, description="Task result TTL in seconds"
+    )
     worker_concurrency: int = Field(
         default=4, description="Number of concurrent tasks per worker"
     )
@@ -116,7 +126,9 @@ class Settings(BaseSettings):
         default="your-secret-key-change-in-production",
         description="Secret key for JWT token signing",
     )
-    jwt_algorithm: str = Field(default="HS256", description="JWT signing algorithm")
+    jwt_algorithm: str = Field(
+        default="HS256", description="JWT signing algorithm"
+    )
     jwt_access_token_expire_minutes: int = Field(
         default=15, description="Access token expiration time in minutes"
     )

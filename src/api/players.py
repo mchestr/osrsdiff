@@ -10,16 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.auth import require_auth
 from src.models.base import get_db_session
 from src.models.player import Player
-from src.services.osrs_api import get_osrs_api_client, OSRSAPIClient
-from src.services.player import (
-    PlayerService,
-    PlayerAlreadyExistsError,
-    PlayerNotFoundServiceError,
-    InvalidUsernameError,
+from src.services.osrs_api import (
+    OSRSAPIClient,
+    OSRSAPIError,
 )
 from src.services.osrs_api import (
     PlayerNotFoundError as OSRSPlayerNotFoundError,
-    OSRSAPIError,
+)
+from src.services.osrs_api import (
+    get_osrs_api_client,
+)
+from src.services.player import (
+    InvalidUsernameError,
+    PlayerAlreadyExistsError,
+    PlayerNotFoundServiceError,
+    PlayerService,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,7 +60,9 @@ class PlayerResponse(BaseModel):
             username=player.username,
             created_at=player.created_at.isoformat(),
             last_fetched=(
-                player.last_fetched.isoformat() if player.last_fetched else None
+                player.last_fetched.isoformat()
+                if player.last_fetched
+                else None
             ),
             is_active=player.is_active,
             fetch_interval_minutes=player.fetch_interval_minutes,
@@ -97,7 +104,9 @@ async def get_player_service(
     return PlayerService(db_session, osrs_api_client)
 
 
-@router.post("", response_model=PlayerResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=PlayerResponse, status_code=status.HTTP_201_CREATED
+)
 async def add_player(
     request: PlayerCreateRequest,
     player_service: PlayerService = Depends(get_player_service),
@@ -136,29 +145,45 @@ async def add_player(
         # Trigger initial fetch task
         try:
             from src.workers.tasks import fetch_player_hiscores_task
+
             await fetch_player_hiscores_task.kiq(player.username)
-            logger.info(f"Triggered initial fetch task for player {player.username}")
+            logger.info(
+                f"Triggered initial fetch task for player {player.username}"
+            )
         except Exception as e:
-            logger.warning(f"Failed to trigger initial fetch for {player.username}: {e}")
+            logger.warning(
+                f"Failed to trigger initial fetch for {player.username}: {e}"
+            )
             # Don't fail the player creation if fetch trigger fails
-        
-        logger.info(f"Successfully added player {player.username} (ID: {player.id})")
+
+        logger.info(
+            f"Successfully added player {player.username} (ID: {player.id})"
+        )
 
         return PlayerResponse.from_player(player)
 
     except InvalidUsernameError as e:
         logger.warning(f"Invalid username format: {request.username} - {e}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        )
     except PlayerAlreadyExistsError as e:
         logger.warning(f"Player already exists: {request.username} - {e}")
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(e)
+        )
     except OSRSPlayerNotFoundError as e:
-        logger.warning(f"Player not found in OSRS hiscores: {request.username} - {e}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        logger.warning(
+            f"Player not found in OSRS hiscores: {request.username} - {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
+        )
     except OSRSAPIError as e:
         logger.error(f"OSRS API error for player {request.username}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"OSRS API unavailable: {e}"
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OSRS API unavailable: {e}",
         )
     except Exception as e:
         logger.error(f"Unexpected error adding player {request.username}: {e}")
@@ -193,7 +218,9 @@ async def remove_player(
         500 Internal Server Error: Service errors
     """
     try:
-        logger.info(f"User {current_user.get('username')} removing player: {username}")
+        logger.info(
+            f"User {current_user.get('username')} removing player: {username}"
+        )
 
         # Remove player from tracking system
         removed = await player_service.remove_player(username)
@@ -250,7 +277,9 @@ async def list_players(
         players = await player_service.list_players(active_only=active_only)
 
         # Convert to response models
-        player_responses = [PlayerResponse.from_player(player) for player in players]
+        player_responses = [
+            PlayerResponse.from_player(player) for player in players
+        ]
 
         logger.debug(f"Returning {len(player_responses)} players")
         return PlayersListResponse(
@@ -307,17 +336,19 @@ async def trigger_manual_fetch(
         # Import and enqueue the fetch task
         try:
             from src.workers.tasks import fetch_player_hiscores_task
-            
+
             # Enqueue the task and get task info
             task_result = await fetch_player_hiscores_task.kiq(username)
             task_id = task_result.task_id
-            
-            logger.info(f"Successfully enqueued manual fetch task for {username} (task ID: {task_id})")
-            
+
+            logger.info(
+                f"Successfully enqueued manual fetch task for {username} (task ID: {task_id})"
+            )
+
             # Estimated completion time based on typical OSRS API response time
             # and processing overhead (usually 5-15 seconds)
             estimated_completion_seconds = 15
-            
+
             return FetchTriggerResponse(
                 task_id=task_id,
                 username=username,
@@ -325,7 +356,7 @@ async def trigger_manual_fetch(
                 estimated_completion_seconds=estimated_completion_seconds,
                 status="enqueued",
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to enqueue fetch task for {username}: {e}")
             raise HTTPException(
@@ -337,7 +368,9 @@ async def trigger_manual_fetch(
         # Re-raise HTTP exceptions
         raise
     except Exception as e:
-        logger.error(f"Unexpected error triggering manual fetch for {username}: {e}")
+        logger.error(
+            f"Unexpected error triggering manual fetch for {username}: {e}"
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error occurred while triggering manual fetch",

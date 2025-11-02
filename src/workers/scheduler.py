@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 import redis.asyncio as redis
@@ -92,7 +92,15 @@ class TaskScheduler:
 
                 try:
                     # Get last run timestamp from Redis (shared across all workers)
-                    last_run_str = await self._redis_client.get(self._last_run_key)
+                    if self._redis_client is None:
+                        logger.warning(
+                            "Redis client not available, skipping scheduled check"
+                        )
+                        continue
+
+                    last_run_str = await self._redis_client.get(
+                        self._last_run_key
+                    )
 
                     if last_run_str is None:
                         # Never run before across any worker
@@ -102,7 +110,9 @@ class TaskScheduler:
                         )
                     else:
                         # Parse the stored timestamp
-                        last_run_time = datetime.fromisoformat(last_run_str.decode())
+                        last_run_time = datetime.fromisoformat(
+                            last_run_str.decode()
+                        )
                         time_since_last = current_time - last_run_time
 
                         if time_since_last >= self.fetch_interval:
@@ -111,13 +121,17 @@ class TaskScheduler:
                                 f"Time for scheduled fetch run (last run: {time_since_last} ago)"
                             )
                         else:
-                            time_remaining = self.fetch_interval - time_since_last
+                            time_remaining = (
+                                self.fetch_interval - time_since_last
+                            )
                             logger.debug(
                                 f"Not time for scheduled run yet (next run in: {time_remaining})"
                             )
 
                 except Exception as e:
-                    logger.error(f"Failed to check last run time from Redis: {e}")
+                    logger.error(
+                        f"Failed to check last run time from Redis: {e}"
+                    )
                     # Continue without scheduling to avoid duplicate runs
 
                 if should_run:
@@ -126,6 +140,12 @@ class TaskScheduler:
 
                     try:
                         # Try to acquire lock with 30-second timeout
+                        if self._redis_client is None:
+                            logger.warning(
+                                "Redis client not available, skipping lock acquisition"
+                            )
+                            continue
+
                         acquired = await self._redis_client.set(
                             self._lock_key,
                             "locked",
@@ -139,7 +159,6 @@ class TaskScheduler:
                                 "Acquired scheduler lock, enqueuing scheduled fetch processing task"
                             )
 
-                            # Double-check that we still need to run (race condition protection)
                             last_run_str = await self._redis_client.get(
                                 self._last_run_key
                             )
@@ -159,9 +178,11 @@ class TaskScheduler:
                             await process_scheduled_fetches_task.kiq()
 
                             # Update last run timestamp in Redis (shared state)
-                            await self._redis_client.set(
-                                self._last_run_key, current_time.isoformat()
-                            )
+                            if self._redis_client is not None:
+                                await self._redis_client.set(
+                                    self._last_run_key,
+                                    current_time.isoformat(),
+                                )
 
                             # Update local timestamp for property access
                             self._last_scheduled_run = current_time
@@ -169,13 +190,13 @@ class TaskScheduler:
                             logger.info(
                                 "Successfully enqueued scheduled fetch processing"
                             )
-
-                            # Release lock immediately after successful scheduling
-                            await self._release_lock()
                         else:
-                            logger.debug(
-                                "Another worker is handling scheduled fetch processing"
+                            logger.warning(
+                                "Redis client not available during lock check"
                             )
+
+                        # Release lock immediately after successful scheduling
+                        await self._release_lock()
 
                     except Exception as e:
                         logger.error(
@@ -205,7 +226,7 @@ class TaskScheduler:
 
     async def _release_lock(self) -> None:
         """Release the scheduler lock if we have it."""
-        if self._has_lock and self._redis_client:
+        if self._has_lock and self._redis_client is not None:
             try:
                 await self._redis_client.delete(self._lock_key)
                 logger.debug("Released scheduler lock")
@@ -247,14 +268,10 @@ class TaskScheduler:
         if not self._redis_client:
             return None
 
-        try:
-            last_run_str = await self._redis_client.get(self._last_run_key)
-            if last_run_str is None:
-                return None
-            return datetime.fromisoformat(last_run_str.decode())
-        except Exception as e:
-            logger.error(f"Failed to get last run time from Redis: {e}")
+        last_run_str = await self._redis_client.get(self._last_run_key)
+        if last_run_str is None:
             return None
+        return datetime.fromisoformat(last_run_str.decode())
 
 
 # Global scheduler instance
