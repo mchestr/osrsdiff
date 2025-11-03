@@ -146,48 +146,6 @@ class TestStatisticsService:
         assert result.player.username == "playerWithStats"
 
     @pytest.mark.asyncio
-    async def test_get_multiple_stats_success(
-        self, statistics_service, test_player_with_stats, test_player
-    ):
-        """Test getting stats for multiple players."""
-        usernames = ["playerWithStats", "testplayer", "nonexistent"]
-        result = await statistics_service.get_multiple_stats(usernames)
-
-        assert len(result) == 3
-        assert "playerWithStats" in result
-        assert "testplayer" in result
-        assert "nonexistent" in result
-
-        # Player with stats should have a record
-        assert result["playerWithStats"] is not None
-        assert result["playerWithStats"].overall_level == 1520
-
-        # Player without stats should have None
-        assert result["testplayer"] is None
-
-        # Non-existent player should have None
-        assert result["nonexistent"] is None
-
-    @pytest.mark.asyncio
-    async def test_get_multiple_stats_empty_list(self, statistics_service):
-        """Test getting stats for empty list."""
-        result = await statistics_service.get_multiple_stats([])
-        assert result == {}
-
-    @pytest.mark.asyncio
-    async def test_get_multiple_stats_whitespace_usernames(
-        self, statistics_service, test_player_with_stats
-    ):
-        """Test getting stats with whitespace in usernames."""
-        usernames = ["  playerWithStats  ", "", "   "]
-        result = await statistics_service.get_multiple_stats(usernames)
-
-        # Should only process non-empty usernames after stripping
-        assert len(result) == 1
-        assert "playerWithStats" in result
-        assert result["playerWithStats"] is not None
-
-    @pytest.mark.asyncio
     async def test_get_stats_at_date_success(
         self, statistics_service, test_player_with_stats
     ):
@@ -289,44 +247,6 @@ class TestStatisticsService:
             None, "test_user"
         )
         assert result == {}
-
-    @pytest.mark.asyncio
-    async def test_format_multiple_stats_response_success(
-        self, statistics_service, test_player_with_stats, test_player
-    ):
-        """Test formatting multiple stats response."""
-        stats_map = {
-            "playerWithStats": await statistics_service.get_current_stats(
-                "playerWithStats"
-            ),
-            "testplayer": None,
-            "nonexistent": None,
-        }
-
-        result = await statistics_service.format_multiple_stats_response(
-            stats_map
-        )
-
-        assert "players" in result
-        assert "metadata" in result
-
-        players = result["players"]
-        assert len(players) == 3
-
-        # Player with stats should have full data
-        assert players["playerWithStats"]["username"] == "playerWithStats"
-        assert players["playerWithStats"]["overall"]["level"] == 1520
-
-        # Players without stats should have error message
-        assert players["testplayer"]["error"] == "No data available"
-        assert players["testplayer"]["overall"] is None
-        assert players["nonexistent"]["error"] == "No data available"
-
-        # Check metadata
-        metadata = result["metadata"]
-        assert metadata["total_requested"] == 3
-        assert metadata["total_found"] == 1
-        assert metadata["total_missing"] == 2
 
     @pytest.mark.asyncio
     async def test_username_normalization(

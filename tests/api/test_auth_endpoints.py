@@ -185,31 +185,6 @@ class TestAuthEndpoints:
         assert response.status_code == 200
         assert "Successfully logged out" in response.json()["message"]
 
-    @patch("src.services.auth.auth_service.authenticate_user")
-    def test_logout_all_devices_success(
-        self, mock_authenticate, client, mock_user
-    ):
-        """Test successful logout from all devices."""
-        # Mock successful authentication
-        mock_authenticate.return_value = mock_user
-
-        # First login to get token using form data
-        login_response = client.post(
-            "/auth/login", data={"username": "admin", "password": "admin"}
-        )
-        token = login_response.json()["access_token"]
-
-        # Logout from all devices
-        response = client.post(
-            "/auth/logout-all", headers={"Authorization": f"Bearer {token}"}
-        )
-
-        assert response.status_code == 200
-        assert (
-            "Successfully logged out from all devices"
-            in response.json()["message"]
-        )
-
     def test_logout_without_token(self, client):
         """Test logout without authentication token."""
         response = client.post("/auth/logout")
@@ -217,37 +192,3 @@ class TestAuthEndpoints:
         assert (
             response.status_code == 403
         )  # FastAPI returns 403 for missing auth
-
-    @patch("src.services.auth.auth_service.authenticate_user")
-    def test_login_json_success(self, mock_authenticate, client, mock_user):
-        """Test successful login with JSON endpoint."""
-        # Mock successful authentication
-        mock_authenticate.return_value = mock_user
-
-        response = client.post(
-            "/auth/login-json", json={"username": "admin", "password": "admin"}
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "access_token" in data
-        assert "refresh_token" in data
-        assert data["token_type"] == "bearer"
-
-        # Verify tokens are valid
-        assert len(data["access_token"]) > 0
-        assert len(data["refresh_token"]) > 0
-
-    @patch("src.services.auth.auth_service.authenticate_user")
-    def test_login_json_invalid_credentials(self, mock_authenticate, client):
-        """Test login with invalid credentials using JSON endpoint."""
-        # Mock failed authentication
-        mock_authenticate.return_value = None
-
-        response = client.post(
-            "/auth/login-json", json={"username": "admin", "password": "wrong"}
-        )
-
-        assert response.status_code == 401
-        assert "Invalid username or password" in response.json()["detail"]

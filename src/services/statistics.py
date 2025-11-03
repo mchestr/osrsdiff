@@ -105,70 +105,6 @@ class StatisticsService:
                 f"Failed to get current stats for '{username}': {e}"
             )
 
-    async def get_multiple_stats(
-        self, usernames: List[str]
-    ) -> Dict[str, Optional[HiscoreRecord]]:
-        """
-        Get current statistics for multiple players in a single query.
-
-        Args:
-            usernames: List of OSRS player usernames
-
-        Returns:
-            Dict[str, Optional[HiscoreRecord]]: Mapping of username to latest hiscore record.
-                                               None values indicate no data available.
-
-        Raises:
-            StatisticsServiceError: For database or other service errors
-        """
-        if not usernames:
-            return {}
-
-        # Normalize usernames
-        usernames = [
-            username.strip() for username in usernames if username.strip()
-        ]
-
-        if not usernames:
-            return {}
-
-        try:
-            logger.debug(f"Getting current stats for {len(usernames)} players")
-
-            # Query for all players with their hiscore records
-            stmt = (
-                select(Player)
-                .options(selectinload(Player.hiscore_records))
-                .where(Player.username.in_(usernames))
-            )
-            result = await self.db_session.execute(stmt)
-            players = result.scalars().all()
-
-            # Create mapping of username to latest hiscore record
-            stats_map = {}
-            found_usernames = set()
-
-            for player in players:
-                # Use original case from database for consistency
-                stats_map[player.username] = player.latest_hiscore
-                found_usernames.add(player.username.lower())
-
-            # Add None entries for players not found
-            for username in usernames:
-                if username.lower() not in found_usernames:
-                    stats_map[username] = None
-
-            logger.debug(
-                f"Retrieved stats for {len(players)} players, "
-                f"{len(usernames) - len(players)} not found"
-            )
-
-            return stats_map
-
-        except Exception as e:
-            logger.error(f"Error getting multiple stats: {e}")
-            raise StatisticsServiceError(f"Failed to get multiple stats: {e}")
-
     async def get_stats_at_date(
         self, username: str, date: datetime
     ) -> Optional[HiscoreRecord]:
@@ -290,61 +226,6 @@ class StatisticsService:
             logger.error(f"Error formatting stats response: {e}")
             raise StatisticsServiceError(
                 f"Failed to format stats response: {e}"
-            )
-
-    async def format_multiple_stats_response(
-        self, stats_map: Dict[str, Optional[HiscoreRecord]]
-    ) -> Dict[str, Any]:
-        """
-        Format multiple hiscore records for API response.
-
-        Args:
-            stats_map: Mapping of username to hiscore record
-
-        Returns:
-            Dict: Formatted statistics data for multiple players
-        """
-        try:
-            formatted_data = {}
-
-            for username, record in stats_map.items():
-                if record:
-                    formatted_data[username] = (
-                        await self.format_stats_response(record, username)
-                    )
-                else:
-                    formatted_data[username] = {
-                        "username": username,
-                        "error": "No data available",
-                        "fetched_at": None,
-                        "overall": None,
-                        "combat_level": None,
-                        "skills": {},
-                        "bosses": {},
-                        "metadata": {
-                            "total_skills": 0,
-                            "total_bosses": 0,
-                            "record_id": None,
-                        },
-                    }
-
-            return {
-                "players": formatted_data,
-                "metadata": {
-                    "total_requested": len(stats_map),
-                    "total_found": sum(
-                        1 for record in stats_map.values() if record
-                    ),
-                    "total_missing": sum(
-                        1 for record in stats_map.values() if not record
-                    ),
-                },
-            }
-
-        except Exception as e:
-            logger.error(f"Error formatting multiple stats response: {e}")
-            raise StatisticsServiceError(
-                f"Failed to format multiple stats response: {e}"
             )
 
 

@@ -21,13 +21,6 @@ from src.services.auth import auth_service
 
 
 # Request/Response models
-class LoginRequest(BaseModel):
-    """Login request model."""
-
-    username: str
-    password: str
-
-
 class TokenResponse(BaseModel):
     """Token response model."""
 
@@ -87,29 +80,6 @@ async def login(
     return TokenResponse(**tokens)
 
 
-@router.post("/login-json", response_model=TokenResponse)
-async def login_json(
-    request: LoginRequest, db: AsyncSession = Depends(get_db_session)
-) -> TokenResponse:
-    """
-    Alternative login endpoint that accepts JSON payload.
-    """
-    # Authenticate user against database
-    user = await auth_service.authenticate_user(
-        db, request.username, request.password
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-        )
-
-    user_data = auth_service.create_user_token_data(user)
-    tokens = auth_service.create_token_pair(user_data)
-    return TokenResponse(**tokens)
-
-
 @router.post("/refresh", response_model=TokenRefreshResponse)
 async def refresh_token(request: TokenRefreshRequest) -> TokenRefreshResponse:
     """
@@ -156,18 +126,3 @@ async def logout(
     await auth_service.logout_token(token)
 
     return {"message": "Successfully logged out"}
-
-
-@router.post("/logout-all")
-async def logout_all_devices(
-    current_user: Dict[str, Any] = Depends(require_auth),
-) -> Dict[str, str]:
-    """
-    Logout from all devices by blacklisting all user tokens.
-    """
-    user_id = str(
-        current_user.get("sub") or current_user.get("user_id", "unknown")
-    )
-    await auth_service.logout_user_all_tokens(user_id)
-
-    return {"message": "Successfully logged out from all devices"}

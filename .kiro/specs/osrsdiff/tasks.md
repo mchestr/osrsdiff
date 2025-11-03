@@ -66,7 +66,6 @@
   - [x] 4.2 Create Statistics service for current data retrieval
 
     - Implement get_current_stats to return latest hiscore record
-    - Create get_multiple_stats for batch player queries
     - Add data formatting for API responses
     - _Requirements: 3.1, 3.2, 3.5_
 
@@ -160,7 +159,6 @@
   - [x] 8.2 Create statistics endpoints
 
     - Implement GET /players/{username}/stats for current statistics
-    - Add GET /players/stats for multiple player queries
     - Integrate with Statistics service and response formatting
     - _Requirements: 3.1, 3.3, 3.5, 6.1_
 

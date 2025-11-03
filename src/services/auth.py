@@ -219,15 +219,6 @@ class AuthService:
         """
         await token_blacklist_service.blacklist_token(token)
 
-    async def logout_user_all_tokens(self, user_id: str) -> None:
-        """
-        Logout user from all devices by blacklisting all their tokens.
-
-        Args:
-            user_id: The user ID whose tokens should be blacklisted
-        """
-        await token_blacklist_service.blacklist_user_tokens(user_id)
-
 
 # Global auth service instance
 auth_service = AuthService()

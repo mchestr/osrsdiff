@@ -107,7 +107,6 @@ class PlayerService:
 ```python
 class StatsService:
     async def get_current_stats(self, username: str) -> Optional[HiscoreRecord]
-    async def get_multiple_stats(self, usernames: List[str]) -> Dict[str, HiscoreRecord]
     async def get_stats_at_date(self, username: str, date: datetime) -> Optional[HiscoreRecord]
 ```
 
