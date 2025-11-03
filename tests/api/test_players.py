@@ -435,3 +435,115 @@ class TestPlayerEndpoints:
         assert (
             response.status_code == 401
         )  # FastAPI returns 401 for missing auth
+
+
+class TestPlayerMetadata:
+    """Test player metadata endpoint."""
+
+    @patch("src.api.players.get_db_session")
+    def test_get_player_metadata_success(
+        self, mock_get_db, client, mock_player_service
+    ):
+        """Test successful player metadata retrieval."""
+        from datetime import datetime
+
+        # Create mock database session
+        mock_db_session = AsyncMock()
+        mock_get_db.return_value = mock_db_session
+
+        # Create test player
+        test_player = create_test_player(1, "testuser")
+
+        # Mock database queries in order
+        mock_db_session.execute.side_effect = [
+            # Player query
+            AsyncMock(scalar_one_or_none=lambda: test_player),
+            # Record count
+            AsyncMock(scalar=lambda: 50),
+            # First record
+            AsyncMock(scalar=lambda: datetime(2024, 1, 1)),
+            # Latest record
+            AsyncMock(scalar=lambda: datetime(2024, 11, 2)),
+            # Records last 24h
+            AsyncMock(scalar=lambda: 5),
+            # Records last 7d
+            AsyncMock(scalar=lambda: 25),
+        ]
+
+        response = client.get("/players/testuser/metadata")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["username"] == "testuser"
+        assert data["total_records"] == 50
+        assert data["records_last_24h"] == 5
+        assert data["records_last_7d"] == 25
+        assert "avg_fetch_frequency_hours" in data
+
+    @patch("src.api.players.get_db_session")
+    def test_get_player_metadata_not_found(
+        self, mock_get_db, client, mock_player_service
+    ):
+        """Test player metadata for non-existent player."""
+        # Create mock database session
+        mock_db_session = AsyncMock()
+        mock_get_db.return_value = mock_db_session
+
+        # Mock player not found
+        mock_db_session.execute.return_value = AsyncMock(
+            scalar_one_or_none=lambda: None
+        )
+
+        response = client.get("/players/nonexistent/metadata")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+
+class TestPlayerActivation:
+    """Test player activation/deactivation endpoints."""
+
+    def test_deactivate_player_success(self, client, mock_player_service):
+        """Test successful player deactivation."""
+        mock_player_service.deactivate_player.return_value = True
+
+        response = client.post("/players/testuser/deactivate")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "deactivated" in data["message"]
+        mock_player_service.deactivate_player.assert_called_once_with(
+            "testuser"
+        )
+
+    def test_deactivate_player_not_found(self, client, mock_player_service):
+        """Test deactivating non-existent player."""
+        mock_player_service.deactivate_player.return_value = False
+
+        response = client.post("/players/nonexistent/deactivate")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+    def test_reactivate_player_success(self, client, mock_player_service):
+        """Test successful player reactivation."""
+        mock_player_service.reactivate_player.return_value = True
+
+        response = client.post("/players/testuser/reactivate")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "reactivated" in data["message"]
+        mock_player_service.reactivate_player.assert_called_once_with(
+            "testuser"
+        )
+
+    def test_reactivate_player_not_found(self, client, mock_player_service):
+        """Test reactivating non-existent player."""
+        mock_player_service.reactivate_player.return_value = False
+
+        response = client.post("/players/nonexistent/reactivate")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]

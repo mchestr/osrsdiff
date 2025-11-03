@@ -1,14 +1,16 @@
 """Player management API endpoints."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.auth import require_auth
 from src.models.base import get_db_session
+from src.models.hiscore import HiscoreRecord
 from src.models.player import Player
 from src.services.osrs_api import (
     OSRSAPIClient,
@@ -90,6 +92,57 @@ class FetchTriggerResponse(BaseModel):
     message: str
     estimated_completion_seconds: int
     status: str = "enqueued"
+
+
+class PlayerMetadataResponse(BaseModel):
+    """Response model for player metadata and admin information."""
+
+    id: int
+    username: str
+    created_at: str
+    last_fetched: str | None
+    is_active: bool
+    fetch_interval_minutes: int
+    total_records: int = Field(description="Total number of hiscore records")
+    first_record: str | None = Field(
+        description="Timestamp of first hiscore record"
+    )
+    latest_record: str | None = Field(
+        description="Timestamp of latest hiscore record"
+    )
+    records_last_24h: int = Field(
+        description="Records created in last 24 hours"
+    )
+    records_last_7d: int = Field(description="Records created in last 7 days")
+    avg_fetch_frequency_hours: float | None = Field(
+        description="Average time between fetches in hours"
+    )
+
+    @classmethod
+    def from_player_with_metadata(
+        cls, player: Player, metadata: Dict[str, Any]
+    ) -> "PlayerMetadataResponse":
+        """Create response model from Player entity with metadata."""
+        return cls(
+            id=player.id,
+            username=player.username,
+            created_at=player.created_at.isoformat(),
+            last_fetched=(
+                player.last_fetched.isoformat()
+                if player.last_fetched
+                else None
+            ),
+            is_active=player.is_active,
+            fetch_interval_minutes=player.fetch_interval_minutes,
+            total_records=metadata.get("total_records", 0),
+            first_record=metadata.get("first_record"),
+            latest_record=metadata.get("latest_record"),
+            records_last_24h=metadata.get("records_last_24h", 0),
+            records_last_7d=metadata.get("records_last_7d", 0),
+            avg_fetch_frequency_hours=metadata.get(
+                "avg_fetch_frequency_hours"
+            ),
+        )
 
 
 # Router
@@ -374,4 +427,236 @@ async def trigger_manual_fetch(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error occurred while triggering manual fetch",
+        )
+
+
+@router.get("/{username}/metadata", response_model=PlayerMetadataResponse)
+async def get_player_metadata(
+    username: str,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> PlayerMetadataResponse:
+    """
+    Get detailed metadata and statistics for a specific player.
+
+    Returns comprehensive information about a player including record counts,
+    fetch history, and timing statistics. Useful for monitoring individual
+    player tracking performance and troubleshooting.
+
+    Args:
+        username: OSRS player username
+        db_session: Database session dependency
+        current_user: Authenticated user information
+
+    Returns:
+        PlayerMetadataResponse: Detailed player metadata and statistics
+
+    Raises:
+        404 Not Found: Player not found in system
+        500 Internal Server Error: Database or calculation errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} requesting metadata for player: {username}"
+        )
+
+        # Get player
+        player_result = await db_session.execute(
+            select(Player).where(Player.username.ilike(username))
+        )
+        player = player_result.scalar_one_or_none()
+
+        if not player:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        # Get record count
+        total_records_result = await db_session.execute(
+            select(func.count(HiscoreRecord.id)).where(
+                HiscoreRecord.player_id == player.id
+            )
+        )
+        total_records = total_records_result.scalar() or 0
+
+        # Get first and latest record timestamps
+        first_record_result = await db_session.execute(
+            select(func.min(HiscoreRecord.fetched_at)).where(
+                HiscoreRecord.player_id == player.id
+            )
+        )
+        first_record = first_record_result.scalar()
+
+        latest_record_result = await db_session.execute(
+            select(func.max(HiscoreRecord.fetched_at)).where(
+                HiscoreRecord.player_id == player.id
+            )
+        )
+        latest_record = latest_record_result.scalar()
+
+        # Get recent record counts
+        from datetime import datetime, timedelta
+
+        now = datetime.utcnow()
+        last_24h = now - timedelta(hours=24)
+        last_7d = now - timedelta(days=7)
+
+        records_24h_result = await db_session.execute(
+            select(func.count(HiscoreRecord.id)).where(
+                HiscoreRecord.player_id == player.id,
+                HiscoreRecord.fetched_at >= last_24h,
+            )
+        )
+        records_last_24h = records_24h_result.scalar() or 0
+
+        records_7d_result = await db_session.execute(
+            select(func.count(HiscoreRecord.id)).where(
+                HiscoreRecord.player_id == player.id,
+                HiscoreRecord.fetched_at >= last_7d,
+            )
+        )
+        records_last_7d = records_7d_result.scalar() or 0
+
+        # Calculate average fetch frequency
+        avg_fetch_frequency_hours = None
+        if total_records > 1 and first_record and latest_record:
+            time_span = latest_record - first_record
+            if time_span.total_seconds() > 0:
+                avg_fetch_frequency_hours = round(
+                    time_span.total_seconds() / 3600 / (total_records - 1), 2
+                )
+
+        metadata = {
+            "total_records": total_records,
+            "first_record": first_record.isoformat() if first_record else None,
+            "latest_record": (
+                latest_record.isoformat() if latest_record else None
+            ),
+            "records_last_24h": records_last_24h,
+            "records_last_7d": records_last_7d,
+            "avg_fetch_frequency_hours": avg_fetch_frequency_hours,
+        }
+
+        response = PlayerMetadataResponse.from_player_with_metadata(
+            player, metadata
+        )
+
+        logger.info(f"Successfully retrieved metadata for player: {username}")
+        return response
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving metadata for player {username}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve player metadata",
+        )
+
+
+@router.post("/{username}/deactivate", response_model=MessageResponse)
+async def deactivate_player(
+    username: str,
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> MessageResponse:
+    """
+    Deactivate a player (soft delete) to stop automatic fetching.
+
+    This sets is_active to False, which stops automatic hiscore fetching
+    but preserves all historical data. The player can be reactivated later.
+
+    Args:
+        username: OSRS player username to deactivate
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        MessageResponse: Confirmation message
+
+    Raises:
+        404 Not Found: Player not found in system
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} deactivating player: {username}"
+        )
+
+        deactivated = await player_service.deactivate_player(username)
+
+        if not deactivated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        logger.info(f"Successfully deactivated player: {username}")
+        return MessageResponse(
+            message=f"Player '{username}' has been deactivated (automatic fetching stopped)"
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error deactivating player {username}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to deactivate player",
+        )
+
+
+@router.post("/{username}/reactivate", response_model=MessageResponse)
+async def reactivate_player(
+    username: str,
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> MessageResponse:
+    """
+    Reactivate a previously deactivated player.
+
+    This sets is_active to True, which resumes automatic hiscore fetching
+    according to the player's fetch interval.
+
+    Args:
+        username: OSRS player username to reactivate
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        MessageResponse: Confirmation message
+
+    Raises:
+        404 Not Found: Player not found in system
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} reactivating player: {username}"
+        )
+
+        reactivated = await player_service.reactivate_player(username)
+
+        if not reactivated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        logger.info(f"Successfully reactivated player: {username}")
+        return MessageResponse(
+            message=f"Player '{username}' has been reactivated (automatic fetching resumed)"
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error reactivating player {username}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reactivate player",
         )

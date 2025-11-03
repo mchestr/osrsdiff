@@ -10,6 +10,7 @@ from src.api.auth_endpoints import router as auth_router
 from src.api.history import router as history_router
 from src.api.players import router as players_router
 from src.api.statistics import router as statistics_router
+from src.api.system import router as system_router
 from src.config import settings
 from src.models.base import init_db
 from src.services.startup import startup_service
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     app.include_router(players_router)
     app.include_router(statistics_router)
     app.include_router(history_router)
+    app.include_router(system_router)
 
     return app
 
