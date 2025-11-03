@@ -13,6 +13,7 @@ from src.models.hiscore import HiscoreRecord
 from src.models.player import Player
 from src.services.osrs_api import (
     APIUnavailableError,
+    HiscoreData,
     OSRSAPIClient,
     OSRSAPIError,
     PlayerNotFoundError,
@@ -35,13 +36,51 @@ class PlayerNotInDatabaseError(FetchWorkerError):
     pass
 
 
+def _hiscore_data_changed(
+    new_data: "HiscoreData", last_record: Optional[HiscoreRecord]
+) -> bool:
+    """
+    Compare new hiscore data with the last record to determine if data has changed.
+
+    Args:
+        new_data: New hiscore data from OSRS API
+        last_record: Last hiscore record from database (None if no previous record)
+
+    Returns:
+        bool: True if data has changed or no previous record exists, False otherwise
+    """
+    if last_record is None:
+        # No previous record, always save
+        return True
+
+    # Compare overall stats
+    if (
+        new_data.overall.get("rank") != last_record.overall_rank
+        or new_data.overall.get("level") != last_record.overall_level
+        or new_data.overall.get("experience") != last_record.overall_experience
+    ):
+        return True
+
+    # Compare skills data
+    if new_data.skills != last_record.skills_data:
+        return True
+
+    # Compare bosses data
+    if new_data.bosses != last_record.bosses_data:
+        return True
+
+    # No changes detected
+    return False
+
+
 async def _fetch_player_hiscores(username: str) -> Dict[str, Any]:
     """
     Fetch and store hiscore data for a specific player.
 
     This task retrieves current hiscore data from the OSRS API and stores
-    it as a new HiscoreRecord in the database. It handles various error
-    conditions gracefully and provides detailed status information.
+    it as a new HiscoreRecord in the database only if the data has changed
+    from the previous record. It handles various error conditions gracefully
+    and provides detailed status information.
 
     Args:
         username: OSRS player username to fetch data for
@@ -92,6 +131,16 @@ async def _fetch_player_hiscores(username: str) -> Dict[str, Any]:
                         datetime.now(UTC) - start_time
                     ).total_seconds(),
                 }
+
+            # Get the most recent hiscore record for comparison
+            last_record_stmt = (
+                select(HiscoreRecord)
+                .where(HiscoreRecord.player_id == player.id)
+                .order_by(HiscoreRecord.fetched_at.desc())
+                .limit(1)
+            )
+            last_record_result = await db_session.execute(last_record_stmt)
+            last_record = last_record_result.scalar_one_or_none()
 
             # Fetch hiscore data from OSRS API
             async with OSRSAPIClient() as osrs_client:
@@ -152,7 +201,42 @@ async def _fetch_player_hiscores(username: str) -> Dict[str, Any]:
                         ).total_seconds(),
                     }
 
-            # Create new hiscore record
+            # Check if data has changed compared to the last record
+            data_changed = _hiscore_data_changed(hiscore_data, last_record)
+
+            # Always update player's last_fetched timestamp regardless of data changes
+            player.last_fetched = hiscore_data.fetched_at
+
+            if not data_changed:
+                # Data hasn't changed, don't save a new record
+                await db_session.commit()  # Still commit to update last_fetched
+
+                duration = (datetime.now(UTC) - start_time).total_seconds()
+
+                logger.info(
+                    f"Hiscore data for {username} unchanged, skipping save "
+                    f"(duration: {duration:.2f}s)"
+                )
+
+                return {
+                    "status": "unchanged",
+                    "username": username,
+                    "player_id": player.id,
+                    "message": "Hiscore data unchanged from previous fetch",
+                    "last_record_id": last_record.id if last_record else None,
+                    "overall_rank": hiscore_data.overall.get("rank"),
+                    "overall_level": hiscore_data.overall.get("level"),
+                    "overall_experience": hiscore_data.overall.get(
+                        "experience"
+                    ),
+                    "skills_count": len(hiscore_data.skills),
+                    "bosses_count": len(hiscore_data.bosses),
+                    "fetched_at": hiscore_data.fetched_at.isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "duration_seconds": duration,
+                }
+
+            # Data has changed, create and save new hiscore record
             hiscore_record = HiscoreRecord(
                 player_id=player.id,
                 fetched_at=hiscore_data.fetched_at,
@@ -165,17 +249,13 @@ async def _fetch_player_hiscores(username: str) -> Dict[str, Any]:
 
             # Save to database
             db_session.add(hiscore_record)
-
-            # Update player's last_fetched timestamp
-            player.last_fetched = hiscore_data.fetched_at
-
             await db_session.commit()
             await db_session.refresh(hiscore_record)
 
             duration = (datetime.now(UTC) - start_time).total_seconds()
 
             logger.info(
-                f"Successfully stored hiscore data for {username} "
+                f"Successfully stored new hiscore data for {username} "
                 f"(record ID: {hiscore_record.id}, duration: {duration:.2f}s)"
             )
 
@@ -184,6 +264,7 @@ async def _fetch_player_hiscores(username: str) -> Dict[str, Any]:
                 "username": username,
                 "player_id": player.id,
                 "record_id": hiscore_record.id,
+                "data_changed": True,
                 "overall_rank": hiscore_record.overall_rank,
                 "overall_level": hiscore_record.overall_level,
                 "overall_experience": hiscore_record.overall_experience,

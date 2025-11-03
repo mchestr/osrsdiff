@@ -7,6 +7,7 @@ A backend service for tracking Old School RuneScape character progression by per
 - Track multiple OSRS players' progression over time
 - JWT-based authentication for secure API access
 - Async background tasks for data fetching
+- **Smart data deduplication** - only saves hiscore records when data has changed
 - RESTful API for player management and statistics
 - Historical progress analysis and reporting
 
@@ -89,6 +90,27 @@ src/
 scripts/          # Database and deployment scripts
 migrations/       # Alembic database migrations
 tests/           # Test suite
+```
+
+## Key Features
+
+### Data Deduplication
+
+The service implements intelligent data deduplication to avoid storing redundant hiscore records:
+
+- **Automatic comparison**: Each fetch compares new data with the most recent record
+- **Efficient storage**: Only saves records when player stats, ranks, or boss kills have changed
+- **Timestamp tracking**: Always updates the player's `last_fetched` timestamp regardless of data changes
+- **Status reporting**: Fetch results indicate whether data was `unchanged`, `success` (new record), or other statuses
+
+This ensures the database only grows when players actually make progress, significantly reducing storage requirements and improving query performance.
+
+### Testing Deduplication
+
+Run the demonstration script to see deduplication in action:
+
+```bash
+python scripts/test_deduplication.py
 ```
 
 ## Development
