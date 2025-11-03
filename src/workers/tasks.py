@@ -78,6 +78,7 @@ timeout_task = broker.task(**get_task_defaults(task_timeout=10.0))(
 
 # Import fetch tasks from fetch module
 from src.workers.fetch import (
+    check_game_mode_downgrades_task,
     fetch_all_players_task,
     fetch_player_hiscores_task,
     process_scheduled_fetches_task,

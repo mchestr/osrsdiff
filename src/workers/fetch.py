@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,9 @@ from src.services.osrs_api import (
     RateLimitError,
 )
 from src.workers.main import broker, get_task_defaults
+
+if TYPE_CHECKING:
+    from taskiq import AsyncTaskiqTask
 
 logger = logging.getLogger(__name__)
 
@@ -142,14 +145,14 @@ async def _fetch_player_hiscores(username: str) -> Dict[str, Any]:
             last_record_result = await db_session.execute(last_record_stmt)
             last_record = last_record_result.scalar_one_or_none()
 
-            # Fetch hiscore data from OSRS API
+            # Fetch hiscore data from OSRS API using player's game mode
             async with OSRSAPIClient() as osrs_client:
                 try:
                     logger.debug(
-                        f"Fetching hiscore data from OSRS API for {username}"
+                        f"Fetching hiscore data from OSRS API for {username} (game mode: {player.game_mode.value})"
                     )
                     hiscore_data = await osrs_client.fetch_player_hiscores(
-                        username
+                        username, player.game_mode.value
                     )
                     logger.debug(
                         f"Successfully fetched hiscore data for {username}"
@@ -543,3 +546,178 @@ fetch_all_players_task = broker.task(
         task_timeout=600.0,  # 10 minutes for fetching all players
     )
 )(_fetch_all_players)
+
+
+async def _check_game_mode_downgrades() -> Dict[str, Any]:
+    """
+    Check all active players for game mode downgrades.
+
+    This task runs daily to detect when players have transitioned between game modes
+    (e.g., hardcore ironman dies and becomes regular ironman, or ironman becomes regular).
+    It updates the player's game mode in the database and logs any changes.
+
+    Returns:
+        Dict containing task execution results with statistics and any changes detected
+    """
+    logger.info("Starting daily game mode downgrade check")
+    start_time = datetime.now(UTC)
+
+    players_checked = 0
+    players_updated = 0
+    errors = []
+    changes = []
+
+    async with AsyncSessionLocal() as db_session:
+        try:
+            # Get all active players
+            stmt = select(Player).where(Player.is_active.is_(True))
+            db_result = await db_session.execute(stmt)
+            active_players = db_result.scalars().all()
+
+            logger.info(
+                f"Checking game modes for {len(active_players)} active players"
+            )
+
+            async with OSRSAPIClient() as osrs_client:
+                for player in active_players:
+                    try:
+                        players_checked += 1
+                        old_game_mode = player.game_mode.value
+
+                        logger.debug(
+                            f"Checking game mode for {player.username} (current: {old_game_mode})"
+                        )
+
+                        # Detect current game mode
+                        detected_game_mode = (
+                            await osrs_client.detect_player_game_mode(
+                                player.username
+                            )
+                        )
+
+                        if detected_game_mode != old_game_mode:
+                            # Import GameMode enum
+                            from src.models.player import GameMode
+
+                            new_game_mode_enum = GameMode(detected_game_mode)
+
+                            # Update player's game mode
+                            player.game_mode = new_game_mode_enum
+                            players_updated += 1
+
+                            change_info = {
+                                "username": player.username,
+                                "old_mode": old_game_mode,
+                                "new_mode": detected_game_mode,
+                                "timestamp": datetime.now(UTC).isoformat(),
+                            }
+                            changes.append(change_info)
+
+                            logger.info(
+                                f"Game mode changed for {player.username}: {old_game_mode} → {detected_game_mode}"
+                            )
+                        else:
+                            logger.debug(
+                                f"No game mode change for {player.username}"
+                            )
+
+                    except PlayerNotFoundError:
+                        # Player not found in any hiscores - they might have been renamed or deleted
+                        error_info = {
+                            "username": player.username,
+                            "error": "Player not found in OSRS hiscores",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        }
+                        errors.append(error_info)
+                        logger.warning(
+                            f"Player {player.username} not found in OSRS hiscores during game mode check"
+                        )
+
+                    except (RateLimitError, APIUnavailableError) as e:
+                        # API issues - log but don't fail the entire task
+                        error_info = {
+                            "username": player.username,
+                            "error": f"OSRS API error: {str(e)}",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        }
+                        errors.append(error_info)
+                        logger.error(
+                            f"OSRS API error checking {player.username}: {e}"
+                        )
+
+                    except Exception as e:
+                        # Unexpected error for this player
+                        error_info = {
+                            "username": player.username,
+                            "error": f"Unexpected error: {str(e)}",
+                            "timestamp": datetime.now(UTC).isoformat(),
+                        }
+                        errors.append(error_info)
+                        logger.error(
+                            f"Unexpected error checking game mode for {player.username}: {e}"
+                        )
+
+                    # Small delay between players to be respectful to the OSRS API
+                    await asyncio.sleep(
+                        2.1
+                    )  # Slightly longer than the API client's rate limit
+
+            # Commit all changes
+            await db_session.commit()
+
+            duration = (datetime.now(UTC) - start_time).total_seconds()
+
+            result = {
+                "status": "completed",
+                "timestamp": datetime.now(UTC).isoformat(),
+                "duration_seconds": duration,
+                "players_checked": players_checked,
+                "players_updated": players_updated,
+                "changes": changes,
+                "errors": errors,
+                "message": f"Game mode check completed: {players_checked} players checked, {players_updated} updated, {len(errors)} errors",
+            }
+
+            if changes:
+                logger.info(
+                    f"Game mode downgrade check completed with {len(changes)} changes detected"
+                )
+                for change in changes:
+                    logger.info(
+                        f"  {change['username']}: {change['old_mode']} → {change['new_mode']}"
+                    )
+            else:
+                logger.info(
+                    "Game mode downgrade check completed with no changes detected"
+                )
+
+            if errors:
+                logger.warning(f"Game mode check had {len(errors)} errors")
+
+            return result
+
+        except Exception as e:
+            await db_session.rollback()
+            logger.error(f"Fatal error during game mode downgrade check: {e}")
+            return {
+                "status": "error",
+                "timestamp": datetime.now(UTC).isoformat(),
+                "duration_seconds": (
+                    datetime.now(UTC) - start_time
+                ).total_seconds(),
+                "players_checked": players_checked,
+                "players_updated": players_updated,
+                "changes": changes,
+                "errors": errors,
+                "error": str(e),
+                "message": f"Game mode check failed after checking {players_checked} players",
+            }
+
+
+check_game_mode_downgrades_task = broker.task(
+    **get_task_defaults(
+        retry_count=2,
+        retry_delay=30.0,
+        task_timeout=1800.0,  # 30 minutes for checking all players
+    )
+)(_check_game_mode_downgrades)

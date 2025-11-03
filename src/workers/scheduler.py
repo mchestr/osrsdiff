@@ -1,70 +1,122 @@
-"""Task scheduling functionality for periodic hiscore fetches."""
+"""Cron-like task scheduler."""
 
 import asyncio
 import logging
-from datetime import UTC, datetime, timedelta
-from typing import Optional
+from datetime import UTC, datetime
+from typing import Any, Callable, Dict, List, Optional
 
 import redis.asyncio as redis
+from croniter import croniter
 
 from src.config import settings
-from src.workers.fetch import process_scheduled_fetches_task
 
 logger = logging.getLogger(__name__)
 
 
-class TaskScheduler:
-    """
-    Scheduler for periodic background tasks.
+class ScheduledTask:
+    """A task that runs on a cron schedule."""
 
-    This class manages the scheduling of recurring tasks like periodic
-    hiscore fetches for all active players.
-    """
-
-    def __init__(self, fetch_interval_minutes: int = 30):
+    def __init__(
+        self,
+        name: str,
+        cron_expression: str,
+        task_func: Callable[[], Any],
+        description: str = "",
+    ):
         """
-        Initialize the task scheduler.
+        Initialize a scheduled task.
 
         Args:
-            fetch_interval_minutes: How often to run scheduled fetch processing
+            name: Unique name for the task
+            cron_expression: Cron expression (e.g., "0 2 * * *" for daily at 2 AM)
+            task_func: Async function to execute
+            description: Human-readable description
         """
-        self.fetch_interval_minutes = fetch_interval_minutes
-        self.fetch_interval = timedelta(minutes=fetch_interval_minutes)
+        self.name = name
+        self.cron_expression = cron_expression
+        self.task_func = task_func
+        self.description = description
+
+        # Validate cron expression
+        try:
+            croniter(cron_expression)
+        except Exception as e:
+            raise ValueError(f"Invalid cron expression '{cron_expression}': {e}")
+
+    def get_next_run_time(self, base_time: Optional[datetime] = None) -> datetime:
+        """Get the next time this task should run."""
+        if base_time is None:
+            base_time = datetime.now(UTC)
+
+        cron = croniter(self.cron_expression, base_time)
+        return cron.get_next(datetime)
+
+    def should_run(self, current_time: datetime, last_run: Optional[datetime]) -> bool:
+        """Check if this task should run now."""
+        if last_run is None:
+            # Never run before, check if we're past the first scheduled time
+            return True
+
+        # Get the next scheduled time after the last run
+        next_run = self.get_next_run_time(last_run)
+        return current_time >= next_run
+
+
+class TaskScheduler:
+    """Cron-like scheduler for background tasks."""
+
+    def __init__(self) -> None:
+        """Initialize the scheduler."""
+        self.tasks: Dict[str, ScheduledTask] = {}
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._last_scheduled_run: Optional[datetime] = None
+        self._task: Optional[asyncio.Task[None]] = None
         self._redis_client: Optional[redis.Redis] = None
-        self._lock_key = "osrsdiff:scheduler:lock"
-        self._last_run_key = "osrsdiff:scheduler:last_run"
-        self._has_lock = False
+        self._check_interval = 60  # Check every minute
+
+    def add_task(
+        self,
+        name: str,
+        cron_expression: str,
+        task_func: Callable[[], Any],
+        description: str = "",
+    ) -> None:
+        """
+        Add a task to the scheduler.
+
+        Args:
+            name: Unique name for the task
+            cron_expression: Cron expression (e.g., "0 2 * * *")
+            task_func: Async function to execute
+            description: Human-readable description
+        """
+        if name in self.tasks:
+            raise ValueError(f"Task '{name}' already exists")
+
+        task = ScheduledTask(name, cron_expression, task_func, description)
+        self.tasks[name] = task
+        logger.info(f"Added scheduled task: {name} ({cron_expression}) - {description}")
 
     async def start(self) -> None:
-        """Start the task scheduler."""
+        """Start the scheduler."""
         if self._running:
-            logger.warning("Task scheduler is already running")
+            logger.warning("Scheduler is already running")
             return
 
-        logger.info(
-            f"Starting task scheduler (fetch interval: {self.fetch_interval_minutes} minutes)"
-        )
+        logger.info(f"Starting scheduler with {len(self.tasks)} tasks")
 
-        # Create Redis client for leader election
+        # Create Redis client
         self._redis_client = redis.from_url(settings.redis.url)
 
         self._running = True
         self._task = asyncio.create_task(self._scheduler_loop())
 
     async def stop(self) -> None:
-        """Stop the task scheduler."""
+        """Stop the scheduler."""
         if not self._running:
-            logger.warning("Task scheduler is not running")
             return
 
-        logger.info("Stopping task scheduler")
+        logger.info("Stopping scheduler")
         self._running = False
-
-        # Release lock if we have it
-        await self._release_lock()
 
         if self._task:
             self._task.cancel()
@@ -74,208 +126,171 @@ class TaskScheduler:
                 pass
             self._task = None
 
-        # Clean up Redis client
         if self._redis_client:
             await self._redis_client.aclose()
             self._redis_client = None
 
     async def _scheduler_loop(self) -> None:
-        """Main scheduler loop that runs periodic tasks."""
-        logger.info("Task scheduler loop started")
+        """Main scheduler loop."""
+        logger.info("Scheduler loop started")
 
         try:
             while self._running:
                 current_time = datetime.now(UTC)
 
-                # Check if it's time to run scheduled fetches by reading from Redis
-                should_run = False
-
-                try:
-                    # Get last run timestamp from Redis (shared across all workers)
-                    if self._redis_client is None:
-                        logger.warning(
-                            "Redis client not available, skipping scheduled check"
-                        )
-                        continue
-
-                    last_run_str = await self._redis_client.get(
-                        self._last_run_key
-                    )
-
-                    if last_run_str is None:
-                        # Never run before across any worker
-                        should_run = True
-                        logger.info(
-                            "First scheduled fetch run (no previous run found in Redis)"
-                        )
-                    else:
-                        # Parse the stored timestamp
-                        last_run_time = datetime.fromisoformat(
-                            last_run_str.decode()
-                        )
-                        time_since_last = current_time - last_run_time
-
-                        if time_since_last >= self.fetch_interval:
-                            should_run = True
-                            logger.info(
-                                f"Time for scheduled fetch run (last run: {time_since_last} ago)"
-                            )
-                        else:
-                            time_remaining = (
-                                self.fetch_interval - time_since_last
-                            )
-                            logger.debug(
-                                f"Not time for scheduled run yet (next run in: {time_remaining})"
-                            )
-
-                except Exception as e:
-                    logger.error(
-                        f"Failed to check last run time from Redis: {e}"
-                    )
-                    # Continue without scheduling to avoid duplicate runs
-
-                if should_run:
-                    # Use Redis lock for leader election
-                    lock_timeout = 30  # 30 seconds
-
+                # Check each task
+                for task in self.tasks.values():
                     try:
-                        # Try to acquire lock with 30-second timeout
-                        if self._redis_client is None:
-                            logger.warning(
-                                "Redis client not available, skipping lock acquisition"
-                            )
-                            continue
-
-                        acquired = await self._redis_client.set(
-                            self._lock_key,
-                            "locked",
-                            nx=True,  # Only set if key doesn't exist
-                            ex=lock_timeout,  # Expire after 30 seconds
-                        )
-
-                        if acquired:
-                            self._has_lock = True
-                            logger.info(
-                                "Acquired scheduler lock, enqueuing scheduled fetch processing task"
-                            )
-
-                            last_run_str = await self._redis_client.get(
-                                self._last_run_key
-                            )
-                            if last_run_str is not None:
-                                last_run_time = datetime.fromisoformat(
-                                    last_run_str.decode()
-                                )
-                                time_since_last = current_time - last_run_time
-                                if time_since_last < self.fetch_interval:
-                                    logger.info(
-                                        "Another worker already scheduled recently, skipping"
-                                    )
-                                    await self._release_lock()
-                                    continue
-
-                            # Enqueue the task
-                            await process_scheduled_fetches_task.kiq()
-
-                            # Update last run timestamp in Redis (shared state)
-                            if self._redis_client is not None:
-                                await self._redis_client.set(
-                                    self._last_run_key,
-                                    current_time.isoformat(),
-                                )
-
-                            # Update local timestamp for property access
-                            self._last_scheduled_run = current_time
-
-                            logger.info(
-                                "Successfully enqueued scheduled fetch processing"
-                            )
-                        else:
-                            logger.warning(
-                                "Redis client not available during lock check"
-                            )
-
-                        # Release lock immediately after successful scheduling
-                        await self._release_lock()
-
+                        await self._check_and_run_task(task, current_time)
                     except Exception as e:
-                        logger.error(
-                            f"Failed to enqueue scheduled fetch processing: {e}"
-                        )
-                        # Release lock on error
-                        await self._release_lock()
-                        # Continue running even if one enqueue fails
+                        logger.error(f"Error checking task {task.name}: {e}")
 
-                # Sleep for a reasonable check interval (10 seconds)
-                # This ensures we don't miss the scheduled time by too much
-                await asyncio.sleep(10)
+                # Sleep until next check
+                await asyncio.sleep(self._check_interval)
 
         except asyncio.CancelledError:
-            logger.info("Task scheduler loop cancelled")
+            logger.info("Scheduler loop cancelled")
             raise
         except Exception as e:
             logger.error(f"Unexpected error in scheduler loop: {e}")
             raise
         finally:
-            # Release lock and clean up Redis client
-            await self._release_lock()
-            if self._redis_client:
-                await self._redis_client.aclose()
-                self._redis_client = None
-            logger.info("Task scheduler loop ended")
+            logger.info("Scheduler loop ended")
 
-    async def _release_lock(self) -> None:
-        """Release the scheduler lock if we have it."""
-        if self._has_lock and self._redis_client is not None:
-            try:
-                await self._redis_client.delete(self._lock_key)
-                logger.debug("Released scheduler lock")
-            except Exception as e:
-                logger.error(f"Failed to release scheduler lock: {e}")
-            finally:
-                # Always reset the flag, even if Redis delete fails
-                self._has_lock = False
+    async def _check_and_run_task(
+        self, task: ScheduledTask, current_time: datetime
+    ) -> None:
+        """Check if a task should run and execute it if needed."""
+        if not self._redis_client:
+            logger.warning("Redis client not available")
+            return
 
-    async def trigger_immediate_fetch(self) -> None:
-        """Trigger an immediate scheduled fetch processing."""
+        # Redis keys for this task
+        lock_key = f"osrsdiff:scheduler:lock:{task.name}"
+        last_run_key = f"osrsdiff:scheduler:last_run:{task.name}"
+
+        # Get last run time
         try:
-            logger.info("Triggering immediate scheduled fetch processing")
-            await process_scheduled_fetches_task.kiq()
-            logger.info("Successfully triggered immediate scheduled fetch")
+            last_run_str = await self._redis_client.get(last_run_key)
+            last_run = None
+            if last_run_str:
+                last_run = datetime.fromisoformat(last_run_str.decode())
         except Exception as e:
-            logger.error(f"Failed to trigger immediate scheduled fetch: {e}")
+            logger.error(f"Failed to get last run time for {task.name}: {e}")
+            return
+
+        # Check if task should run
+        if not task.should_run(current_time, last_run):
+            return
+
+        # Try to acquire lock
+        lock_timeout = 300  # 5 minutes
+        try:
+            acquired = await self._redis_client.set(
+                lock_key,
+                "locked",
+                nx=True,  # Only set if key doesn't exist
+                ex=lock_timeout,  # Expire after timeout
+            )
+
+            if not acquired:
+                logger.debug(f"Could not acquire lock for task {task.name}")
+                return
+
+            # Double-check that another worker hasn't run this recently
+            last_run_str = await self._redis_client.get(last_run_key)
+            if last_run_str:
+                last_run = datetime.fromisoformat(last_run_str.decode())
+                if not task.should_run(current_time, last_run):
+                    logger.debug(
+                        f"Task {task.name} was run by another worker, skipping"
+                    )
+                    await self._redis_client.delete(lock_key)
+                    return
+
+            # Run the task
+            logger.info(f"Running scheduled task: {task.name}")
+            try:
+                await task.task_func()
+
+                # Update last run time
+                await self._redis_client.set(last_run_key, current_time.isoformat())
+                logger.info(f"Successfully completed task: {task.name}")
+
+            except Exception as e:
+                logger.error(f"Task {task.name} failed: {e}")
+
+            # Release lock
+            await self._redis_client.delete(lock_key)
+
+        except Exception as e:
+            logger.error(f"Error running task {task.name}: {e}")
+            # Try to release lock on error
+            try:
+                await self._redis_client.delete(lock_key)
+            except:
+                pass
+
+    async def trigger_task(self, task_name: str) -> None:
+        """Manually trigger a specific task."""
+        if task_name not in self.tasks:
+            raise ValueError(f"Task '{task_name}' not found")
+
+        task = self.tasks[task_name]
+        logger.info(f"Manually triggering task: {task_name}")
+
+        try:
+            await task.task_func()
+            logger.info(f"Successfully triggered task: {task_name}")
+        except Exception as e:
+            logger.error(f"Manually triggered task {task_name} failed: {e}")
             raise
 
-    @property
-    def is_running(self) -> bool:
-        """Check if the scheduler is currently running."""
-        return self._running
+    def list_tasks(self) -> List[Dict[str, Any]]:
+        """List all registered tasks with their schedules."""
+        result = []
+        for task in self.tasks.values():
+            next_run = task.get_next_run_time()
+            result.append(
+                {
+                    "name": task.name,
+                    "cron_expression": task.cron_expression,
+                    "description": task.description,
+                    "next_run": next_run.isoformat(),
+                }
+            )
+        return result
 
-    @property
-    def last_run(self) -> Optional[datetime]:
-        """Get the timestamp of the last scheduled run."""
-        return self._last_scheduled_run
+    async def get_task_status(self, task_name: str) -> Dict[str, Any]:
+        """Get status information for a specific task."""
+        if task_name not in self.tasks:
+            raise ValueError(f"Task '{task_name}' not found")
 
-    @property
-    def next_run(self) -> Optional[datetime]:
-        """Get the estimated timestamp of the next scheduled run."""
-        if self._last_scheduled_run is None:
-            return None
-        return self._last_scheduled_run + self.fetch_interval
+        task = self.tasks[task_name]
 
-    async def get_last_run_from_redis(self) -> Optional[datetime]:
-        """Get the last run timestamp from Redis (shared across all workers)."""
-        if not self._redis_client:
-            return None
+        # Get last run time from Redis
+        last_run = None
+        if self._redis_client:
+            try:
+                last_run_key = f"osrsdiff:scheduler:last_run:{task_name}"
+                last_run_str = await self._redis_client.get(last_run_key)
+                if last_run_str:
+                    last_run = datetime.fromisoformat(last_run_str.decode())
+            except Exception as e:
+                logger.error(f"Failed to get last run time for {task_name}: {e}")
 
-        try:
-            last_run_str = await self._redis_client.get(self._last_run_key)
-            if last_run_str is None:
-                return None
-            return datetime.fromisoformat(last_run_str.decode())
-        except Exception as e:
-            logger.error(f"Failed to get last run from Redis: {e}")
-            return None
+        next_run = (
+            task.get_next_run_time(last_run) if last_run else task.get_next_run_time()
+        )
+
+        return {
+            "name": task.name,
+            "cron_expression": task.cron_expression,
+            "description": task.description,
+            "last_run": last_run.isoformat() if last_run else None,
+            "next_run": next_run.isoformat(),
+            "should_run_now": task.should_run(datetime.now(UTC), last_run),
+        }
 
 
 # Global scheduler instance
@@ -283,28 +298,67 @@ _scheduler: Optional[TaskScheduler] = None
 
 
 def get_scheduler() -> TaskScheduler:
-    """Get the global task scheduler instance."""
+    """Get the global scheduler instance."""
     global _scheduler
     if _scheduler is None:
-        # Default to 30 minute intervals for scheduled fetches
-        # This can be made configurable via settings if needed
-        _scheduler = TaskScheduler(fetch_interval_minutes=30)
+        _scheduler = TaskScheduler()
     return _scheduler
 
 
+async def setup_scheduled_tasks() -> None:
+    """Set up all scheduled tasks from configuration."""
+    scheduler = get_scheduler()
+
+    # Import task configuration
+    from src.workers.task_config import get_task_configs
+
+    # Set up tasks from configuration
+    task_configs = get_task_configs()
+
+    for config in task_configs:
+        # Dynamically import the task function
+        module_name = config["task_module"]
+        function_name = config["task_function"]
+
+        try:
+            # Import the module and get the task function
+            module = __import__(module_name, fromlist=[function_name])
+            task_func = getattr(module, function_name)
+
+            # Add the task to scheduler
+            async def create_task_wrapper(tf: Any = task_func) -> Any:
+                return await tf.kiq()
+
+            scheduler.add_task(
+                name=config["name"],
+                cron_expression=config["cron_expression"],
+                task_func=create_task_wrapper,
+                description=config["description"],
+            )
+
+            logger.info(
+                f"Configured task: {config['name']} ({config['cron_expression']})"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to configure task {config['name']}: {e}")
+            raise
+
+
 async def start_scheduler() -> None:
-    """Start the global task scheduler."""
+    """Start the scheduler with all tasks."""
+    await setup_scheduled_tasks()
     scheduler = get_scheduler()
     await scheduler.start()
 
 
 async def stop_scheduler() -> None:
-    """Stop the global task scheduler."""
+    """Stop the scheduler."""
     scheduler = get_scheduler()
     await scheduler.stop()
 
 
-async def trigger_immediate_fetch() -> None:
-    """Trigger an immediate scheduled fetch via the scheduler."""
+async def trigger_task(task_name: str) -> None:
+    """Manually trigger a specific task."""
     scheduler = get_scheduler()
-    await scheduler.trigger_immediate_fetch()
+    await scheduler.trigger_task(task_name)

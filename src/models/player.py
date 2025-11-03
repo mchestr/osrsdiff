@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+import enum
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Enum, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
     from .hiscore import HiscoreRecord
+
+
+class GameMode(enum.Enum):
+    """OSRS game modes."""
+
+    REGULAR = "regular"
+    IRONMAN = "ironman"
+    HARDCORE_IRONMAN = "hardcore_ironman"
 
 
 class Player(Base):
@@ -63,6 +72,13 @@ class Player(Base):
         default=60,
         nullable=False,
         doc="How often to fetch hiscore data (in minutes)",
+    )
+
+    game_mode: Mapped[GameMode] = mapped_column(
+        Enum(GameMode),
+        default=GameMode.REGULAR,
+        nullable=False,
+        doc="Player's current game mode (regular, ironman, hardcore_ironman)",
     )
 
     # Relationships

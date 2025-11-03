@@ -53,6 +53,7 @@ class PlayerResponse(BaseModel):
     last_fetched: str | None
     is_active: bool
     fetch_interval_minutes: int
+    game_mode: str
 
     @classmethod
     def from_player(cls, player: Player) -> "PlayerResponse":
@@ -68,6 +69,7 @@ class PlayerResponse(BaseModel):
             ),
             is_active=player.is_active,
             fetch_interval_minutes=player.fetch_interval_minutes,
+            game_mode=player.game_mode.value,
         )
 
 
@@ -103,6 +105,7 @@ class PlayerMetadataResponse(BaseModel):
     last_fetched: str | None
     is_active: bool
     fetch_interval_minutes: int
+    game_mode: str
     total_records: int = Field(description="Total number of hiscore records")
     first_record: str | None = Field(
         description="Timestamp of first hiscore record"
@@ -134,6 +137,7 @@ class PlayerMetadataResponse(BaseModel):
             ),
             is_active=player.is_active,
             fetch_interval_minutes=player.fetch_interval_minutes,
+            game_mode=player.game_mode.value,
             total_records=metadata.get("total_records", 0),
             first_record=metadata.get("first_record"),
             latest_record=metadata.get("latest_record"),
@@ -659,4 +663,82 @@ async def reactivate_player(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to reactivate player",
+        )
+
+
+@router.post("/{username}/update-game-mode", response_model=MessageResponse)
+async def update_player_game_mode(
+    username: str,
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> MessageResponse:
+    """
+    Update a player's game mode by re-detecting it from OSRS hiscores.
+
+    This endpoint is useful when a player transitions between game modes
+    (e.g., hardcore ironman dies and becomes regular ironman). It will
+    fetch the player's current stats from all game mode hiscores and
+    determine their current mode based on the highest experience values.
+
+    Args:
+        username: OSRS player username to update
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        MessageResponse: Confirmation message with old and new game mode
+
+    Raises:
+        404 Not Found: Player not found in system or OSRS hiscores
+        502 Bad Gateway: OSRS API unavailable
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} updating game mode for player: {username}"
+        )
+
+        # Get current player to show old game mode
+        player = await player_service.get_player(username)
+        if not player:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        old_game_mode = player.game_mode.value
+
+        # Update game mode
+        updated = await player_service.update_player_game_mode(username)
+
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        # Get updated player to show new game mode
+        updated_player = await player_service.get_player(username)
+        new_game_mode = (
+            updated_player.game_mode.value if updated_player else old_game_mode
+        )
+
+        if old_game_mode == new_game_mode:
+            message = (
+                f"Player '{username}' game mode unchanged: {old_game_mode}"
+            )
+        else:
+            message = f"Player '{username}' game mode updated: {old_game_mode} → {new_game_mode}"
+
+        logger.info(f"Successfully updated game mode for player: {username}")
+        return MessageResponse(message=message)
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error updating game mode for player {username}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update player game mode",
         )

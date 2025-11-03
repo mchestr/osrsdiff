@@ -103,20 +103,23 @@ class PlayerService:
                     f"Player '{username}' is already being tracked"
                 )
 
-            # Verify player exists in OSRS hiscores
-            logger.debug(
-                f"Checking if player {username} exists in OSRS hiscores"
+            # Detect player's game mode and verify existence
+            logger.debug(f"Detecting game mode for player {username}")
+            detected_game_mode = (
+                await self.osrs_api_client.detect_player_game_mode(username)
             )
-            player_exists = await self.osrs_api_client.check_player_exists(
-                username
+            logger.info(
+                f"Detected game mode for {username}: {detected_game_mode}"
             )
-            if not player_exists:
-                raise OSRSPlayerNotFoundError(
-                    f"Player '{username}' not found in OSRS hiscores"
-                )
 
-            # Create new player entity
-            new_player = Player(username=username)
+            # Import GameMode enum
+            from src.models.player import GameMode
+
+            # Convert string to enum
+            game_mode_enum = GameMode(detected_game_mode)
+
+            # Create new player entity with detected game mode
+            new_player = Player(username=username, game_mode=game_mode_enum)
             self.db_session.add(new_player)
 
             try:
@@ -355,6 +358,73 @@ class PlayerService:
             logger.error(f"Error reactivating player {username}: {e}")
             raise PlayerServiceError(
                 f"Failed to reactivate player '{username}': {e}"
+            )
+
+    async def update_player_game_mode(self, username: str) -> bool:
+        """
+        Update a player's game mode by re-detecting it from OSRS hiscores.
+
+        This is useful when a player transitions between game modes
+        (e.g., hardcore ironman dies and becomes regular ironman).
+
+        Args:
+            username: OSRS player username to update
+
+        Returns:
+            bool: True if game mode was updated, False if player was not found
+
+        Raises:
+            PlayerServiceError: For database or other service errors
+            OSRSAPIError: For OSRS API related errors
+        """
+        if not username:
+            return False
+
+        username = username.strip()
+
+        try:
+            logger.info(f"Updating game mode for player: {username}")
+
+            player = await self.get_player(username)
+            if not player:
+                logger.debug(
+                    f"Player not found for game mode update: {username}"
+                )
+                return False
+
+            # Detect current game mode
+            old_game_mode = player.game_mode.value
+            detected_game_mode = (
+                await self.osrs_api_client.detect_player_game_mode(username)
+            )
+
+            # Import GameMode enum
+            from src.models.player import GameMode
+
+            new_game_mode_enum = GameMode(detected_game_mode)
+
+            if player.game_mode == new_game_mode_enum:
+                logger.debug(
+                    f"Player {username} game mode unchanged: {old_game_mode}"
+                )
+                return True
+
+            # Update game mode
+            player.game_mode = new_game_mode_enum
+            await self.db_session.commit()
+
+            logger.info(
+                f"Successfully updated game mode for {username}: {old_game_mode} -> {detected_game_mode}"
+            )
+            return True
+
+        except Exception as e:
+            await self.db_session.rollback()
+            logger.error(
+                f"Error updating game mode for player {username}: {e}"
+            )
+            raise PlayerServiceError(
+                f"Failed to update game mode for player '{username}': {e}"
             )
 
 

@@ -5,6 +5,8 @@ A backend service for tracking Old School RuneScape character progression by per
 ## Features
 
 - Track multiple OSRS players' progression over time
+- **Automatic game mode detection** - detects regular, ironman, and hardcore ironman modes
+- **Daily game mode monitoring** - automatically checks for mode transitions (e.g., hardcore death)
 - JWT-based authentication for secure API access
 - Async background tasks for data fetching
 - **Smart data deduplication** - only saves hiscore records when data has changed
@@ -104,6 +106,33 @@ The service implements intelligent data deduplication to avoid storing redundant
 - **Status reporting**: Fetch results indicate whether data was `unchanged`, `success` (new record), or other statuses
 
 This ensures the database only grows when players actually make progress, significantly reducing storage requirements and improving query performance.
+
+### Game Mode Detection
+
+The service automatically detects and tracks OSRS game modes for each player:
+
+- **Automatic detection**: When adding a player, the system fetches from all hiscore endpoints (regular, ironman, hardcore ironman)
+- **Smart comparison**: Determines current game mode based on highest total experience across all modes
+- **Transition tracking**: Handles mode transitions (hardcore → ironman → regular) but prevents impossible backwards transitions
+- **Daily monitoring**: Runs a daily task to check all active players for game mode changes
+- **Manual updates**: API endpoint to manually update a player's game mode: `POST /players/{username}/update-game-mode`
+- **Manual trigger**: System endpoint to manually trigger daily game mode check: `POST /system/trigger-game-mode-check`
+
+Game modes are stored in the database and used to fetch from the correct hiscore endpoint for each player.
+
+### Task Scheduling
+
+The service uses a cron-like scheduler for background tasks:
+
+- **Cron expressions**: Easy-to-understand scheduling like `*/30 * * * *` (every 30 minutes) or `0 2 * * *` (daily at 2 AM)
+- **Configuration-based**: Tasks are defined in `src/workers/task_config.py` for easy management
+- **Redis coordination**: Uses Redis locks to prevent duplicate execution across multiple workers
+- **Manual triggering**: All scheduled tasks can be triggered manually via API endpoints
+- **Task monitoring**: View task status, last run times, and next scheduled runs
+
+Current scheduled tasks:
+- **Hiscore fetching**: Every 30 minutes (`*/30 * * * *`)
+- **Game mode checking**: Daily at 2 AM UTC (`0 2 * * *`)
 
 ### Testing Deduplication
 

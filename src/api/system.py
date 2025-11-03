@@ -345,3 +345,191 @@ async def get_player_distribution(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve player distribution statistics",
         )
+
+
+class TaskTriggerResponse(BaseModel):
+    """Response model for task trigger operations."""
+
+    task_name: str = Field(description="Name of the triggered task")
+    message: str = Field(description="Success message")
+    timestamp: str = Field(description="When the task was triggered")
+
+
+class ScheduledTaskInfo(BaseModel):
+    """Information about a scheduled task."""
+
+    name: str = Field(description="Task name")
+    cron_expression: str = Field(description="Cron schedule expression")
+    description: str = Field(description="Task description")
+    last_run: Optional[str] = Field(description="Last run timestamp")
+    next_run: str = Field(description="Next scheduled run timestamp")
+    should_run_now: bool = Field(description="Whether task should run now")
+
+
+class ScheduledTasksResponse(BaseModel):
+    """Response model for scheduled tasks list."""
+
+    tasks: List[ScheduledTaskInfo] = Field(
+        description="List of scheduled tasks"
+    )
+    total_count: int = Field(description="Total number of tasks")
+
+
+@router.post("/trigger-game-mode-check", response_model=TaskTriggerResponse)
+async def trigger_game_mode_check(
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> TaskTriggerResponse:
+    """
+    Manually trigger a game mode downgrade check for all active players.
+
+    This endpoint allows administrators to manually trigger the daily game mode
+    check task without waiting for the scheduled run. The task will check all
+    active players to see if their game mode has changed (e.g., hardcore ironman
+    died and became regular ironman).
+
+    Args:
+        current_user: Authenticated user information
+
+    Returns:
+        TaskTriggerResponse: Confirmation that the task was triggered
+
+    Raises:
+        500 Internal Server Error: Task trigger errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} manually triggering game mode check"
+        )
+
+        # Import the scheduler function
+        from src.workers.scheduler import trigger_task
+
+        # Trigger the task
+        await trigger_task("check_game_modes")
+
+        response = TaskTriggerResponse(
+            task_name="check_game_mode_downgrades",
+            message="Game mode downgrade check task has been triggered successfully",
+            timestamp=datetime.utcnow().isoformat(),
+        )
+
+        logger.info("Successfully triggered manual game mode check")
+        return response
+
+    except Exception as e:
+        logger.error(f"Error triggering game mode check: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger game mode check: {str(e)}",
+        )
+
+
+@router.get("/scheduled-tasks", response_model=ScheduledTasksResponse)
+async def get_scheduled_tasks(
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> ScheduledTasksResponse:
+    """
+    Get information about all scheduled tasks.
+
+    Returns details about each scheduled task including their cron expressions,
+    last run times, next run times, and current status.
+
+    Args:
+        current_user: Authenticated user information
+
+    Returns:
+        ScheduledTasksResponse: List of scheduled tasks with their information
+
+    Raises:
+        500 Internal Server Error: Scheduler errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} requesting scheduled tasks info"
+        )
+
+        from src.workers.scheduler import get_scheduler
+
+        scheduler = get_scheduler()
+
+        # Get detailed status for each task
+        tasks_info = []
+        for task_name in scheduler.tasks.keys():
+            try:
+                task_status = await scheduler.get_task_status(task_name)
+                tasks_info.append(ScheduledTaskInfo(**task_status))
+            except Exception as e:
+                logger.error(f"Error getting status for task {task_name}: {e}")
+
+        response = ScheduledTasksResponse(
+            tasks=tasks_info,
+            total_count=len(tasks_info),
+        )
+
+        logger.info(
+            f"Successfully retrieved {len(tasks_info)} scheduled tasks"
+        )
+        return response
+
+    except Exception as e:
+        logger.error(f"Error retrieving scheduled tasks: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve scheduled tasks: {str(e)}",
+        )
+
+
+@router.post("/trigger-task/{task_name}", response_model=TaskTriggerResponse)
+async def trigger_scheduled_task(
+    task_name: str,
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> TaskTriggerResponse:
+    """
+    Manually trigger any scheduled task.
+
+    This endpoint allows administrators to manually trigger any scheduled task
+    without waiting for its scheduled time.
+
+    Args:
+        task_name: Name of the task to trigger (e.g., "check_game_modes", "fetch_hiscores")
+        current_user: Authenticated user information
+
+    Returns:
+        TaskTriggerResponse: Confirmation that the task was triggered
+
+    Raises:
+        404 Not Found: Task not found
+        500 Internal Server Error: Task trigger errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} manually triggering task: {task_name}"
+        )
+
+        from src.workers.scheduler import trigger_task
+
+        # Trigger the task
+        await trigger_task(task_name)
+
+        response = TaskTriggerResponse(
+            task_name=task_name,
+            message=f"Task '{task_name}' has been triggered successfully",
+            timestamp=datetime.utcnow().isoformat(),
+        )
+
+        logger.info(f"Successfully triggered task: {task_name}")
+        return response
+
+    except ValueError as e:
+        # Task not found
+        logger.warning(f"Task not found: {task_name}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Error triggering task {task_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to trigger task: {str(e)}",
+        )

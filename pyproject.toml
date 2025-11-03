@@ -36,6 +36,9 @@ dependencies = [
     # HTTP client
     "aiohttp>=3.9.0",
 
+    # Scheduling
+    "croniter>=2.0.0",
+
     # Authentication
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",

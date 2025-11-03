@@ -47,6 +47,9 @@ class HiscoreData(BaseModel):
     bosses: Dict[str, Dict[str, Optional[int]]] = Field(
         description="Boss kill counts"
     )
+    game_mode: str = Field(
+        description="Game mode (regular, ironman, hardcore_ironman)"
+    )
     fetched_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -55,9 +58,11 @@ class HiscoreData(BaseModel):
 class OSRSAPIClient:
     """Async HTTP client for OSRS Hiscores API."""
 
-    BASE_URL = (
-        "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json"
-    )
+    BASE_URLS = {
+        "regular": "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json",
+        "ironman": "https://secure.runescape.com/m=hiscore_oldschool_ironman/index_lite.json",
+        "hardcore_ironman": "https://secure.runescape.com/m=hiscore_oldschool_hardcore_ironman/index_lite.json",
+    }
 
     # OSRS API rate limiting: 1 request per 2 seconds to be safe
     RATE_LIMIT_DELAY = 2.0
@@ -140,12 +145,15 @@ class OSRSAPIClient:
 
             self._last_request_time = datetime.now(timezone.utc)
 
-    async def _make_request(self, username: str) -> Dict[str, Any]:
+    async def _make_request(
+        self, username: str, game_mode: str = "regular"
+    ) -> Dict[str, Any]:
         """Make HTTP request to OSRS API with retry logic."""
         await self._ensure_session()
         assert self._session is not None
 
-        url = f"{self.BASE_URL}?player={quote(username)}"
+        base_url = self.BASE_URLS.get(game_mode, self.BASE_URLS["regular"])
+        url = f"{base_url}?player={quote(username)}"
 
         for attempt in range(self.MAX_RETRIES + 1):
             try:
@@ -254,7 +262,9 @@ class OSRSAPIClient:
         except (ValueError, TypeError):
             return {"rank": None, "kc": None}
 
-    def _parse_hiscore_data(self, json_data: Dict[str, Any]) -> HiscoreData:
+    def _parse_hiscore_data(
+        self, json_data: Dict[str, Any], game_mode: str = "regular"
+    ) -> HiscoreData:
         """Parse OSRS hiscore JSON data into structured format."""
         if not isinstance(json_data, dict):
             raise OSRSAPIError(
@@ -333,14 +343,19 @@ class OSRSAPIClient:
 
             bosses[activity_name] = parsed_activity
 
-        return HiscoreData(overall=overall, skills=skills, bosses=bosses)
+        return HiscoreData(
+            overall=overall, skills=skills, bosses=bosses, game_mode=game_mode
+        )
 
-    async def fetch_player_hiscores(self, username: str) -> HiscoreData:
+    async def fetch_player_hiscores(
+        self, username: str, game_mode: str = "regular"
+    ) -> HiscoreData:
         """
         Fetch hiscore data for a player from OSRS API.
 
         Args:
             username: OSRS player username
+            game_mode: Game mode to fetch (regular, ironman, hardcore_ironman)
 
         Returns:
             HiscoreData: Parsed hiscore data
@@ -357,8 +372,8 @@ class OSRSAPIClient:
         username = username.strip()
 
         try:
-            json_data = await self._make_request(username)
-            return self._parse_hiscore_data(json_data)
+            json_data = await self._make_request(username, game_mode)
+            return self._parse_hiscore_data(json_data, game_mode)
 
         except (PlayerNotFoundError, RateLimitError, APIUnavailableError):
             # Re-raise known exceptions
@@ -366,9 +381,70 @@ class OSRSAPIClient:
 
         except Exception as e:
             logger.error(
-                f"Unexpected error fetching hiscores for {username}: {e}"
+                f"Unexpected error fetching hiscores for {username} ({game_mode}): {e}"
             )
             raise OSRSAPIError(f"Failed to fetch hiscores: {e}")
+
+    async def detect_player_game_mode(self, username: str) -> str:
+        """
+        Detect a player's current game mode by comparing experience across all hiscores.
+
+        Args:
+            username: OSRS player username
+
+        Returns:
+            str: Detected game mode (hardcore_ironman, ironman, or regular)
+
+        Raises:
+            PlayerNotFoundError: If player is not found in any hiscores
+            RateLimitError: If rate limit is exceeded
+            APIUnavailableError: If API is unavailable
+            OSRSAPIError: For other API errors
+        """
+        if not username or not username.strip():
+            raise ValueError("Username cannot be empty")
+
+        username = username.strip()
+
+        # Try to fetch from all game modes
+        game_mode_data = {}
+
+        for mode in ["hardcore_ironman", "ironman", "regular"]:
+            try:
+                data = await self.fetch_player_hiscores(username, mode)
+                # Use overall experience as the comparison metric
+                overall_exp = data.overall.get("experience")
+                if overall_exp is not None and overall_exp > 0:
+                    game_mode_data[mode] = overall_exp
+                    logger.debug(
+                        f"Found {username} in {mode} with {overall_exp} total exp"
+                    )
+            except PlayerNotFoundError:
+                # Player not found in this game mode, continue
+                logger.debug(f"Player {username} not found in {mode} hiscores")
+                continue
+
+        if not game_mode_data:
+            raise PlayerNotFoundError(
+                f"Player '{username}' not found in any hiscores"
+            )
+
+        # Determine game mode based on highest experience
+        # Players can transition from hardcore -> ironman -> regular, but not backwards
+        if (
+            "hardcore_ironman" in game_mode_data
+            and game_mode_data["hardcore_ironman"]
+            >= game_mode_data.get("ironman", 0)
+            and game_mode_data["hardcore_ironman"]
+            >= game_mode_data.get("regular", 0)
+        ):
+            return "hardcore_ironman"
+        elif "ironman" in game_mode_data and game_mode_data[
+            "ironman"
+        ] >= game_mode_data.get("regular", 0):
+            return "ironman"
+        else:
+            return "regular"
 
     async def check_player_exists(self, username: str) -> bool:
         """
@@ -381,7 +457,7 @@ class OSRSAPIClient:
             bool: True if player exists, False otherwise
         """
         try:
-            await self.fetch_player_hiscores(username)
+            await self.detect_player_game_mode(username)
             return True
         except PlayerNotFoundError:
             return False
