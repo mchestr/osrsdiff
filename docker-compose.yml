@@ -77,6 +77,30 @@ services:
         condition: service_healthy
     command: taskiq worker src.workers.main:broker
 
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: osrs-diff-scheduler
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@postgres:5432/osrs_diff
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - ENVIRONMENT=development
+      - TASKIQ_SCHEDULER_PREFIX=osrsdiff:schedules
+      - LOG_LEVEL=INFO
+    volumes:
+      - .:/app
+      - /app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: taskiq scheduler src.workers.main:scheduler
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

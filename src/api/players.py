@@ -44,6 +44,55 @@ class PlayerCreateRequest(BaseModel):
     )
 
 
+class PlayerUpdateIntervalRequest(BaseModel):
+    """Request model for updating a player's fetch interval."""
+
+    fetch_interval_minutes: int = Field(
+        ...,
+        ge=1,
+        le=10080,  # 1 week maximum
+        description="Fetch interval in minutes (1-10080)",
+    )
+
+
+class PlayerScheduleStatusResponse(BaseModel):
+    """Response model for player schedule status."""
+
+    id: int
+    username: str
+    is_active: bool
+    fetch_interval_minutes: int
+    schedule_id: str | None
+    schedule_status: str = Field(
+        description="Status of the schedule: 'scheduled', 'missing', 'invalid', 'not_scheduled'"
+    )
+    last_verified: str | None = Field(
+        description="Timestamp when schedule was last verified"
+    )
+
+
+class ScheduleListResponse(BaseModel):
+    """Response model for listing all player schedules."""
+
+    players: List[PlayerScheduleStatusResponse]
+    total_count: int
+    scheduled_count: int
+    missing_count: int
+    invalid_count: int
+
+
+class ScheduleVerificationResponse(BaseModel):
+    """Response model for schedule verification results."""
+
+    total_schedules: int
+    player_fetch_schedules: int
+    other_schedules: int
+    invalid_schedules: List[Dict[str, Any]]
+    orphaned_schedules: List[str]
+    duplicate_schedules: Dict[str, Any]
+    verification_timestamp: str
+
+
 class PlayerResponse(BaseModel):
     """Response model for player data."""
 
@@ -54,6 +103,9 @@ class PlayerResponse(BaseModel):
     is_active: bool
     fetch_interval_minutes: int
     game_mode: str
+    schedule_id: str | None = Field(
+        description="TaskIQ schedule ID for this player's fetch task"
+    )
 
     @classmethod
     def from_player(cls, player: Player) -> "PlayerResponse":
@@ -70,6 +122,7 @@ class PlayerResponse(BaseModel):
             is_active=player.is_active,
             fetch_interval_minutes=player.fetch_interval_minutes,
             game_mode=player.game_mode.value,
+            schedule_id=player.schedule_id,
         )
 
 
@@ -106,6 +159,9 @@ class PlayerMetadataResponse(BaseModel):
     is_active: bool
     fetch_interval_minutes: int
     game_mode: str
+    schedule_id: str | None = Field(
+        description="TaskIQ schedule ID for this player's fetch task"
+    )
     total_records: int = Field(description="Total number of hiscore records")
     first_record: str | None = Field(
         description="Timestamp of first hiscore record"
@@ -138,6 +194,7 @@ class PlayerMetadataResponse(BaseModel):
             is_active=player.is_active,
             fetch_interval_minutes=player.fetch_interval_minutes,
             game_mode=player.game_mode.value,
+            schedule_id=player.schedule_id,
             total_records=metadata.get("total_records", 0),
             first_record=metadata.get("first_record"),
             latest_record=metadata.get("latest_record"),
@@ -741,4 +798,447 @@ async def update_player_game_mode(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update player game mode",
+        )
+
+
+@router.put("/{username}/fetch-interval", response_model=PlayerResponse)
+async def update_player_fetch_interval(
+    username: str,
+    request: PlayerUpdateIntervalRequest,
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> PlayerResponse:
+    """
+    Update a player's fetch interval and reschedule their task.
+
+    This endpoint updates the player's fetch interval and automatically
+    reschedules their background task with the new interval if they are active.
+
+    Args:
+        username: OSRS player username to update
+        request: Update request with new fetch interval
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        PlayerResponse: Updated player information
+
+    Raises:
+        400 Bad Request: Invalid fetch interval
+        404 Not Found: Player not found in system
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} updating fetch interval for player {username} "
+            f"to {request.fetch_interval_minutes} minutes"
+        )
+
+        # Update the player's fetch interval
+        updated = await player_service.update_player_fetch_interval(
+            username, request.fetch_interval_minutes
+        )
+
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        # Get updated player to return
+        player = await player_service.get_player(username)
+        if not player:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve updated player information",
+            )
+
+        logger.info(
+            f"Successfully updated fetch interval for player {username} "
+            f"to {request.fetch_interval_minutes} minutes"
+        )
+
+        return PlayerResponse.from_player(player)
+
+    except ValueError as e:
+        logger.warning(f"Invalid fetch interval for player {username}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error updating fetch interval for player {username}: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update player fetch interval",
+        )
+
+
+@router.get("/schedules", response_model=ScheduleListResponse)
+async def list_player_schedules(
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> ScheduleListResponse:
+    """
+    List all players with their schedule status.
+
+    This endpoint provides comprehensive information about all players and
+    their scheduling status, including whether schedules exist, are valid,
+    or are missing.
+
+    Args:
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        ScheduleListResponse: List of players with schedule status information
+
+    Raises:
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} requesting player schedule list"
+        )
+
+        # Get all players
+        players = await player_service.list_players(active_only=False)
+
+        # Get schedule manager to verify schedules
+        from src.services.scheduler import get_player_schedule_manager
+
+        try:
+            schedule_manager = await get_player_schedule_manager()
+        except Exception as e:
+            logger.warning(f"Failed to get schedule manager: {e}")
+            schedule_manager = None
+
+        player_statuses = []
+        scheduled_count = 0
+        missing_count = 0
+        invalid_count = 0
+
+        for player in players:
+            schedule_status = "not_scheduled"
+
+            if player.is_active and schedule_manager:
+                if player.schedule_id:
+                    # Verify if schedule exists and is valid
+                    try:
+                        is_valid = await schedule_manager._verify_schedule_exists_and_valid(
+                            player
+                        )
+                        if is_valid:
+                            schedule_status = "scheduled"
+                            scheduled_count += 1
+                        else:
+                            schedule_status = "invalid"
+                            invalid_count += 1
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to verify schedule for player {player.username}: {e}"
+                        )
+                        schedule_status = "missing"
+                        missing_count += 1
+                else:
+                    schedule_status = "missing"
+                    missing_count += 1
+            elif not player.is_active:
+                schedule_status = "not_scheduled"
+
+            player_status = PlayerScheduleStatusResponse(
+                id=player.id,
+                username=player.username,
+                is_active=player.is_active,
+                fetch_interval_minutes=player.fetch_interval_minutes,
+                schedule_id=player.schedule_id,
+                schedule_status=schedule_status,
+                last_verified=None,  # Could be enhanced to track verification timestamps
+            )
+            player_statuses.append(player_status)
+
+        response = ScheduleListResponse(
+            players=player_statuses,
+            total_count=len(player_statuses),
+            scheduled_count=scheduled_count,
+            missing_count=missing_count,
+            invalid_count=invalid_count,
+        )
+
+        logger.info(
+            f"Returning schedule status for {len(player_statuses)} players "
+            f"(scheduled: {scheduled_count}, missing: {missing_count}, invalid: {invalid_count})"
+        )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error listing player schedules: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list player schedules",
+        )
+
+
+@router.post("/{username}/pause", response_model=MessageResponse)
+async def pause_player_schedule(
+    username: str,
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> MessageResponse:
+    """
+    Pause a player's scheduled task without deactivating the player.
+
+    This endpoint removes the player's schedule from TaskIQ but keeps the
+    player active in the system. The schedule can be resumed later.
+
+    Args:
+        username: OSRS player username to pause
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        MessageResponse: Confirmation message
+
+    Raises:
+        404 Not Found: Player not found in system
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} pausing schedule for player: {username}"
+        )
+
+        # Get player
+        player = await player_service.get_player(username)
+        if not player:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        # Get schedule manager
+        from src.services.scheduler import get_player_schedule_manager
+
+        try:
+            schedule_manager = await get_player_schedule_manager()
+        except Exception as e:
+            logger.error(f"Failed to get schedule manager: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Schedule management is not available",
+            )
+
+        # Unschedule the player
+        if player.schedule_id:
+            try:
+                await schedule_manager.unschedule_player(player)
+                player.schedule_id = None
+                await player_service.db_session.commit()
+                logger.info(f"Paused schedule for player {username}")
+            except Exception as e:
+                logger.error(
+                    f"Failed to pause schedule for player {username}: {e}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Failed to pause schedule: {e}",
+                )
+        else:
+            logger.info(f"Player {username} has no active schedule to pause")
+
+        return MessageResponse(
+            message=f"Schedule paused for player '{username}' (player remains active)"
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error pausing schedule for player {username}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to pause player schedule",
+        )
+
+
+@router.post("/{username}/resume", response_model=MessageResponse)
+async def resume_player_schedule(
+    username: str,
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> MessageResponse:
+    """
+    Resume a player's scheduled task.
+
+    This endpoint recreates the player's schedule in TaskIQ if they are
+    active but don't have a current schedule.
+
+    Args:
+        username: OSRS player username to resume
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        MessageResponse: Confirmation message
+
+    Raises:
+        404 Not Found: Player not found in system
+        400 Bad Request: Player is not active
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} resuming schedule for player: {username}"
+        )
+
+        # Get player
+        player = await player_service.get_player(username)
+        if not player:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Player '{username}' not found in tracking system",
+            )
+
+        if not player.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Player '{username}' is not active. Activate the player first.",
+            )
+
+        # Get schedule manager
+        from src.services.scheduler import get_player_schedule_manager
+
+        try:
+            schedule_manager = await get_player_schedule_manager()
+        except Exception as e:
+            logger.error(f"Failed to get schedule manager: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Schedule management is not available",
+            )
+
+        # Ensure player is scheduled
+        try:
+            schedule_id = await schedule_manager.ensure_player_scheduled(
+                player
+            )
+            player.schedule_id = schedule_id
+            await player_service.db_session.commit()
+            logger.info(
+                f"Resumed schedule for player {username} (schedule_id: {schedule_id})"
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to resume schedule for player {username}: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to resume schedule: {e}",
+            )
+
+        return MessageResponse(
+            message=f"Schedule resumed for player '{username}' (schedule_id: {schedule_id})"
+        )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error resuming schedule for player {username}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resume player schedule",
+        )
+
+
+@router.post("/schedules/verify", response_model=ScheduleVerificationResponse)
+async def verify_all_schedules(
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> ScheduleVerificationResponse:
+    """
+    Manually trigger schedule verification for all players.
+
+    This endpoint runs a comprehensive verification of all schedules in Redis
+    and returns a detailed report of any issues found.
+
+    Args:
+        current_user: Authenticated user information
+
+    Returns:
+        ScheduleVerificationResponse: Detailed verification report
+
+    Raises:
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} triggering schedule verification"
+        )
+
+        # Get schedule manager
+        from src.services.scheduler import get_player_schedule_manager
+
+        try:
+            schedule_manager = await get_player_schedule_manager()
+        except Exception as e:
+            logger.error(f"Failed to get schedule manager: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Schedule management is not available",
+            )
+
+        # Run verification
+        try:
+            verification_report = await schedule_manager.verify_all_schedules()
+
+            from datetime import datetime
+
+            verification_timestamp = datetime.utcnow().isoformat()
+
+            response = ScheduleVerificationResponse(
+                total_schedules=verification_report.get("total_schedules", 0),
+                player_fetch_schedules=verification_report.get(
+                    "player_fetch_schedules", 0
+                ),
+                other_schedules=verification_report.get("other_schedules", 0),
+                invalid_schedules=verification_report.get(
+                    "invalid_schedules", []
+                ),
+                orphaned_schedules=verification_report.get(
+                    "orphaned_schedules", []
+                ),
+                duplicate_schedules=verification_report.get(
+                    "duplicate_schedules", {}
+                ),
+                verification_timestamp=verification_timestamp,
+            )
+
+            logger.info(
+                f"Schedule verification completed: {verification_report.get('total_schedules', 0)} total schedules, "
+                f"{len(verification_report.get('invalid_schedules', []))} invalid, "
+                f"{len(verification_report.get('orphaned_schedules', []))} orphaned"
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to verify schedules: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to verify schedules: {e}",
+            )
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error during schedule verification: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to perform schedule verification",
         )

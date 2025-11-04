@@ -22,7 +22,15 @@ class TestPlayerModel:
         assert player.is_active is True
         assert player.fetch_interval_minutes == 60
         assert player.last_fetched is None
+        assert player.schedule_id is None
         assert player.hiscore_records == []
+
+    def test_player_creation_with_schedule_id(self):
+        """Test player model creation with schedule_id."""
+        player = Player(username="test_player", schedule_id="player_fetch_123")
+
+        assert player.username == "test_player"
+        assert player.schedule_id == "player_fetch_123"
 
     def test_player_repr(self):
         """Test player string representation."""
@@ -194,7 +202,32 @@ class TestPlayerDatabaseOperations:
         assert player.username == "new_player"
         assert player.is_active is True
         assert player.fetch_interval_minutes == 60
+        assert player.schedule_id is None
         assert player.created_at is not None
+
+    @pytest.mark.asyncio
+    async def test_create_player_with_schedule_id_in_database(
+        self, test_session: AsyncSession
+    ):
+        """Test creating a player with schedule_id in the database."""
+        player = Player(
+            username="scheduled_player", schedule_id="player_fetch_456"
+        )
+        test_session.add(player)
+        await test_session.commit()
+
+        # Verify player was created with schedule_id
+        assert player.id is not None
+        assert player.username == "scheduled_player"
+        assert player.schedule_id == "player_fetch_456"
+
+        # Query back from database to verify persistence
+        stmt = select(Player).where(Player.username == "scheduled_player")
+        result = await test_session.execute(stmt)
+        found_player = result.scalar_one_or_none()
+
+        assert found_player is not None
+        assert found_player.schedule_id == "player_fetch_456"
 
     @pytest.mark.asyncio
     async def test_query_player_by_username(

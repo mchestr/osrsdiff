@@ -401,11 +401,11 @@ async def trigger_game_mode_check(
             f"User {current_user.get('username')} manually triggering game mode check"
         )
 
-        # Import the scheduler function
-        from src.workers.scheduler import trigger_task
+        # Import the task directly and trigger it
+        from src.workers.fetch import check_game_mode_downgrades_task
 
-        # Trigger the task
-        await trigger_task("check_game_modes")
+        # Trigger the task directly using TaskIQ
+        await check_game_mode_downgrades_task.kiq()
 
         response = TaskTriggerResponse(
             task_name="check_game_mode_downgrades",
@@ -434,6 +434,9 @@ async def get_scheduled_tasks(
     Returns details about each scheduled task including their cron expressions,
     last run times, next run times, and current status.
 
+    Note: This endpoint now returns information about TaskIQ scheduled tasks
+    managed by the TaskiqScheduler instead of the old custom scheduler.
+
     Args:
         current_user: Authenticated user information
 
@@ -448,18 +451,44 @@ async def get_scheduled_tasks(
             f"User {current_user.get('username')} requesting scheduled tasks info"
         )
 
-        from src.workers.scheduler import get_scheduler
+        # Import the TaskIQ scheduler
+        from src.workers.main import scheduler
 
-        scheduler = get_scheduler()
-
-        # Get detailed status for each task
+        # Get schedules from Redis schedule source
         tasks_info = []
-        for task_name in scheduler.tasks.keys():
-            try:
-                task_status = await scheduler.get_task_status(task_name)
-                tasks_info.append(ScheduledTaskInfo(**task_status))
-            except Exception as e:
-                logger.error(f"Error getting status for task {task_name}: {e}")
+
+        # Get schedules from the Redis schedule source
+        redis_source = scheduler.sources[
+            0
+        ]  # First source is RedisScheduleSource
+        try:
+            schedules = await redis_source.get_schedules()
+
+            for schedule in schedules:
+                # Convert TaskIQ schedule to our response format
+                task_info = ScheduledTaskInfo(
+                    name=schedule.schedule_id,
+                    cron_expression=schedule.cron or "N/A",
+                    description=f"TaskIQ scheduled task: {schedule.task_name}",
+                    last_run=None,  # TaskIQ doesn't track last run in schedule
+                    next_run="Managed by TaskIQ scheduler",
+                    should_run_now=False,  # TaskIQ manages this internally
+                )
+                tasks_info.append(task_info)
+
+        except Exception as e:
+            logger.warning(f"Could not retrieve schedules from Redis: {e}")
+            # Add static information about known scheduled tasks
+            tasks_info.append(
+                ScheduledTaskInfo(
+                    name="check_game_mode_downgrades_task",
+                    cron_expression="0 2 * * *",
+                    description="Daily game mode downgrade check",
+                    last_run=None,
+                    next_run="Daily at 2 AM UTC",
+                    should_run_now=False,
+                )
+            )
 
         response = ScheduledTasksResponse(
             tasks=tasks_info,
@@ -488,10 +517,11 @@ async def trigger_scheduled_task(
     Manually trigger any scheduled task.
 
     This endpoint allows administrators to manually trigger any scheduled task
-    without waiting for its scheduled time.
+    without waiting for its scheduled time. Currently supports triggering
+    TaskIQ tasks directly.
 
     Args:
-        task_name: Name of the task to trigger (e.g., "check_game_modes", "fetch_hiscores")
+        task_name: Name of the task to trigger (e.g., "check_game_mode_downgrades_task")
         current_user: Authenticated user information
 
     Returns:
@@ -506,10 +536,25 @@ async def trigger_scheduled_task(
             f"User {current_user.get('username')} manually triggering task: {task_name}"
         )
 
-        from src.workers.scheduler import trigger_task
+        # Map task names to actual TaskIQ tasks
+        task_mapping = {
+            "check_game_mode_downgrades_task": "src.workers.fetch:check_game_mode_downgrades_task",
+            "check_game_modes": "src.workers.fetch:check_game_mode_downgrades_task",  # Alias
+        }
 
-        # Trigger the task
-        await trigger_task(task_name)
+        if task_name not in task_mapping:
+            raise ValueError(f"Task '{task_name}' not found")
+
+        # Import and trigger the specific task
+        if task_name in [
+            "check_game_mode_downgrades_task",
+            "check_game_modes",
+        ]:
+            from src.workers.fetch import check_game_mode_downgrades_task
+
+            await check_game_mode_downgrades_task.kiq()
+        else:
+            raise ValueError(f"Task '{task_name}' not supported")
 
         response = TaskTriggerResponse(
             task_name=task_name,

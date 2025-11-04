@@ -81,6 +81,14 @@ class Player(Base):
         doc="Player's current game mode (regular, ironman, hardcore_ironman)",
     )
 
+    # TaskIQ scheduler integration
+    schedule_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+        doc="TaskIQ schedule ID for this player's fetch task",
+    )
+
     # Relationships
     hiscore_records: Mapped[List[HiscoreRecord]] = relationship(
         "HiscoreRecord",

@@ -29,6 +29,18 @@ broker.add_middlewares(
     )
 )
 
+# Create a redis schedule source for use by services
+from taskiq_redis import ListRedisScheduleSource
+
+# Import scheduler from dedicated configuration module
+from src.workers.scheduler_config import scheduler
+
+redis_schedule_source = ListRedisScheduleSource(
+    url=settings.redis.url,
+    prefix=settings.taskiq.scheduler_prefix,
+    max_connection_pool_size=settings.redis.max_connections,
+)
+
 
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
 async def startup_event(context: TaskiqState) -> None:
@@ -40,11 +52,8 @@ async def startup_event(context: TaskiqState) -> None:
 
     await init_db()
 
-    # Start the task scheduler for periodic fetches
-    # Uses Redis lock for leader election to prevent duplicate scheduling
-    from src.workers.scheduler import start_scheduler
-
-    await start_scheduler()
+    # Note: TaskiqScheduler is run separately via CLI command
+    # No need to start custom scheduler here anymore
 
     print("TaskIQ worker startup complete")
 
@@ -53,11 +62,6 @@ async def startup_event(context: TaskiqState) -> None:
 async def shutdown_event(context: TaskiqState) -> None:
     """Clean up worker resources on shutdown."""
     print("TaskIQ worker shutting down...")
-
-    # Stop the task scheduler
-    from src.workers.scheduler import stop_scheduler
-
-    await stop_scheduler()
 
     # Close database connections
     from src.models.base import close_db

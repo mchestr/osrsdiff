@@ -78,6 +78,10 @@ class TaskIQSettings(BaseModel):
     worker_concurrency: int = Field(
         default=4, description="Number of concurrent tasks per worker"
     )
+    scheduler_prefix: str = Field(
+        default="osrsdiff:schedules",
+        description="Redis prefix for TaskIQ schedules",
+    )
 
 
 class Settings(BaseSettings):
@@ -155,6 +159,10 @@ class Settings(BaseSettings):
     taskiq_worker_concurrency: int = Field(
         default=4, description="Number of concurrent tasks per worker"
     )
+    taskiq_scheduler_prefix: str = Field(
+        default="osrsdiff:schedules",
+        description="Redis prefix for TaskIQ schedules",
+    )
 
     # Admin user settings
     admin_username: str = Field(
@@ -215,6 +223,7 @@ class Settings(BaseSettings):
             task_timeout=self.taskiq_task_timeout,
             result_ttl=self.taskiq_result_ttl,
             worker_concurrency=self.taskiq_worker_concurrency,
+            scheduler_prefix=self.taskiq_scheduler_prefix,
         )
 
 

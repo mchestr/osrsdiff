@@ -18,7 +18,6 @@ from src.services.osrs_api import (
 from src.workers.fetch import (
     fetch_all_players_task,
     fetch_player_hiscores_task,
-    process_scheduled_fetches_task,
 )
 
 
@@ -211,95 +210,6 @@ class TestFetchPlayerHiscores:
                     await fetch_player_hiscores_task.original_func(
                         sample_player.username
                     )
-
-
-class TestProcessScheduledFetches:
-    """Test scheduled fetch processing."""
-
-    @pytest.mark.asyncio
-    async def test_process_no_active_players(self, test_session):
-        """Test processing when no active players exist."""
-        with patch(
-            "src.workers.fetch.AsyncSessionLocal"
-        ) as mock_session_local:
-            mock_session_local.return_value.__aenter__.return_value = (
-                test_session
-            )
-            result = await process_scheduled_fetches_task.original_func()
-
-        assert result["status"] == "success"
-        assert result["players_processed"] == 0
-        assert result["tasks_enqueued"] == 0
-        assert "No active players" in result["message"]
-
-    @pytest.mark.asyncio
-    async def test_process_players_needing_fetch(self, test_session):
-        """Test processing players that need fetching."""
-        # Create players with different fetch needs
-        player1 = Player(
-            username="player1", last_fetched=None
-        )  # Never fetched
-        player2 = Player(
-            username="player2",
-            last_fetched=datetime.now(UTC) - timedelta(hours=2),  # Needs fetch
-            fetch_interval_minutes=60,
-        )
-        player3 = Player(
-            username="player3",
-            last_fetched=datetime.now(UTC)
-            - timedelta(minutes=30),  # Recent fetch
-            fetch_interval_minutes=60,
-        )
-
-        test_session.add_all([player1, player2, player3])
-        await test_session.commit()
-
-        with patch(
-            "src.workers.fetch.fetch_player_hiscores_task"
-        ) as mock_task:
-            mock_task.kiq = AsyncMock()
-
-            with patch(
-                "src.workers.fetch.AsyncSessionLocal"
-            ) as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = (
-                    test_session
-                )
-                result = await process_scheduled_fetches_task.original_func()
-
-            assert result["status"] == "success"
-            assert result["players_processed"] == 3
-            assert result["players_needing_fetch"] == 2  # player1 and player2
-            # Note: Due to mocking complexity, we just verify the basic result structure
-            assert "tasks_enqueued" in result
-            assert "failed_enqueues" in result
-
-    @pytest.mark.asyncio
-    async def test_process_no_players_need_fetch(self, test_session):
-        """Test processing when no players need fetching."""
-        # Create player with recent fetch
-        player = Player(
-            username="recent_player",
-            last_fetched=datetime.now(UTC) - timedelta(minutes=30),
-            fetch_interval_minutes=60,
-        )
-
-        test_session.add(player)
-        await test_session.commit()
-
-        with patch(
-            "src.workers.fetch.AsyncSessionLocal"
-        ) as mock_session_local:
-            mock_session_local.return_value.__aenter__.return_value = (
-                test_session
-            )
-            result = await process_scheduled_fetches_task.original_func()
-
-        assert result["status"] == "success"
-        assert result["players_processed"] == 1
-        assert result["players_needing_fetch"] == 0
-        assert result["tasks_enqueued"] == 0
-        assert "No players need fetching" in result["message"]
 
 
 class TestFetchAllPlayers:

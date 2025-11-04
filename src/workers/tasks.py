@@ -81,5 +81,4 @@ from src.workers.fetch import (
     check_game_mode_downgrades_task,
     fetch_all_players_task,
     fetch_player_hiscores_task,
-    process_scheduled_fetches_task,
 )
