@@ -69,7 +69,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          target: production
           load: true
           tags: osrs-diff:scan
           cache-from: type=gha
