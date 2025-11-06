@@ -10,6 +10,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     curl \
     libpq-dev \
+    build-essential \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
