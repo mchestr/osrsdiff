@@ -10,7 +10,7 @@ from fastapi.security import (
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.auth import (
+from app.api.auth_utils import (
     get_current_user,
     get_current_user_bearer,
     require_auth,

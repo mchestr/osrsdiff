@@ -7,10 +7,13 @@ from typing import AsyncGenerator, Dict
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.router import router
-from app.config import settings
+from app.api.router import router
+from app.config import settings, LogConfig
 from app.models.base import init_db
 from app.services.startup import startup_service
+
+dictConfig(LogConfig().model_dump())
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -64,19 +67,3 @@ def create_app() -> FastAPI:
 
 # Create the application instance
 app = create_app()
-
-
-@app.get("/")
-async def root() -> Dict[str, str]:
-    """Root endpoint for health check."""
-    return {
-        "message": "OSRS Diff API",
-        "version": "1.0.0",
-        "status": "running",
-    }
-
-
-@app.get("/health")
-async def health_check() -> Dict[str, str]:
-    """Health check endpoint."""
-    return {"status": "healthy"}

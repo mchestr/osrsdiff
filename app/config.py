@@ -40,7 +40,7 @@ class LogConfig(BaseModel):
             "default": {
                 "formatter": "default",
                 "class": "logging.StreamHandler",
-                "stream": "ext://sys.stderr",
+                "stream": "ext://sys.stdout",
             },
             "access": {
                 "formatter": "access",
@@ -50,7 +50,7 @@ class LogConfig(BaseModel):
             "error": {
                 "formatter": "error",
                 "class": "logging.StreamHandler",
-                "stream": "ext://sys.stderr",
+                "stream": "ext://sys.stdout",
             },
         }
     )
