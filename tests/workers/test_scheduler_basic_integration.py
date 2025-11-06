@@ -11,10 +11,10 @@ from taskiq import TaskiqScheduler
 from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import ListRedisScheduleSource
 
-from src.config import settings
-from src.models.player import GameMode, Player
-from src.services.scheduler import PlayerScheduleManager
-from src.workers.main import broker
+from app.config import settings
+from app.models.player import GameMode, Player
+from app.services.scheduler import PlayerScheduleManager
+from app.workers.main import broker
 
 
 @pytest.mark.integration
@@ -23,7 +23,7 @@ class TestBasicSchedulerIntegration:
 
     def test_scheduler_configuration_creation(self):
         """Test that scheduler configuration can be created successfully."""
-        from src.workers.scheduler_config import (
+        from app.workers.scheduler_config import (
             create_scheduler,
             create_scheduler_sources,
         )
@@ -136,7 +136,7 @@ class TestBasicSchedulerIntegration:
         mock_kicker.schedule_by_cron = AsyncMock(return_value=mock_schedule)
 
         with patch(
-            "src.workers.fetch.fetch_player_hiscores_task"
+            "app.workers.fetch.fetch_player_hiscores_task"
         ) as mock_task:
             mock_task.kicker.return_value = mock_kicker
 
@@ -340,7 +340,7 @@ class TestSchedulerErrorHandling:
 
         # Mock task to raise exception
         with patch(
-            "src.workers.fetch.fetch_player_hiscores_task"
+            "app.workers.fetch.fetch_player_hiscores_task"
         ) as mock_task:
             mock_task.kicker.side_effect = Exception("Task creation failed")
 

@@ -20,8 +20,7 @@ classifiers = [
 
 dependencies = [
     # FastAPI and ASGI server
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
+    "fastapi[standard]<1.0.0,>=0.114.2",
 
     # Database
     "sqlalchemy[asyncio]>=2.0.0",
@@ -51,6 +50,7 @@ dependencies = [
     # Utilities
     "python-dateutil>=2.8.2",
     "structlog>=23.2.0",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -74,10 +74,10 @@ dev = [
 ]
 
 [project.scripts]
-osrs-diff = "src.main:main"
+osrs-diff = "app.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["app"]
 
 [tool.black]
 line-length = 79
@@ -101,7 +101,7 @@ extend-exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 79
-known_first_party = ["src"]
+known_first_party = ["app"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -134,7 +134,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["app"]
 omit = ["*/tests/*", "*/migrations/*"]
 
 [tool.coverage.report]

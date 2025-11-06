@@ -7,11 +7,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.auth import require_auth
-from src.api.history import get_history_service, router
-from src.models.hiscore import HiscoreRecord
-from src.models.player import Player
-from src.services.history import (
+from app.api.auth import require_auth
+from app.api.history import get_history_service, router
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
+from app.services.history import (
     BossProgress,
     HistoryService,
     HistoryServiceError,

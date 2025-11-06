@@ -4,16 +4,16 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from src.models.player import Player
-from src.services.osrs_api import (
+from app.models.player import Player
+from app.services.osrs_api import (
     APIUnavailableError,
     OSRSAPIClient,
     OSRSAPIError,
 )
-from src.services.osrs_api import (
+from app.services.osrs_api import (
     PlayerNotFoundError as OSRSPlayerNotFoundError,
 )
-from src.services.player import (
+from app.services.player import (
     InvalidUsernameError,
     PlayerAlreadyExistsError,
     PlayerNotFoundServiceError,

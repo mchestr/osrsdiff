@@ -6,9 +6,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.auth import require_auth
-from src.api.system import router
-from src.models.base import get_db_session
+from app.api.auth import require_auth
+from app.api.system import router
+from app.models.base import get_db_session
 
 
 @pytest.fixture

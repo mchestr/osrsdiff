@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 
 # Import our models and configuration
-from src.models.base import Base
-from src.config import settings
+from app.models.base import Base
+from app.config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -23,9 +23,9 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 # Import all models to ensure they're registered with Base.metadata
-from src.models.user import User  # noqa: F401
-from src.models.player import Player  # noqa: F401
-from src.models.hiscore import HiscoreRecord  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.models.player import Player  # noqa: F401
+from app.models.hiscore import HiscoreRecord  # noqa: F401
 
 target_metadata = Base.metadata
 

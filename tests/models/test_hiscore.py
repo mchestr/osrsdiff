@@ -7,8 +7,8 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.hiscore import HiscoreRecord
-from src.models.player import Player
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
 
 
 class TestHiscoreRecordModel:

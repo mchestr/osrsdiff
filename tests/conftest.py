@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from src.models.base import Base
+from app.models.base import Base
 
 # Test database URL - use in-memory SQLite for fast tests
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

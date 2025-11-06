@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.models.user import User
-from src.services.user import user_service
+from app.models.user import User
+from app.services.user import user_service
 
 
 class TestUserService:

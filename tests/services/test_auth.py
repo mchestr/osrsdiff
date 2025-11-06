@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi import HTTPException
 
-from src.services.auth import AuthService
+from app.services.auth import AuthService
 
 
 class TestAuthService:

@@ -8,16 +8,16 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.auth import require_auth
-from src.api.players import get_player_service, router
-from src.models.player import Player
-from src.services.osrs_api import (
+from app.api.auth import require_auth
+from app.api.players import get_player_service, router
+from app.models.player import Player
+from app.services.osrs_api import (
     OSRSAPIError,
 )
-from src.services.osrs_api import (
+from app.services.osrs_api import (
     PlayerNotFoundError as OSRSPlayerNotFoundError,
 )
-from src.services.player import (
+from app.services.player import (
     InvalidUsernameError,
     PlayerAlreadyExistsError,
     PlayerNotFoundServiceError,
@@ -337,7 +337,7 @@ class TestPlayerEndpoints:
 
         assert response.status_code == 422  # Pydantic validation error
 
-    @patch("src.workers.tasks.fetch_player_hiscores_task")
+    @patch("app.workers.tasks.fetch_player_hiscores_task")
     def test_trigger_manual_fetch_success(
         self, mock_task, client, mock_player_service
     ):
@@ -376,7 +376,7 @@ class TestPlayerEndpoints:
         # Verify service was called correctly
         mock_player_service.get_player.assert_called_once_with("test_player")
 
-    @patch("src.workers.tasks.fetch_player_hiscores_task")
+    @patch("app.workers.tasks.fetch_player_hiscores_task")
     def test_trigger_manual_fetch_player_not_found(
         self, mock_task, client, mock_player_service
     ):
@@ -395,7 +395,7 @@ class TestPlayerEndpoints:
         mock_player_service.get_player.assert_called_once_with("nonexistent")
         mock_task.kiq.assert_not_called()
 
-    @patch("src.workers.tasks.fetch_player_hiscores_task")
+    @patch("app.workers.tasks.fetch_player_hiscores_task")
     def test_trigger_manual_fetch_task_enqueue_error(
         self, mock_task, client, mock_player_service
     ):
@@ -440,7 +440,7 @@ class TestPlayerEndpoints:
 class TestPlayerMetadata:
     """Test player metadata endpoint."""
 
-    @patch("src.api.players.get_db_session")
+    @patch("app.api.players.get_db_session")
     def test_get_player_metadata_success(
         self, mock_get_db, client, mock_player_service
     ):
@@ -481,7 +481,7 @@ class TestPlayerMetadata:
         assert data["records_last_7d"] == 25
         assert "avg_fetch_frequency_hours" in data
 
-    @patch("src.api.players.get_db_session")
+    @patch("app.api.players.get_db_session")
     def test_get_player_metadata_not_found(
         self, mock_get_db, client, mock_player_service
     ):

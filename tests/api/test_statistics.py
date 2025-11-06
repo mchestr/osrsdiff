@@ -7,11 +7,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.auth import require_auth
-from src.api.statistics import get_statistics_service, router
-from src.models.hiscore import HiscoreRecord
-from src.models.player import Player
-from src.services.statistics import (
+from app.api.auth import require_auth
+from app.api.statistics import get_statistics_service, router
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
+from app.services.statistics import (
     NoDataAvailableError,
     PlayerNotFoundError,
     StatisticsService,

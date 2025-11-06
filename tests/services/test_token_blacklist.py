@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.services.auth import auth_service
-from src.services.token_blacklist import TokenBlacklistService
+from app.services.auth import auth_service
+from app.services.token_blacklist import TokenBlacklistService
 
 
 class TestTokenBlacklistService:

@@ -6,10 +6,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import pytest_asyncio
 
-from src.models.hiscore import HiscoreRecord
-from src.models.player import Player
-from src.services.osrs_api import HiscoreData
-from src.workers.fetch import _fetch_player_hiscores, _hiscore_data_changed
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
+from app.services.osrs_api import HiscoreData
+from app.workers.fetch import (
+    _fetch_player_hiscores,
+    _hiscore_data_changed,
+)
 
 
 @pytest_asyncio.fixture
@@ -192,8 +195,10 @@ class TestFetchPlayerHiscoresDeduplication:
         )
 
         with (
-            patch("src.workers.fetch.OSRSAPIClient") as mock_client_class,
-            patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local,
+            patch("app.workers.fetch.OSRSAPIClient") as mock_client_class,
+            patch(
+                "app.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local,
         ):
 
             mock_client = AsyncMock()
@@ -264,8 +269,10 @@ class TestFetchPlayerHiscoresDeduplication:
         )
 
         with (
-            patch("src.workers.fetch.OSRSAPIClient") as mock_client_class,
-            patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local,
+            patch("app.workers.fetch.OSRSAPIClient") as mock_client_class,
+            patch(
+                "app.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local,
         ):
 
             mock_client = AsyncMock()
@@ -315,8 +322,10 @@ class TestFetchPlayerHiscoresDeduplication:
         )
 
         with (
-            patch("src.workers.fetch.OSRSAPIClient") as mock_client_class,
-            patch("src.workers.fetch.AsyncSessionLocal") as mock_session_local,
+            patch("app.workers.fetch.OSRSAPIClient") as mock_client_class,
+            patch(
+                "app.workers.fetch.AsyncSessionLocal"
+            ) as mock_session_local,
         ):
 
             mock_client = AsyncMock()

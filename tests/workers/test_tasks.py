@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from src.workers.tasks import health_check_task, retry_task, timeout_task
+from app.workers.tasks import health_check_task, retry_task, timeout_task
 
 
 class TestBasicTasks:

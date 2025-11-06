@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.models.user import User
+from app.models.user import User
 
 
 class TestUserModel:

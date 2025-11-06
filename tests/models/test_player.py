@@ -7,8 +7,8 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.hiscore import HiscoreRecord
-from src.models.player import Player
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
 
 
 class TestPlayerModel:
@@ -83,7 +83,7 @@ class TestPlayerModel:
 
     def test_latest_hiscore_property_with_records(self):
         """Test latest_hiscore property with mock records."""
-        from src.models.hiscore import HiscoreRecord
+        from app.models.hiscore import HiscoreRecord
 
         player = Player(username="test_player")
 

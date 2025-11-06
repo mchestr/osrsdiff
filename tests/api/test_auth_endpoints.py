@@ -6,10 +6,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.auth_endpoints import router
-from src.models.base import get_db_session
-from src.models.user import User
-from src.services.auth import auth_service
+from app.api.auth_endpoints import router
+from app.models.base import get_db_session
+from app.models.user import User
+from app.services.auth import auth_service
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def client(app):
 class TestAuthEndpoints:
     """Test cases for authentication endpoints."""
 
-    @patch("src.services.auth.auth_service.authenticate_user")
+    @patch("app.services.auth.auth_service.authenticate_user")
     def test_login_success(self, mock_authenticate, client, mock_user):
         """Test successful login."""
         # Mock successful authentication
@@ -75,7 +75,7 @@ class TestAuthEndpoints:
         assert len(data["access_token"]) > 0
         assert len(data["refresh_token"]) > 0
 
-    @patch("src.services.auth.auth_service.authenticate_user")
+    @patch("app.services.auth.auth_service.authenticate_user")
     def test_login_invalid_credentials(self, mock_authenticate, client):
         """Test login with invalid credentials."""
         # Mock failed authentication
@@ -89,7 +89,7 @@ class TestAuthEndpoints:
         assert response.status_code == 401
         assert "Invalid username or password" in response.json()["detail"]
 
-    @patch("src.services.auth.auth_service.authenticate_user")
+    @patch("app.services.auth.auth_service.authenticate_user")
     def test_refresh_token_success(self, mock_authenticate, client, mock_user):
         """Test successful token refresh."""
         # Mock successful authentication
@@ -124,7 +124,7 @@ class TestAuthEndpoints:
         assert response.status_code == 401
         assert "Invalid refresh token" in response.json()["detail"]
 
-    @patch("src.services.auth.auth_service.authenticate_user")
+    @patch("app.services.auth.auth_service.authenticate_user")
     def test_get_current_user_success(
         self, mock_authenticate, client, mock_user
     ):
@@ -165,7 +165,7 @@ class TestAuthEndpoints:
 
         assert response.status_code == 401
 
-    @patch("src.services.auth.auth_service.authenticate_user")
+    @patch("app.services.auth.auth_service.authenticate_user")
     def test_logout_success(self, mock_authenticate, client, mock_user):
         """Test successful logout."""
         # Mock successful authentication

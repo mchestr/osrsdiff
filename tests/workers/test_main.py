@@ -4,7 +4,7 @@ import pytest
 from taskiq.middlewares import SimpleRetryMiddleware
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
-from src.workers.main import broker, get_task_defaults
+from app.workers.main import broker, get_task_defaults
 
 
 class TestTaskIQBroker:

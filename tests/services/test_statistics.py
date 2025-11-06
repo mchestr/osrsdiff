@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.models.hiscore import HiscoreRecord
-from src.models.player import Player
-from src.services.statistics import (
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
+from app.services.statistics import (
     NoDataAvailableError,
     PlayerNotFoundError,
     StatisticsService,

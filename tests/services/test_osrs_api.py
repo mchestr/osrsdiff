@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from aiohttp import ClientError
 
-from src.services.osrs_api import (
+from app.services.osrs_api import (
     APIUnavailableError,
     HiscoreData,
     OSRSAPIClient,

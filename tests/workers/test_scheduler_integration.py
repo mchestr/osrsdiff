@@ -13,11 +13,11 @@ from taskiq import TaskiqScheduler
 from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import ListRedisScheduleSource
 
-from src.config import settings
-from src.models.player import GameMode, Player
-from src.services.scheduler import PlayerScheduleManager
-from src.workers.main import broker
-from src.workers.scheduler_config import (
+from app.config import settings
+from app.models.player import GameMode, Player
+from app.services.scheduler import PlayerScheduleManager
+from app.workers.main import broker
+from app.workers.scheduler_config import (
     create_scheduler,
     create_scheduler_sources,
 )
@@ -31,7 +31,7 @@ class TestSchedulerIntegration:
     async def redis_schedule_source(self):
         """Create a test Redis schedule source."""
         # Use a test-specific prefix to avoid conflicts
-        test_prefix = f"test_osrsdiff_schedules_{datetime.now().timestamp()}"
+        test_prefix = f"test_app_schedules_{datetime.now().timestamp()}"
 
         source = ListRedisScheduleSource(
             url=settings.redis.url,
@@ -304,7 +304,7 @@ class TestSchedulerIntegration:
             await schedule_manager.schedule_player(player)
 
         # Create an invalid schedule manually (wrong player_id in labels)
-        from src.workers.fetch import fetch_player_hiscores_task
+        from app.workers.fetch import fetch_player_hiscores_task
 
         await fetch_player_hiscores_task.kicker().with_schedule_id(
             "player_fetch_9999"
@@ -536,7 +536,7 @@ class TestSchedulerMigrationIntegration:
         await test_session.commit()
 
         # Create orphaned schedule (player deleted but schedule remains)
-        from src.workers.fetch import fetch_player_hiscores_task
+        from app.workers.fetch import fetch_player_hiscores_task
 
         orphaned_schedule_id = "player_fetch_9999"
         await fetch_player_hiscores_task.kicker().with_schedule_id(
@@ -661,7 +661,7 @@ class TestTaskExecutionIntegration:
     @pytest.mark.asyncio
     async def test_label_schedule_source_integration(self):
         """Test that LabelScheduleSource works with static schedules."""
-        from src.workers.scheduler_config import create_scheduler_sources
+        from app.workers.scheduler_config import create_scheduler_sources
 
         sources = create_scheduler_sources()
 

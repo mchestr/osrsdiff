@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.models.player import GameMode, Player
-from src.services.scheduler import (
+from app.models.player import GameMode, Player
+from app.services.scheduler import (
     PlayerScheduleManager,
     ScheduleCreationError,
     ScheduleDeletionError,
@@ -143,7 +143,7 @@ class TestPlayerScheduleManager:
         mock_kicker.schedule_by_cron = AsyncMock(return_value=mock_schedule)
 
         with patch(
-            "src.workers.fetch.fetch_player_hiscores_task"
+            "app.workers.fetch.fetch_player_hiscores_task"
         ) as mock_task:
             mock_task.kicker.return_value = mock_kicker
 
@@ -169,7 +169,7 @@ class TestPlayerScheduleManager:
     ):
         """Test player scheduling failure."""
         with patch(
-            "src.workers.fetch.fetch_player_hiscores_task"
+            "app.workers.fetch.fetch_player_hiscores_task"
         ) as mock_task:
             mock_task.kicker.side_effect = Exception("Redis connection failed")
 

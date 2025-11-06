@@ -1,3 +1,6 @@
+[tools]
+uv = "latest"
+
 [tasks.help]
 description = "Show available tasks"
 run = """
@@ -35,19 +38,19 @@ echo "  mise run clean        - Clean up build artifacts"
 
 [tasks.install]
 description = "Install production dependencies"
-run = "pip install -e ."
+run = "uv sync --no-dev"
 
 [tasks.dev-install]
 description = "Install development dependencies"
-run = "pip install -e .[dev]"
+run = "uv sync"
 
 [tasks.dev]
 description = "Start development server"
-run = "uvicorn src.main:app --reload"
+run = "fastapi run app/main.py --host 0.0.0.0 --port 8000 --reload"
 
 [tasks.worker]
 description = "Start background worker"
-run = "taskiq worker src.workers.main:broker"
+run = "taskiq worker app.workers.main:broker"
 
 [tasks.test]
 description = "Run tests"
@@ -55,25 +58,26 @@ run = "pytest"
 
 [tasks."test:cov"]
 description = "Run tests with coverage"
-run = "pytest --cov=src --cov-report=html --cov-report=term"
+run = "pytest --cov=app --cov-report=html --cov-report=term"
 
 [tasks.lint]
 description = "Run linting"
 run = """
-flake8 src/ tests/
-mypy src/
+black --check app/ tests/
+isort --check app/ tests/
+mypy app/
 """
 
 [tasks.format]
 description = "Format code"
 run = """
-black src/ tests/
-isort src/ tests/
+black app/ tests/
+isort app/ tests/
 """
 
 [tasks.typecheck]
 description = "Run type checking"
-run = "mypy src/"
+run = "mypy app/"
 
 [tasks.clean]
 description = "Clean up build artifacts"

@@ -4,9 +4,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.models.hiscore import HiscoreRecord
-from src.models.player import Player
-from src.services.history import (
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
+from app.services.history import (
     BossProgress,
     HistoryService,
     HistoryServiceError,

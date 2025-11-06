@@ -3,7 +3,12 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import AsyncSessionLocal, Base, engine, get_db_session
+from app.models.base import (
+    AsyncSessionLocal,
+    Base,
+    engine,
+    get_db_session,
+)
 
 
 class TestDatabaseConfiguration:
