@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 from taskiq_redis import ListRedisScheduleSource
 
 from app.models.player import Player
-from app.workers.main import redis_schedule_source
 
 logger = logging.getLogger(__name__)
 
@@ -632,15 +631,43 @@ class PlayerScheduleManager:
             raise
 
 
-# Global instance using the redis_schedule_source from main.py
-player_schedule_manager = PlayerScheduleManager(redis_schedule_source)
+# Global instance - lazily initialized to avoid circular imports
+_player_schedule_manager: Optional[PlayerScheduleManager] = None
 
 
-async def get_player_schedule_manager() -> PlayerScheduleManager:
+def _get_redis_schedule_source() -> ListRedisScheduleSource:
+    """Lazy import to avoid circular dependency."""
+    from app.workers.scheduler_config import redis_schedule_source
+
+    return redis_schedule_source
+
+
+def get_player_schedule_manager() -> PlayerScheduleManager:
     """
-    Dependency injection function for FastAPI.
+    Get or create the global player schedule manager instance.
+
+    Uses lazy initialization to avoid circular import issues.
 
     Returns:
         PlayerScheduleManager: Configured player schedule manager instance
     """
-    return player_schedule_manager
+    global _player_schedule_manager
+    if _player_schedule_manager is None:
+        redis_source = _get_redis_schedule_source()
+        _player_schedule_manager = PlayerScheduleManager(redis_source)
+    return _player_schedule_manager
+
+
+# Create a simple accessor that looks like a variable
+class _PlayerScheduleManagerProxy:
+    """Proxy object that provides attribute access to the manager."""
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_player_schedule_manager(), name)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> PlayerScheduleManager:
+        return get_player_schedule_manager()
+
+
+# Module-level variable that acts like PlayerScheduleManager
+player_schedule_manager = _PlayerScheduleManagerProxy()

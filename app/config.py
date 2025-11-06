@@ -59,7 +59,11 @@ class LogConfig(BaseModel):
         default_factory=lambda: {
             "": {"handlers": ["default"], "level": "DEBUG", "propagate": True},
             "app": {"level": "DEBUG"},
-            "uvicorn.access": {"handlers": ["access"], "level": "DEBUG", "propagate": False},
+            "uvicorn.access": {
+                "handlers": ["access"],
+                "level": "DEBUG",
+                "propagate": False,
+            },
             "uvicorn.error": {"handlers": ["error"], "level": "DEBUG"},
         }
     )

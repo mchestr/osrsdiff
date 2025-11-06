@@ -258,7 +258,7 @@ async def add_player(
         try:
             from app.services.scheduler import get_player_schedule_manager
 
-            schedule_manager = await get_player_schedule_manager()
+            schedule_manager = get_player_schedule_manager()
             schedule_id = await schedule_manager.schedule_player(player)
             player.schedule_id = schedule_id
             await player_service.db_session.commit()
@@ -849,7 +849,7 @@ async def list_player_schedules(
         from app.services.scheduler import get_player_schedule_manager
 
         try:
-            schedule_manager = await get_player_schedule_manager()
+            schedule_manager = get_player_schedule_manager()
         except Exception as e:
             logger.warning(f"Failed to get schedule manager: {e}")
             schedule_manager = None
@@ -962,7 +962,7 @@ async def pause_player_schedule(
         from app.services.scheduler import get_player_schedule_manager
 
         try:
-            schedule_manager = await get_player_schedule_manager()
+            schedule_manager = get_player_schedule_manager()
         except Exception as e:
             logger.error(f"Failed to get schedule manager: {e}")
             raise HTTPException(
@@ -1051,7 +1051,7 @@ async def resume_player_schedule(
         from app.services.scheduler import get_player_schedule_manager
 
         try:
-            schedule_manager = await get_player_schedule_manager()
+            schedule_manager = get_player_schedule_manager()
         except Exception as e:
             logger.error(f"Failed to get schedule manager: {e}")
             raise HTTPException(
@@ -1121,7 +1121,7 @@ async def verify_all_schedules(
         from app.services.scheduler import get_player_schedule_manager
 
         try:
-            schedule_manager = await get_player_schedule_manager()
+            schedule_manager = get_player_schedule_manager()
         except Exception as e:
             logger.error(f"Failed to get schedule manager: {e}")
             raise HTTPException(

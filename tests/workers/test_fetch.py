@@ -52,9 +52,7 @@ class TestFetchPlayerHiscores:
             fetched_at=datetime.now(UTC),
         )
 
-        with patch(
-            "app.workers.fetch.OSRSAPIClient"
-        ) as mock_client_class:
+        with patch("app.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_client
@@ -140,9 +138,7 @@ class TestFetchPlayerHiscores:
         self, test_session, sample_player
     ):
         """Test fetch when player not found in OSRS hiscores."""
-        with patch(
-            "app.workers.fetch.OSRSAPIClient"
-        ) as mock_client_class:
+        with patch("app.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_client
@@ -168,9 +164,7 @@ class TestFetchPlayerHiscores:
     @pytest.mark.asyncio
     async def test_fetch_rate_limit_error(self, test_session, sample_player):
         """Test fetch with rate limit error (should raise for retry)."""
-        with patch(
-            "app.workers.fetch.OSRSAPIClient"
-        ) as mock_client_class:
+        with patch("app.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_client
@@ -196,9 +190,7 @@ class TestFetchPlayerHiscores:
         self, test_session, sample_player
     ):
         """Test fetch with API unavailable error (should raise for retry)."""
-        with patch(
-            "app.workers.fetch.OSRSAPIClient"
-        ) as mock_client_class:
+        with patch("app.workers.fetch.OSRSAPIClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client_class.return_value.__aenter__.return_value = (
                 mock_client

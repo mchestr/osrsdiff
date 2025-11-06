@@ -13,21 +13,24 @@ from app.workers.main import broker
 logger = logging.getLogger(__name__)
 
 
+# Create scheduler sources for direct access
+# Redis-based schedule source for dynamic scheduling
+redis_schedule_source = ListRedisScheduleSource(
+    url=settings.redis.url,
+    prefix=settings.taskiq.scheduler_prefix,
+    max_connection_pool_size=settings.redis.max_connections,
+)
+
+# Label-based schedule source for static schedules
+label_schedule_source = LabelScheduleSource(broker)  # type: ignore[has-type]
+
+
 def create_scheduler_sources() -> List[Any]:
     """Create and configure scheduler sources."""
-    sources: List[Any] = []
-
-    # Redis-based schedule source for dynamic scheduling
-    redis_schedule_source = ListRedisScheduleSource(
-        url=settings.redis.url,
-        prefix=settings.taskiq.scheduler_prefix,
-        max_connection_pool_size=settings.redis.max_connections,
-    )
-    sources.append(redis_schedule_source)
-
-    # Label-based schedule source for static schedules
-    label_schedule_source = LabelScheduleSource(broker)
-    sources.append(label_schedule_source)
+    sources: List[Any] = [
+        redis_schedule_source,
+        label_schedule_source,
+    ]
 
     logger.info(f"Configured {len(sources)} scheduler sources")
     return sources

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.base import AsyncSessionLocal
 from app.services.schedule_maintenance import ScheduleMaintenanceService
-from app.services.scheduler import player_schedule_manager
+from app.services.scheduler import get_player_schedule_manager
 from app.workers.main import broker, get_task_defaults
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ async def _schedule_verification_job() -> Dict[str, Any]:
         try:
             # Create maintenance service
             maintenance_service = ScheduleMaintenanceService(
-                player_schedule_manager
+                get_player_schedule_manager()
             )
 
             # Get schedule summary
@@ -257,7 +257,7 @@ async def _cleanup_orphaned_schedules_job() -> Dict[str, Any]:
         try:
             # Create maintenance service
             maintenance_service = ScheduleMaintenanceService(
-                player_schedule_manager
+                get_player_schedule_manager()
             )
 
             # Perform cleanup

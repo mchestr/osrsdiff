@@ -12,7 +12,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import ListRedisScheduleSource
 
 from app.config import settings
-from app.models.player import GameMode, Player
+from app.models.player import Player
 from app.services.scheduler import PlayerScheduleManager
 from app.workers.main import broker
 
@@ -122,7 +122,6 @@ class TestBasicSchedulerIntegration:
             id=123,
             username="test_player",
             fetch_interval_minutes=30,
-            game_mode=GameMode.REGULAR,
             is_active=True,
         )
 
@@ -168,7 +167,6 @@ class TestBasicSchedulerIntegration:
             id=123,
             username="test_player",
             fetch_interval_minutes=30,
-            game_mode=GameMode.REGULAR,
             is_active=True,
         )
         player.schedule_id = "player_fetch_123"
@@ -192,7 +190,6 @@ class TestBasicSchedulerIntegration:
             id=123,
             username="test_player",
             fetch_interval_minutes=30,
-            game_mode=GameMode.REGULAR,
             is_active=True,
         )
 

@@ -131,10 +131,27 @@ class TestPlayerDistribution:
     def test_get_player_distribution_success(self, client, mock_db_session):
         """Test successful player distribution retrieval."""
         # Mock database query results for fetch intervals
-        interval_results = [
-            AsyncMock(fetch_interval_minutes=60, count=5),
-            AsyncMock(fetch_interval_minutes=120, count=3),
+        # The first execute() call returns a result with fetchall() method
+        interval_result = AsyncMock()
+
+        # Create mock row objects that support both attribute and index access
+        class MockRow:
+            def __init__(self, fetch_interval_minutes, count):
+                self.fetch_interval_minutes = fetch_interval_minutes
+                self.count = count
+
+            def __getitem__(self, index):
+                if index == 0:
+                    return self.fetch_interval_minutes
+                elif index == 1:
+                    return self.count
+                raise IndexError(f"Index {index} out of range")
+
+        interval_rows = [
+            MockRow(60, 5),
+            MockRow(120, 3),
         ]
+        interval_result.fetchall = lambda: interval_rows
 
         # Mock database query results for time ranges
         time_range_results = [
@@ -147,7 +164,7 @@ class TestPlayerDistribution:
         ]
 
         mock_db_session.execute.side_effect = [
-            interval_results
+            interval_result
         ] + time_range_results
 
         response = client.get("/system/distribution")

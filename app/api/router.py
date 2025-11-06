@@ -1,10 +1,11 @@
 """Main API router for v1 that groups all API endpoint routers."""
 
 from typing import Dict
+
 from fastapi import APIRouter
 
-from app.api.v1.router import router as v1_router
 from app.api.auth import router as auth_router
+from app.api.v1.router import router as v1_router
 
 router = APIRouter()
 

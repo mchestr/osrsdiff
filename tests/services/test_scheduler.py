@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.player import GameMode, Player
+from app.models.player import Player
 from app.services.scheduler import (
     PlayerScheduleManager,
     ScheduleCreationError,
@@ -33,7 +33,6 @@ class TestPlayerScheduleManager:
             id=123,
             username="test_player",
             fetch_interval_minutes=30,
-            game_mode=GameMode.REGULAR,
             is_active=True,
         )
 

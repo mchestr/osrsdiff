@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.v1.endpoints.auth import router
+from app.api.auth import router
 from app.models.base import get_db_session
 from app.models.user import User
 from app.services.auth import auth_service

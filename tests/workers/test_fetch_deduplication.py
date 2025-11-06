@@ -196,9 +196,7 @@ class TestFetchPlayerHiscoresDeduplication:
 
         with (
             patch("app.workers.fetch.OSRSAPIClient") as mock_client_class,
-            patch(
-                "app.workers.fetch.AsyncSessionLocal"
-            ) as mock_session_local,
+            patch("app.workers.fetch.AsyncSessionLocal") as mock_session_local,
         ):
 
             mock_client = AsyncMock()
@@ -270,9 +268,7 @@ class TestFetchPlayerHiscoresDeduplication:
 
         with (
             patch("app.workers.fetch.OSRSAPIClient") as mock_client_class,
-            patch(
-                "app.workers.fetch.AsyncSessionLocal"
-            ) as mock_session_local,
+            patch("app.workers.fetch.AsyncSessionLocal") as mock_session_local,
         ):
 
             mock_client = AsyncMock()
@@ -323,9 +319,7 @@ class TestFetchPlayerHiscoresDeduplication:
 
         with (
             patch("app.workers.fetch.OSRSAPIClient") as mock_client_class,
-            patch(
-                "app.workers.fetch.AsyncSessionLocal"
-            ) as mock_session_local,
+            patch("app.workers.fetch.AsyncSessionLocal") as mock_session_local,
         ):
 
             mock_client = AsyncMock()

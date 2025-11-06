@@ -1,14 +1,15 @@
 """FastAPI application entry point."""
+
 import logging
-from logging.config import dictConfig
 from contextlib import asynccontextmanager
+from logging.config import dictConfig
 from typing import AsyncGenerator, Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import router
-from app.config import settings, LogConfig
+from app.config import LogConfig, settings
 from app.models.base import init_db
 from app.services.startup import startup_service
 
@@ -64,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
 
     return app
+
 
 # Create the application instance
 app = create_app()

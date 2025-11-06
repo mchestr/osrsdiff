@@ -9,7 +9,8 @@ from taskiq.middlewares import SimpleRetryMiddleware
 from taskiq.state import TaskiqState
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
-from app.config import settings, LogConfig
+from app.config import LogConfig, settings
+
 dictConfig(LogConfig().model_dump())
 
 logger = logging.getLogger(__name__)

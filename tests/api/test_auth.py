@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.api.auth import get_current_user, get_optional_current_user
+from app.api.auth_utils import get_current_user, get_optional_current_user
 from app.services.auth import auth_service
 
 

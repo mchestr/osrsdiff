@@ -12,4 +12,3 @@ router.include_router(players.router)
 router.include_router(statistics.router)
 router.include_router(history.router)
 router.include_router(system.router)
-

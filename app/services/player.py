@@ -552,7 +552,7 @@ async def get_player_service(
     from app.services.scheduler import get_player_schedule_manager
 
     try:
-        schedule_manager = await get_player_schedule_manager()
+        schedule_manager = get_player_schedule_manager()
     except Exception as e:
         logger.warning(
             f"Failed to get schedule manager: {e}. Player service will work without scheduling."

@@ -14,7 +14,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import ListRedisScheduleSource
 
 from app.config import settings
-from app.models.player import GameMode, Player
+from app.models.player import Player
 from app.services.scheduler import PlayerScheduleManager
 from app.workers.main import broker
 from app.workers.scheduler_config import (
@@ -77,7 +77,6 @@ class TestSchedulerIntegration:
             id=12345,
             username="integration_test_player",
             fetch_interval_minutes=30,
-            game_mode=GameMode.REGULAR,
             is_active=True,
         )
         test_session.add(player)
@@ -116,7 +115,11 @@ class TestSchedulerIntegration:
 
         assert created_schedule is not None
         assert created_schedule.cron == "*/30 * * * *"  # 30-minute interval
-        assert created_schedule.task_name == "fetch_player_hiscores_task"
+        # TaskIQ stores task names as module:function format
+        assert (
+            created_schedule.task_name
+            == "app.workers.fetch:_fetch_player_hiscores"
+        )
         assert created_schedule.args == [sample_player.username]
 
         # Verify labels
@@ -125,6 +128,8 @@ class TestSchedulerIntegration:
         assert created_schedule.labels["username"] == sample_player.username
 
         # Step 4: Test schedule deletion
+        # Set schedule_id on player so unschedule_player can find it
+        sample_player.schedule_id = schedule_id
         await schedule_manager.unschedule_player(sample_player)
 
         # Verify schedule is removed
@@ -162,21 +167,18 @@ class TestSchedulerIntegration:
                 id=1001,
                 username="player_30min",
                 fetch_interval_minutes=30,
-                game_mode=GameMode.REGULAR,
                 is_active=True,
             ),
             Player(
                 id=1002,
                 username="player_60min",
                 fetch_interval_minutes=60,
-                game_mode=GameMode.IRONMAN,
                 is_active=True,
             ),
             Player(
                 id=1003,
                 username="player_daily",
                 fetch_interval_minutes=1440,
-                game_mode=GameMode.HARDCORE_IRONMAN,
                 is_active=True,
             ),
         ]
@@ -385,7 +387,9 @@ class TestSchedulerIntegration:
         for schedule_id in schedule_ids:
             assert schedule_id in redis_schedule_ids
 
-        # Cleanup concurrently
+        # Cleanup concurrently - set schedule_id on players first
+        for i, player in enumerate(players):
+            player.schedule_id = schedule_ids[i]
         cleanup_tasks = [
             schedule_manager.unschedule_player(player) for player in players
         ]
@@ -589,6 +593,7 @@ class TestSchedulerMigrationIntegration:
 
         # Rollback: cleanup successful migrations
         for player, schedule_id in successful_migrations:
+            player.schedule_id = schedule_id
             await schedule_manager.unschedule_player(player)
 
         # Verify rollback

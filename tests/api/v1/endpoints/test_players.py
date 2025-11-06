@@ -440,37 +440,63 @@ class TestPlayerEndpoints:
 class TestPlayerMetadata:
     """Test player metadata endpoint."""
 
-    @patch("app.api.players.get_db_session")
-    def test_get_player_metadata_success(
-        self, mock_get_db, client, mock_player_service
-    ):
+    def test_get_player_metadata_success(self, client, mock_player_service):
         """Test successful player metadata retrieval."""
         from datetime import datetime
 
+        from app.models.base import get_db_session
+
         # Create mock database session
         mock_db_session = AsyncMock()
-        mock_get_db.return_value = mock_db_session
 
         # Create test player
         test_player = create_test_player(1, "testuser")
 
         # Mock database queries in order
+        # Player query result
+        player_result = AsyncMock()
+        player_result.scalar_one_or_none = lambda: test_player
+
+        # Record count result
+        count_result = AsyncMock()
+        count_result.scalar = lambda: 50
+
+        # First record result
+        first_result = AsyncMock()
+        first_result.scalar = lambda: datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        # Latest record result
+        latest_result = AsyncMock()
+        latest_result.scalar = lambda: datetime(
+            2024, 11, 2, tzinfo=timezone.utc
+        )
+
+        # Records last 24h result
+        records_24h_result = AsyncMock()
+        records_24h_result.scalar = lambda: 5
+
+        # Records last 7d result
+        records_7d_result = AsyncMock()
+        records_7d_result.scalar = lambda: 25
+
         mock_db_session.execute.side_effect = [
-            # Player query
-            AsyncMock(scalar_one_or_none=lambda: test_player),
-            # Record count
-            AsyncMock(scalar=lambda: 50),
-            # First record
-            AsyncMock(scalar=lambda: datetime(2024, 1, 1)),
-            # Latest record
-            AsyncMock(scalar=lambda: datetime(2024, 11, 2)),
-            # Records last 24h
-            AsyncMock(scalar=lambda: 5),
-            # Records last 7d
-            AsyncMock(scalar=lambda: 25),
+            player_result,  # Player query
+            count_result,  # Record count
+            first_result,  # First record
+            latest_result,  # Latest record
+            records_24h_result,  # Records last 24h
+            records_7d_result,  # Records last 7d
         ]
 
-        response = client.get("/players/testuser/metadata")
+        # Override the database dependency
+        client.app.dependency_overrides[get_db_session] = (
+            lambda: mock_db_session
+        )
+
+        response = client.get(
+            "/players/testuser/metadata",
+            headers={"Authorization": "Bearer fake_token"},
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -481,21 +507,27 @@ class TestPlayerMetadata:
         assert data["records_last_7d"] == 25
         assert "avg_fetch_frequency_hours" in data
 
-    @patch("app.api.players.get_db_session")
-    def test_get_player_metadata_not_found(
-        self, mock_get_db, client, mock_player_service
-    ):
+    def test_get_player_metadata_not_found(self, client, mock_player_service):
         """Test player metadata for non-existent player."""
+        from app.models.base import get_db_session
+
         # Create mock database session
         mock_db_session = AsyncMock()
-        mock_get_db.return_value = mock_db_session
 
         # Mock player not found
-        mock_db_session.execute.return_value = AsyncMock(
-            scalar_one_or_none=lambda: None
+        player_result = AsyncMock()
+        player_result.scalar_one_or_none = lambda: None
+        mock_db_session.execute.return_value = player_result
+
+        # Override the database dependency
+        client.app.dependency_overrides[get_db_session] = (
+            lambda: mock_db_session
         )
 
-        response = client.get("/players/nonexistent/metadata")
+        response = client.get(
+            "/players/nonexistent/metadata",
+            headers={"Authorization": "Bearer fake_token"},
+        )
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
