@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Copy dependency files first (for better Docker cache)
-COPY ./pyproject.toml ./uv.lock ./alembic.ini ./logging.conf ./README.md /app/
+COPY ./pyproject.toml ./uv.lock ./alembic.ini ./README.md /app/
 
 # Install dependencies using uv (without installing the project yet)
 # Use cache mount for uv cache to speed up builds
@@ -39,10 +39,6 @@ RUN groupadd -r appuser && \
 USER appuser
 
 EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
 
 # Use exec form for CMD (recommended by FastAPI docs)
 CMD ["fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

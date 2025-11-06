@@ -57,15 +57,15 @@ jobs:
 
       - name: Format code with black
         run: |
-          black --check --diff src/ tests/
+          black --check --diff app/ tests/
 
       - name: Sort imports with isort
         run: |
-          isort --check-only --diff src/ tests/
+          isort --check-only --diff app/ tests/
 
       - name: Type check with mypy
         run: |
-          mypy src/
+          mypy app/
 
       - name: Test with pytest
         env:
@@ -73,7 +73,7 @@ jobs:
           REDIS__URL: redis://localhost:6379/0
           JWT__SECRET_KEY: test-secret-key-for-ci
         run: |
-          pytest --cov=src --cov-report=xml --cov-report=term-missing
+          pytest --cov=app --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

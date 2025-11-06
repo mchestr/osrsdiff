@@ -36,7 +36,7 @@ jobs:
 
       - name: Run bandit security scan
         run: |
-          bandit -r src/ -f json -o bandit-report.json || true
+          bandit -r app/ -f json -o bandit-report.json || true
 
       - name: Upload safety results
         if: always()
