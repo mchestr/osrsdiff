@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.auth import require_auth
-from app.api.statistics import get_statistics_service, router
+from app.api.v1.endpoints.statistics import get_statistics_service, router
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.statistics import (

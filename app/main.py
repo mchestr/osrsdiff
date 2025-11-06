@@ -7,17 +7,10 @@ from typing import AsyncGenerator, Dict
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.auth_endpoints import router as auth_router
-from app.api.history import router as history_router
-from app.api.players import router as players_router
-from app.api.statistics import router as statistics_router
-from app.api.system import router as system_router
-from app.config import settings, LogConfig
+from app.api.v1.router import router
+from app.config import settings
 from app.models.base import init_db
 from app.services.startup import startup_service
-
-dictConfig(LogConfig().model_dump())
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -64,12 +57,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include routers
-    app.include_router(auth_router)
-    app.include_router(players_router)
-    app.include_router(statistics_router)
-    app.include_router(history_router)
-    app.include_router(system_router)
+    # Include the main API router
+    app.include_router(router)
 
     return app
 

@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.auth import require_auth
-from app.api.system import router
+from app.api.v1.endpoints.system import router
 from app.models.base import get_db_session
 
 

@@ -1,19 +1,26 @@
-"""Authentication API endpoints and dependencies."""
+"""Authentication endpoints for login and token management."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-from fastapi import Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import (
     HTTPAuthorizationCredentials,
-    HTTPBearer,
-    OAuth2PasswordBearer,
+    OAuth2PasswordRequestForm,
 )
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.auth import (
+    get_current_user,
+    get_current_user_bearer,
+    require_auth,
+    security,
+)
+from app.models.base import get_db_session
 from app.services.auth import auth_service
 
 
-# Pydantic models for request/response
+# Request/Response models
 class TokenResponse(BaseModel):
     """Token response model."""
 
@@ -35,96 +42,87 @@ class TokenRefreshResponse(BaseModel):
     token_type: str = "bearer"
 
 
-# FastAPI security schemes
-security = HTTPBearer()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+class UserResponse(BaseModel):
+    """User response model."""
+
+    username: str
+    user_id: int
 
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-) -> Dict[str, Any]:
+# Router
+router = APIRouter(prefix="/auth", tags=["authentication"])
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db_session),
+) -> TokenResponse:
     """
-    FastAPI dependency to get current authenticated user from JWT token.
+    Login endpoint to generate JWT tokens.
 
-    Args:
-        token: JWT access token from OAuth2 scheme
-
-    Returns:
-        The decoded token payload containing user information
-
-    Raises:
-        HTTPException: If token is invalid or expired
+    Compatible with OAuth2 password flow for OpenAPI docs integration.
     """
-    return await auth_service.validate_token(token, token_type="access")
-
-
-async def get_current_user_bearer(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> Dict[str, Any]:
-    """
-    FastAPI dependency to get current authenticated user from Bearer token.
-
-    Args:
-        credentials: HTTP Bearer token credentials
-
-    Returns:
-        The decoded token payload containing user information
-
-    Raises:
-        HTTPException: If token is invalid or expired
-    """
-    token = credentials.credentials
-    return await auth_service.validate_token(token, token_type="access")
-
-
-async def get_optional_current_user(
-    token: Optional[str] = Depends(
-        OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+    # Authenticate user against database
+    user = await auth_service.authenticate_user(
+        db, form_data.username, form_data.password
     )
-) -> Optional[Dict[str, Any]]:
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_data = auth_service.create_user_token_data(user)
+    tokens = auth_service.create_token_pair(user_data)
+    return TokenResponse(**tokens)
+
+
+@router.post("/refresh", response_model=TokenRefreshResponse)
+async def refresh_token(request: TokenRefreshRequest) -> TokenRefreshResponse:
     """
-    FastAPI dependency to optionally get current authenticated user.
-
-    Args:
-        token: Optional JWT access token
-
-    Returns:
-        The decoded token payload if valid token provided, None otherwise
+    Refresh access token using refresh token.
     """
-    if token is None:
-        return None
-
     try:
-        return await auth_service.validate_token(token, token_type="access")
+        new_access_token = await auth_service.refresh_access_token(
+            request.refresh_token
+        )
+        return TokenRefreshResponse(
+            access_token=new_access_token, token_type="bearer"
+        )
     except HTTPException:
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
 
 
-def require_auth(
-    user: Dict[str, Any] = Depends(get_current_user),
-) -> Dict[str, Any]:
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> UserResponse:
     """
-    FastAPI dependency that requires authentication.
+    Get current authenticated user information.
 
-    Args:
-        user: Current authenticated user from get_current_user dependency
-
-    Returns:
-        The authenticated user data
+    This endpoint demonstrates how to use the authentication dependency.
     """
-    return user
+    return UserResponse(
+        username=current_user["username"], user_id=current_user["user_id"]
+    )
 
 
-def optional_auth(
-    user: Optional[Dict[str, Any]] = Depends(get_optional_current_user),
-) -> Optional[Dict[str, Any]]:
+@router.post("/logout")
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user: Dict[str, Any] = Depends(get_current_user_bearer),
+) -> Dict[str, str]:
     """
-    FastAPI dependency for optional authentication.
-
-    Args:
-        user: Optional current authenticated user
-
-    Returns:
-        The authenticated user data if available, None otherwise
+    Logout endpoint that blacklists the current access token.
     """
-    return user
+    # Blacklist the current token
+    token = credentials.credentials
+    await auth_service.logout_token(token)
+
+    return {"message": "Successfully logged out"}

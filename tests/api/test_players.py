@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_auth
-from app.api.players import get_player_service, router
+from app.api.v1.endpoints.players import get_player_service, router
 from app.models.player import Player
 from app.services.osrs_api import (
     OSRSAPIError,
