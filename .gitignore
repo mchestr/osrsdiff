@@ -16,6 +16,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# Exception: Frontend API client wrapper (needed for builds)
+!frontend/src/lib/apiClient.ts
 parts/
 sdist/
 var/

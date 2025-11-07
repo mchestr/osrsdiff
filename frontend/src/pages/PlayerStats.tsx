@@ -89,8 +89,8 @@ export const PlayerStats: React.FC = () => {
     .slice(0, 10);
 
   const progressData = progress
-    ? Object.entries(progress.progress.experience_gained)
-        .map(([skill, exp]: [string, number]) => ({
+    ? (Object.entries(progress.progress.experience_gained) as [string, number][])
+        .map(([skill, exp]) => ({
           skill: skill.charAt(0).toUpperCase() + skill.slice(1),
           experience: exp,
           levels: progress.progress.levels_gained[skill] || 0,

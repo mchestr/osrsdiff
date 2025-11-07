@@ -125,6 +125,19 @@ jobs:
         working-directory: ./frontend
         run: npx tsc --noEmit
 
+      - name: Generate API client
+        working-directory: ./frontend
+        # Generate API client - in CI we need the backend running or use a pre-generated schema
+        # For now, we'll skip if backend isn't available (it should be generated before CI)
+        run: |
+          if [ -f "src/api/index.ts" ]; then
+            echo "API client already exists"
+          else
+            echo "Warning: API client not found. It should be generated before CI."
+            echo "The API client files (src/api/ and src/lib/apiClient.ts) should be committed to git."
+            exit 1
+          fi
+
       - name: Build frontend
         working-directory: ./frontend
         run: npm run build

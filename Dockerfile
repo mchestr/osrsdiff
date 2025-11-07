@@ -10,14 +10,8 @@ COPY frontend/package.json frontend/package-lock.json* ./
 # Install frontend dependencies
 RUN npm ci
 
-# Copy frontend source code
+# Copy frontend source code (including generated API client if it exists)
 COPY frontend/ ./
-
-# Generate OpenAPI client (requires backend to be running, but we'll use a placeholder)
-# In production, this should be generated before the Docker build or use a pre-built schema
-# For now, we assume the API client is already generated and committed
-# If not, uncomment the following and ensure the backend is accessible:
-# RUN npm run generate-api:local || echo "Warning: Could not generate API client"
 
 # Build frontend (outputs to dist/)
 RUN npm run build
