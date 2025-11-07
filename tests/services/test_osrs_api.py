@@ -1,7 +1,6 @@
 """Tests for OSRS API client service."""
 
-import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from aiohttp import ClientError
@@ -127,28 +126,6 @@ class TestOSRSAPIClient:
         """Test parsing invalid hiscore data format."""
         with pytest.raises(OSRSAPIError, match="Invalid hiscore data format"):
             client._parse_hiscore_data("invalid_data")
-
-    async def test_rate_limiting(self, client):
-        """Test that rate limiting is enforced."""
-        # Mock the session to avoid actual HTTP requests
-        with patch.object(client, "_session") as mock_session:
-            mock_session.closed = False
-
-            start_time = asyncio.get_event_loop().time()
-
-            # First request should not be delayed
-            await client._enforce_rate_limit()
-            first_time = asyncio.get_event_loop().time()
-
-            # Second request should be delayed
-            await client._enforce_rate_limit()
-            second_time = asyncio.get_event_loop().time()
-
-            # Should have waited at least the rate limit delay
-            time_diff = second_time - first_time
-            assert (
-                time_diff >= client.RATE_LIMIT_DELAY - 0.1
-            )  # Allow small timing variance
 
     async def test_fetch_player_hiscores_empty_username(self, client):
         """Test fetching hiscores with empty username."""

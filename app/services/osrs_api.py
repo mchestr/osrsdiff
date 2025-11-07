@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from urllib.parse import quote
 
-import aiohttp
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
@@ -40,25 +39,18 @@ class OSRSAPIClient:
         "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json"
     )
 
-    # OSRS API rate limiting: 1 request per 2 seconds to be safe
-    RATE_LIMIT_DELAY = 2.0
-
     # Retry configuration
     MAX_RETRIES = 3
     INITIAL_BACKOFF = 1.0
     MAX_BACKOFF = 30.0
     BACKOFF_MULTIPLIER = 2.0
 
-    # Timeout configuration
-    CONNECT_TIMEOUT = 10.0
-    READ_TIMEOUT = 30.0
-    TOTAL_TIMEOUT = 60.0
+    # Timeout configuration (seconds)
+    TIMEOUT = 30.0
 
     def __init__(self) -> None:
         """Initialize the OSRS API client."""
         self._session: Optional[ClientSession] = None
-        self._last_request_time: Optional[datetime] = None
-        self._rate_limit_lock = asyncio.Lock()
 
     async def __aenter__(self) -> "OSRSAPIClient":
         """Async context manager entry."""
@@ -74,24 +66,10 @@ class OSRSAPIClient:
     async def _ensure_session(self) -> None:
         """Ensure HTTP session is created."""
         if self._session is None or self._session.closed:
-            timeout = ClientTimeout(
-                connect=self.CONNECT_TIMEOUT,
-                sock_read=self.READ_TIMEOUT,
-                total=self.TOTAL_TIMEOUT,
-            )
-
-            connector = aiohttp.TCPConnector(
-                limit=10,  # Total connection pool size
-                limit_per_host=5,  # Connections per host
-                ttl_dns_cache=300,  # DNS cache TTL
-                use_dns_cache=True,
-                keepalive_timeout=30,
-                enable_cleanup_closed=True,
-            )
+            timeout = ClientTimeout(total=self.TIMEOUT)
 
             self._session = ClientSession(
                 timeout=timeout,
-                connector=connector,
                 headers={
                     "User-Agent": "OSRSDiff/1.0.0 (https://github.com/mchestr/osrsdiff)"
                 },
@@ -103,24 +81,6 @@ class OSRSAPIClient:
             await self._session.close()
             self._session = None
 
-    async def _enforce_rate_limit(self) -> None:
-        """Enforce rate limiting between requests."""
-        async with self._rate_limit_lock:
-            if self._last_request_time is not None:
-                time_since_last = (
-                    datetime.now(timezone.utc) - self._last_request_time
-                )
-                if time_since_last.total_seconds() < self.RATE_LIMIT_DELAY:
-                    sleep_time = (
-                        self.RATE_LIMIT_DELAY - time_since_last.total_seconds()
-                    )
-                    logger.debug(
-                        f"Rate limiting: sleeping for {sleep_time:.2f} seconds"
-                    )
-                    await asyncio.sleep(sleep_time)
-
-            self._last_request_time = datetime.now(timezone.utc)
-
     async def _make_request(self, username: str) -> Dict[str, Any]:
         """Make HTTP request to OSRS API with retry logic."""
         await self._ensure_session()
@@ -130,8 +90,6 @@ class OSRSAPIClient:
 
         for attempt in range(self.MAX_RETRIES + 1):
             try:
-                await self._enforce_rate_limit()
-
                 logger.debug(
                     f"Fetching hiscores for {username} (attempt {attempt + 1})"
                 )
@@ -325,8 +283,8 @@ class OSRSAPIClient:
             HiscoreData: Parsed hiscore data
 
         Raises:
-            PlayerNotFoundError: If player is not found
-            RateLimitError: If rate limit is exceeded
+            OSRSPlayerNotFoundError: If player is not found
+            RateLimitError: If rate limit is exceeded (from API)
             APIUnavailableError: If API is unavailable
             OSRSAPIError: For other API errors
         """
@@ -358,6 +316,11 @@ class OSRSAPIClient:
 
         Returns:
             bool: True if player exists, False otherwise
+
+        Raises:
+            RateLimitError: If rate limit is exceeded
+            APIUnavailableError: If API is unavailable
+            OSRSAPIError: For other API errors
         """
         try:
             await self.fetch_player_hiscores(username)
