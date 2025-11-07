@@ -90,7 +90,7 @@ export const PlayerStats: React.FC = () => {
 
   const progressData = progress
     ? Object.entries(progress.progress.experience_gained)
-        .map(([skill, exp]) => ({
+        .map(([skill, exp]: [string, number]) => ({
           skill: skill.charAt(0).toUpperCase() + skill.slice(1),
           experience: exp,
           levels: progress.progress.levels_gained[skill] || 0,
@@ -142,7 +142,7 @@ export const PlayerStats: React.FC = () => {
               <h3 className="text-sm font-medium text-gray-500 mb-2">Total Experience Gained</h3>
               <p className="text-2xl font-bold">
                 {Object.values(progress.progress.experience_gained)
-                  .reduce((sum, exp) => sum + exp, 0)
+                  .reduce((sum: number, exp: number) => sum + exp, 0)
                   .toLocaleString()}
               </p>
             </div>
@@ -150,7 +150,7 @@ export const PlayerStats: React.FC = () => {
               <h3 className="text-sm font-medium text-gray-500 mb-2">Total Levels Gained</h3>
               <p className="text-2xl font-bold">
                 {Object.values(progress.progress.levels_gained)
-                  .reduce((sum, levels) => sum + levels, 0)}
+                  .reduce((sum: number, levels: number) => sum + levels, 0)}
               </p>
             </div>
           </div>
