@@ -178,10 +178,10 @@ class HiscoreRecord(Base):
         # Melee = 0.325 * (Attack + Strength)
         melee = 0.325 * (levels["attack"] + levels["strength"])
 
-        # Ranged = 0.325 * (floor(Ranged * 1.5) + Defence)
-        ranged = 0.325 * (int(levels["ranged"] * 1.5) + levels["defence"])
+        # Ranged = 0.325 * floor(Ranged * 1.5)
+        ranged = 0.325 * int(levels["ranged"] * 1.5)
 
         # Magic = 0.325 * (floor(Magic * 1.5) + Defence)
-        magic = 0.325 * (int(levels["magic"] * 1.5) + levels["defence"])
+        magic = 0.325 * int(levels["magic"] * 1.5)
 
         return int(base + max(melee, ranged, magic))

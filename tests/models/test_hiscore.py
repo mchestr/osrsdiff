@@ -189,7 +189,7 @@ class TestHiscoreRecordModel:
         # Ranged = 0.325 * (int(99 * 1.5) + 99) = 0.325 * (148 + 99) = 0.325 * 247 = 80.275
         # Magic = 0.325 * (int(99 * 1.5) + 99) = 0.325 * (148 + 99) = 0.325 * 247 = 80.275
         # Combat = int(61.75 + max(64.35, 80.275, 80.275)) = int(61.75 + 80.275) = int(142.025) = 142
-        assert combat_level == 142
+        assert combat_level == 126
 
     def test_calculate_combat_level_missing_skills(self):
         """Test combat level calculation with missing skills."""
@@ -219,13 +219,6 @@ class TestHiscoreRecordModel:
 
         record = HiscoreRecord(player_id=1, skills_data=skills_data)
         combat_level = record.calculate_combat_level()
-
-        # Should calculate correct combat level for these stats
-        # Base: 0.25 * (40 + 40 + 1//2) = 0.25 * (40 + 40 + 0) = 0.25 * 80 = 20
-        # Melee: 0.325 * (40 + 40) = 0.325 * 80 = 26
-        # Ranged: 0.325 * (int(1 * 1.5) + 40) = 0.325 * (1 + 40) = 0.325 * 41 = 13.325
-        # Magic: 0.325 * (int(1 * 1.5) + 40) = 0.325 * (1 + 40) = 0.325 * 41 = 13.325
-        # Combat level: int(20 + max(26, 13.325, 13.325)) = int(20 + 26) = 46
         assert combat_level == 46
 
 
@@ -510,11 +503,4 @@ class TestHiscoreRecordDatabaseOperations:
         await test_session.refresh(record)
 
         combat_level = record.calculate_combat_level()
-
-        # Verify combat level is calculated correctly
-        # Base: 0.25 * (70 + 85 + 60//2) = 0.25 * (70 + 85 + 30) = 0.25 * 185 = 46.25
-        # Melee: 0.325 * (75 + 80) = 0.325 * 155 = 50.375
-        # Ranged: 0.325 * (int(90 * 1.5) + 70) = 0.325 * (135 + 70) = 0.325 * 205 = 66.625
-        # Magic: 0.325 * (int(85 * 1.5) + 70) = 0.325 * (127 + 70) = 0.325 * 197 = 64.025
-        # Combat: int(46.25 + max(50.375, 66.625, 64.025)) = int(46.25 + 66.625) = int(112.875) = 112
-        assert combat_level == 112
+        assert combat_level == 96
