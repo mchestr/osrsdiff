@@ -4,19 +4,16 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.exceptions import OSRSPlayerNotFoundError, PlayerNotFoundError
 from app.models.player import Player
 from app.services.osrs_api import (
     APIUnavailableError,
     OSRSAPIClient,
     OSRSAPIError,
 )
-from app.services.osrs_api import (
-    PlayerNotFoundError as OSRSPlayerNotFoundError,
-)
 from app.services.player import (
     InvalidUsernameError,
     PlayerAlreadyExistsError,
-    PlayerNotFoundServiceError,
     PlayerService,
     PlayerServiceError,
 )
@@ -104,13 +101,17 @@ class TestPlayerService:
         self, player_service, mock_osrs_client
     ):
         """Test adding player when OSRS API is unavailable."""
+        from app.services.player import PlayerServiceError
+
         username = "testplayer"
         mock_osrs_client.check_player_exists.side_effect = APIUnavailableError(
             "API down"
         )
 
-        with pytest.raises(APIUnavailableError):
+        with pytest.raises(PlayerServiceError) as exc_info:
             await player_service.add_player(username)
+
+        assert "Failed to add player" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_get_player_exists(self, player_service, mock_osrs_client):

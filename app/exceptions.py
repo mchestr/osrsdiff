@@ -44,14 +44,20 @@ class BadRequestError(BaseAPIException):
 class UnauthorizedError(BaseAPIException):
     """Raised when authentication is required or invalid (401)."""
 
-    def __init__(self, message: str = "Authentication required", detail: Optional[str] = None):
+    def __init__(
+        self,
+        message: str = "Authentication required",
+        detail: Optional[str] = None,
+    ):
         super().__init__(message, detail, status_code=401)
 
 
 class ForbiddenError(BaseAPIException):
     """Raised when access is forbidden (403)."""
 
-    def __init__(self, message: str = "Access forbidden", detail: Optional[str] = None):
+    def __init__(
+        self, message: str = "Access forbidden", detail: Optional[str] = None
+    ):
         super().__init__(message, detail, status_code=403)
 
 
@@ -80,7 +86,11 @@ class UnprocessableEntityError(BaseAPIException):
 class InternalServerError(BaseAPIException):
     """Raised when an internal server error occurs (500)."""
 
-    def __init__(self, message: str = "Internal server error", detail: Optional[str] = None):
+    def __init__(
+        self,
+        message: str = "Internal server error",
+        detail: Optional[str] = None,
+    ):
         super().__init__(message, detail, status_code=500)
 
 
@@ -99,6 +109,7 @@ class ServiceUnavailableError(BaseAPIException):
 
 
 # Domain-Specific Exceptions
+
 
 # Player-related exceptions
 class PlayerNotFoundError(NotFoundError):
@@ -128,7 +139,9 @@ class InvalidUsernameError(BadRequestError):
 class OSRSAPIError(BadGatewayError):
     """Base exception for OSRS API errors."""
 
-    def __init__(self, message: str = "OSRS API error", detail: Optional[str] = None):
+    def __init__(
+        self, message: str = "OSRS API error", detail: Optional[str] = None
+    ):
         full_message = f"OSRS API unavailable: {message}"
         super().__init__(full_message, detail)
 
@@ -144,14 +157,22 @@ class OSRSPlayerNotFoundError(NotFoundError):
 class RateLimitError(ServiceUnavailableError):
     """Raised when OSRS API rate limit is exceeded."""
 
-    def __init__(self, message: str = "Rate limit exceeded", detail: Optional[str] = None):
+    def __init__(
+        self,
+        message: str = "Rate limit exceeded",
+        detail: Optional[str] = None,
+    ):
         super().__init__(message, detail)
 
 
 class APIUnavailableError(ServiceUnavailableError):
     """Raised when OSRS API is unavailable."""
 
-    def __init__(self, message: str = "OSRS API is currently unavailable", detail: Optional[str] = None):
+    def __init__(
+        self,
+        message: str = "OSRS API is currently unavailable",
+        detail: Optional[str] = None,
+    ):
         super().__init__(message, detail)
 
 
@@ -167,7 +188,9 @@ class InsufficientDataError(UnprocessableEntityError):
 class ServiceError(InternalServerError):
     """Base exception for service-level errors."""
 
-    def __init__(self, service_name: str, message: str, detail: Optional[str] = None):
+    def __init__(
+        self, service_name: str, message: str, detail: Optional[str] = None
+    ):
         full_message = f"{service_name} error: {message}"
         super().__init__(full_message, detail)
 
@@ -191,4 +214,3 @@ class StatisticsServiceError(ServiceError):
 
     def __init__(self, message: str, detail: Optional[str] = None):
         super().__init__("Statistics service", message, detail)
-

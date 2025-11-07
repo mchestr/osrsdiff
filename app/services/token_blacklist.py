@@ -83,7 +83,7 @@ class TokenBlacklistService:
                     "user_id", "unknown"
                 )
                 user_tokens_key = self._get_user_tokens_key(str(user_id))
-                await redis_client.sadd(user_tokens_key, token)
+                await redis_client.sadd(user_tokens_key, token)  # type: ignore[misc]
                 await redis_client.expire(user_tokens_key, ttl)
 
         except Exception:
@@ -125,7 +125,7 @@ class TokenBlacklistService:
             user_tokens_key = self._get_user_tokens_key(user_id)
 
             # Get all tokens for the user
-            tokens = set(await redis_client.smembers(user_tokens_key))
+            tokens = set(await redis_client.smembers(user_tokens_key))  # type: ignore[misc]
 
             # Blacklist each token
             for token in tokens:

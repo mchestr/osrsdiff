@@ -4,9 +4,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from app.api.auth import router
+from app.exceptions import BaseAPIException
 from app.models.base import get_db_session
 from app.models.user import User
 from app.services.auth import auth_service
@@ -40,6 +42,14 @@ def app(mock_db_session):
 
     # Override database dependency
     app.dependency_overrides[get_db_session] = lambda: mock_db_session
+
+    # Add exception handler for BaseAPIException
+    @app.exception_handler(BaseAPIException)
+    async def api_exception_handler(request, exc: BaseAPIException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "message": exc.message},
+        )
 
     return app
 
@@ -122,7 +132,7 @@ class TestAuthEndpoints:
         )
 
         assert response.status_code == 401
-        assert "Invalid refresh token" in response.json()["detail"]
+        assert "Could not validate credentials" in response.json()["detail"]
 
     @patch("app.services.auth.auth_service.authenticate_user")
     def test_get_current_user_success(

@@ -456,21 +456,15 @@ class TestHistoryService:
         start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
         end_date = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
-        with pytest.raises(
-            PlayerNotFoundError, match="Username cannot be empty"
-        ):
+        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
             await history_service.get_progress_between_dates(
                 "", start_date, end_date
             )
 
-        with pytest.raises(
-            PlayerNotFoundError, match="Username cannot be empty"
-        ):
+        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
             await history_service.get_skill_progress("", "attack", 7)
 
-        with pytest.raises(
-            PlayerNotFoundError, match="Username cannot be empty"
-        ):
+        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
             await history_service.get_boss_progress("", "zulrah", 7)
 
     @pytest.mark.asyncio

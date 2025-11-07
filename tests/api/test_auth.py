@@ -1,10 +1,10 @@
 """Tests for authentication API dependencies."""
 
 import pytest
-from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.api.auth_utils import get_current_user, get_optional_current_user
+from app.exceptions import UnauthorizedError
 from app.services.auth import auth_service
 
 
@@ -36,7 +36,7 @@ class TestAuthDependencies:
     @pytest.mark.asyncio
     async def test_get_current_user_invalid_token(self):
         """Test get_current_user with invalid token."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(UnauthorizedError) as exc_info:
             await get_current_user("invalid_token")
 
         assert exc_info.value.status_code == 401

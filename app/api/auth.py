@@ -1,8 +1,6 @@
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
-
-from app.exceptions import UnauthorizedError
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     OAuth2PasswordRequestForm,
@@ -15,6 +13,7 @@ from app.api.auth_utils import (
     require_auth,
     security,
 )
+from app.exceptions import UnauthorizedError
 from app.models.base import get_db_session
 from app.services.auth import auth_service
 

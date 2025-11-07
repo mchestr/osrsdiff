@@ -10,8 +10,8 @@ from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.osrs_api import HiscoreData
 from app.workers.fetch import (
-    _fetch_player_hiscores,
     _hiscore_data_changed,
+    fetch_player_hiscores_task,
 )
 
 
@@ -210,7 +210,9 @@ class TestFetchPlayerHiscoresDeduplication:
                 test_session
             )
 
-            result = await _fetch_player_hiscores(sample_player.username)
+            result = await fetch_player_hiscores_task.original_func(
+                sample_player.username
+            )
 
         # Verify the result indicates unchanged data
         assert result["status"] == "unchanged"
@@ -282,7 +284,9 @@ class TestFetchPlayerHiscoresDeduplication:
                 test_session
             )
 
-            result = await _fetch_player_hiscores(sample_player.username)
+            result = await fetch_player_hiscores_task.original_func(
+                sample_player.username
+            )
 
         # Verify the result indicates success with new data
         assert result["status"] == "success"
@@ -333,7 +337,9 @@ class TestFetchPlayerHiscoresDeduplication:
                 test_session
             )
 
-            result = await _fetch_player_hiscores(sample_player.username)
+            result = await fetch_player_hiscores_task.original_func(
+                sample_player.username
+            )
 
         # Verify the result indicates success
         assert result["status"] == "success"

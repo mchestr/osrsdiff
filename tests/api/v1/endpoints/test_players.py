@@ -5,22 +5,24 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_auth
 from app.api.v1.endpoints.players import get_player_service, router
+from app.exceptions import (
+    BaseAPIException,
+    OSRSPlayerNotFoundError,
+    PlayerNotFoundError,
+)
 from app.models.player import Player
 from app.services.osrs_api import (
     OSRSAPIError,
 )
-from app.services.osrs_api import (
-    PlayerNotFoundError as OSRSPlayerNotFoundError,
-)
 from app.services.player import (
     InvalidUsernameError,
     PlayerAlreadyExistsError,
-    PlayerNotFoundServiceError,
     PlayerService,
 )
 
@@ -61,6 +63,15 @@ def app():
     """Create FastAPI app for testing with mocked dependencies."""
     app = FastAPI()
     app.include_router(router)
+
+    # Add exception handler for BaseAPIException
+    @app.exception_handler(BaseAPIException)
+    async def api_exception_handler(request, exc: BaseAPIException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "message": exc.message},
+        )
+
     return app
 
 

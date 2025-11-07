@@ -7,12 +7,12 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import OSRSPlayerNotFoundError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.osrs_api import (
     APIUnavailableError,
     HiscoreData,
-    PlayerNotFoundError,
     RateLimitError,
 )
 from app.workers.fetch import (
@@ -144,7 +144,7 @@ class TestFetchPlayerHiscores:
                 mock_client
             )
             mock_client.fetch_player_hiscores.side_effect = (
-                PlayerNotFoundError("Player not found")
+                OSRSPlayerNotFoundError("test_player")
             )
 
             with patch(

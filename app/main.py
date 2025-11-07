@@ -68,7 +68,9 @@ def create_app() -> FastAPI:
 
     # Add exception handlers for centralized exception handling
     @app.exception_handler(BaseAPIException)
-    async def api_exception_handler(request: Request, exc: BaseAPIException):
+    async def api_exception_handler(
+        request: Request, exc: BaseAPIException
+    ) -> JSONResponse:
         """Handle all BaseAPIException instances with consistent formatting."""
         logger.warning(
             f"API exception: {exc.status_code} - {exc.message} "
@@ -80,7 +82,9 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(Exception)
-    async def general_exception_handler(request: Request, exc: Exception):
+    async def general_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
         """Handle unexpected exceptions."""
         logger.error(
             f"Unexpected exception: {type(exc).__name__}: {exc} "

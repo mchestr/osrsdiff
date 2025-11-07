@@ -5,10 +5,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
+from starlette import status
 
 from app.api.auth import require_auth
 from app.api.v1.endpoints.history import get_history_service, router
+from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.history import (
@@ -77,6 +80,15 @@ def app():
     """Create FastAPI app for testing with mocked dependencies."""
     app = FastAPI()
     app.include_router(router)
+
+    # Add exception handler for BaseAPIException
+    @app.exception_handler(BaseAPIException)
+    async def api_exception_handler(request, exc: BaseAPIException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "message": exc.message},
+        )
+
     return app
 
 
@@ -312,7 +324,7 @@ class TestHistoryEndpoints:
         )
 
         assert response.status_code == 500
-        assert "Internal server error" in response.json()["detail"]
+        assert "History service error" in response.json()["detail"]
 
     def test_get_skill_progress_success(self, client, mock_history_service):
         """Test successful retrieval of skill progress."""

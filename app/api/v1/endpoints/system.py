@@ -3,13 +3,12 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, status
-
-from app.exceptions import InternalServerError, NotFoundError
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_utils import require_auth
+from app.exceptions import InternalServerError, NotFoundError
 from app.models.base import get_db_session
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
@@ -170,7 +169,9 @@ async def get_database_stats(
 
     except Exception as e:
         logger.error(f"Error retrieving database stats: {e}")
-        raise InternalServerError("Failed to retrieve database statistics", detail=str(e))
+        raise InternalServerError(
+            "Failed to retrieve database statistics", detail=str(e)
+        )
 
 
 @router.get("/health", response_model=SystemHealthResponse)
@@ -239,7 +240,9 @@ async def get_system_health(
 
     except Exception as e:
         logger.error(f"Error during system health check: {e}")
-        raise InternalServerError("Failed to perform system health check", detail=str(e))
+        raise InternalServerError(
+            "Failed to perform system health check", detail=str(e)
+        )
 
 
 @router.get("/distribution", response_model=PlayerDistributionResponse)
@@ -335,7 +338,9 @@ async def get_player_distribution(
 
     except Exception as e:
         logger.error(f"Error retrieving player distribution: {e}")
-        raise InternalServerError("Failed to retrieve player distribution statistics", detail=str(e))
+        raise InternalServerError(
+            "Failed to retrieve player distribution statistics", detail=str(e)
+        )
 
 
 class TaskTriggerResponse(BaseModel):
@@ -433,7 +438,9 @@ async def get_scheduled_tasks(
 
     except Exception as e:
         logger.error(f"Error retrieving scheduled tasks: {e}")
-        raise InternalServerError("Failed to retrieve scheduled tasks", detail=str(e))
+        raise InternalServerError(
+            "Failed to retrieve scheduled tasks", detail=str(e)
+        )
 
 
 @router.post("/trigger-task/{task_name}", response_model=TaskTriggerResponse)

@@ -6,11 +6,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_utils import require_auth
-from app.models.base import get_db_session
 from app.exceptions import (
     PlayerNotFoundError,
     StatisticsServiceError,
 )
+from app.models.base import get_db_session
 from app.services.statistics import (
     StatisticsService,
 )

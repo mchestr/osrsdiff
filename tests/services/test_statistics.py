@@ -123,9 +123,7 @@ class TestStatisticsService:
     @pytest.mark.asyncio
     async def test_get_current_stats_empty_username(self, statistics_service):
         """Test getting stats with empty username."""
-        with pytest.raises(
-            PlayerNotFoundError, match="Username cannot be empty"
-        ):
+        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
             await statistics_service.get_current_stats("")
 
     @pytest.mark.asyncio

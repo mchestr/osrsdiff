@@ -5,15 +5,15 @@ from typing import Any, Dict, Optional
 from sqlalchemy import select
 from taskiq import Context, TaskiqDepends
 
-from app.models.base import AsyncSessionLocal
-from app.models.hiscore import HiscoreRecord
-from app.models.player import Player
 from app.exceptions import (
     APIUnavailableError,
     OSRSAPIError,
     OSRSPlayerNotFoundError,
     RateLimitError,
 )
+from app.models.base import AsyncSessionLocal
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
 from app.services.osrs_api import (
     HiscoreData,
     OSRSAPIClient,
@@ -72,7 +72,7 @@ def _hiscore_data_changed(
     return False
 
 
-@broker.task(
+@broker.task(  # type: ignore[misc]
     **get_task_defaults(
         retry_count=5,  # More retries for API calls
         retry_delay=5.0,  # Longer delay between retries for rate limiting
@@ -337,7 +337,7 @@ async def fetch_player_hiscores_task(
             raise
 
 
-@broker.task(
+@broker.task(  # type: ignore[misc]
     **get_task_defaults(
         retry_count=2,
         retry_delay=15.0,

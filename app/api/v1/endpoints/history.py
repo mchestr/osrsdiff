@@ -7,13 +7,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_utils import require_auth
-from app.models.base import get_db_session
 from app.exceptions import (
     BadRequestError,
     HistoryServiceError,
     InsufficientDataError,
     PlayerNotFoundError,
 )
+from app.models.base import get_db_session
 from app.services.history import (
     HistoryService,
 )
@@ -272,7 +272,12 @@ async def get_player_history(
         logger.debug(f"Successfully retrieved history for player: {username}")
         return response
 
-    except (BadRequestError, PlayerNotFoundError, InsufficientDataError, HistoryServiceError):
+    except (
+        BadRequestError,
+        PlayerNotFoundError,
+        InsufficientDataError,
+        HistoryServiceError,
+    ):
         raise
     except Exception as e:
         logger.error(f"Unexpected error getting history for {username}: {e}")
@@ -350,7 +355,12 @@ async def get_skill_progress(
         )
         return response
 
-    except (BadRequestError, PlayerNotFoundError, InsufficientDataError, HistoryServiceError):
+    except (
+        BadRequestError,
+        PlayerNotFoundError,
+        InsufficientDataError,
+        HistoryServiceError,
+    ):
         raise
     except Exception as e:
         logger.error(
@@ -429,7 +439,12 @@ async def get_boss_progress(
         )
         return response
 
-    except (BadRequestError, PlayerNotFoundError, InsufficientDataError, HistoryServiceError):
+    except (
+        BadRequestError,
+        PlayerNotFoundError,
+        InsufficientDataError,
+        HistoryServiceError,
+    ):
         raise
     except Exception as e:
         logger.error(

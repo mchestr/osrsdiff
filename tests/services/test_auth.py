@@ -3,8 +3,8 @@
 from datetime import datetime, timedelta
 
 import pytest
-from fastapi import HTTPException
 
+from app.exceptions import UnauthorizedError
 from app.services.auth import AuthService
 
 
@@ -78,7 +78,7 @@ class TestAuthService:
 
     async def test_validate_token_invalid_token(self):
         """Test validation with invalid token."""
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(UnauthorizedError) as exc_info:
             await self.auth_service.validate_token("invalid_token")
 
         assert exc_info.value.status_code == 401
@@ -90,7 +90,7 @@ class TestAuthService:
             self.test_user_data
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(UnauthorizedError) as exc_info:
             await self.auth_service.validate_token(
                 access_token, token_type="refresh"
             )
@@ -125,7 +125,7 @@ class TestAuthService:
             self.test_user_data
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(UnauthorizedError) as exc_info:
             await self.auth_service.refresh_access_token(access_token)
 
         assert exc_info.value.status_code == 401
@@ -142,7 +142,7 @@ class TestAuthService:
         try:
             token = self.auth_service.create_access_token(self.test_user_data)
 
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(UnauthorizedError) as exc_info:
                 await self.auth_service.validate_token(
                     token, token_type="access"
                 )

@@ -118,7 +118,7 @@ class TestSchedulerIntegration:
         # TaskIQ stores task names as module:function format
         assert (
             created_schedule.task_name
-            == "app.workers.fetch:_fetch_player_hiscores"
+            == "app.workers.fetch:fetch_player_hiscores_task"
         )
         assert created_schedule.args == [sample_player.username]
 

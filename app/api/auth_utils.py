@@ -1,8 +1,6 @@
 from typing import Any, Dict, Optional
 
 from fastapi import Depends
-
-from app.exceptions import UnauthorizedError
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBearer,
@@ -10,6 +8,7 @@ from fastapi.security import (
 )
 from pydantic import BaseModel
 
+from app.exceptions import UnauthorizedError
 from app.services.auth import auth_service
 
 

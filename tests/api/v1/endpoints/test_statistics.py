@@ -5,10 +5,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from app.api.auth import require_auth
 from app.api.v1.endpoints.statistics import get_statistics_service, router
+from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.statistics import (
@@ -78,6 +80,15 @@ def app():
     """Create FastAPI app for testing with mocked dependencies."""
     app = FastAPI()
     app.include_router(router)
+
+    # Add exception handler for BaseAPIException
+    @app.exception_handler(BaseAPIException)
+    async def api_exception_handler(request, exc: BaseAPIException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "message": exc.message},
+        )
+
     return app
 
 
@@ -210,7 +221,7 @@ class TestStatisticsEndpoints:
         )
 
         assert response.status_code == 500
-        assert "Internal server error" in response.json()["detail"]
+        assert "Statistics service error" in response.json()["detail"]
 
     def test_authentication_required_single_player(
         self, client, mock_statistics_service

@@ -8,9 +8,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_utils import require_auth
-from app.models.base import get_db_session
-from app.models.hiscore import HiscoreRecord
-from app.models.player import Player
 from app.exceptions import (
     InvalidUsernameError,
     OSRSAPIError,
@@ -19,6 +16,9 @@ from app.exceptions import (
     PlayerNotFoundError,
     PlayerServiceError,
 )
+from app.models.base import get_db_session
+from app.models.hiscore import HiscoreRecord
+from app.models.player import Player
 from app.services.osrs_api import (
     OSRSAPIClient,
     get_osrs_api_client,
@@ -205,8 +205,6 @@ class PlayerMetadataResponse(BaseModel):
 router = APIRouter(prefix="/players", tags=["players"])
 
 
-
-
 @router.post(
     "", response_model=PlayerResponse, status_code=status.HTTP_201_CREATED
 )
@@ -283,7 +281,12 @@ async def add_player(
 
         return PlayerResponse.from_player(player)
 
-    except (InvalidUsernameError, PlayerAlreadyExistsError, OSRSPlayerNotFoundError, OSRSAPIError):
+    except (
+        InvalidUsernameError,
+        PlayerAlreadyExistsError,
+        OSRSPlayerNotFoundError,
+        OSRSAPIError,
+    ):
         # These exceptions are handled by the exception handler in main.py
         raise
     except Exception as e:
@@ -708,7 +711,9 @@ async def update_player_fetch_interval(
         # Get updated player to return
         player = await player_service.get_player(username)
         if not player:
-            raise PlayerServiceError("Failed to retrieve updated player information")
+            raise PlayerServiceError(
+                "Failed to retrieve updated player information"
+            )
 
         logger.info(
             f"Successfully updated fetch interval for player {username} "
@@ -726,7 +731,9 @@ async def update_player_fetch_interval(
         logger.error(
             f"Error updating fetch interval for player {username}: {e}"
         )
-        raise PlayerServiceError(f"Failed to update player fetch interval: {e}")
+        raise PlayerServiceError(
+            f"Failed to update player fetch interval: {e}"
+        )
 
 
 @router.get("/schedules", response_model=ScheduleListResponse)
@@ -907,4 +914,6 @@ async def verify_all_schedules(
         raise
     except Exception as e:
         logger.error(f"Error during schedule verification: {e}")
-        raise PlayerServiceError(f"Failed to perform schedule verification: {e}")
+        raise PlayerServiceError(
+            f"Failed to perform schedule verification: {e}"
+        )

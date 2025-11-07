@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 # Daily schedule verification job - runs at 3 AM UTC
-@broker.task(
+@broker.task(  # type: ignore[misc]
     schedule=[{"cron": "0 3 * * *"}],  # Daily at 3 AM UTC
     **get_task_defaults(
         retry_count=2,
@@ -248,7 +248,7 @@ async def schedule_verification_job() -> Dict[str, Any]:
 
 
 # Manual cleanup job (no schedule - triggered manually)
-@broker.task(
+@broker.task(  # type: ignore[misc]
     **get_task_defaults(
         retry_count=2,
         retry_delay=15.0,

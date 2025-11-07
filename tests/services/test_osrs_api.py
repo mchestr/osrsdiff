@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from aiohttp import ClientError
 
+from app.exceptions import OSRSPlayerNotFoundError
 from app.services.osrs_api import (
     APIUnavailableError,
     HiscoreData,
     OSRSAPIClient,
     OSRSAPIError,
-    PlayerNotFoundError,
     RateLimitError,
 )
 
@@ -176,7 +176,9 @@ class TestOSRSAPIClient:
     async def test_check_player_exists_not_found(self, client):
         """Test checking if player exists when they don't."""
         with patch.object(client, "fetch_player_hiscores") as mock_fetch:
-            mock_fetch.side_effect = PlayerNotFoundError("Player not found")
+            mock_fetch.side_effect = OSRSPlayerNotFoundError(
+                "Player not found"
+            )
 
             result = await client.check_player_exists("nonexistent_player")
             assert result is False
@@ -220,7 +222,7 @@ class TestOSRSAPIClientIntegration:
             assert isinstance(result, HiscoreData)
             assert result.overall is not None
             assert len(result.skills) > 0
-        except PlayerNotFoundError:
+        except OSRSPlayerNotFoundError:
             # Player might not exist anymore, skip test
             pytest.skip("Test player not found")
         except (APIUnavailableError, OSRSAPIError):
@@ -230,7 +232,7 @@ class TestOSRSAPIClientIntegration:
     @pytest.mark.slow
     async def test_fetch_nonexistent_player(self, client):
         """Test fetching data for a nonexistent player."""
-        with pytest.raises(PlayerNotFoundError):
+        with pytest.raises(OSRSPlayerNotFoundError):
             await client.fetch_player_hiscores(
                 "ThisPlayerShouldNotExist123456789"
             )

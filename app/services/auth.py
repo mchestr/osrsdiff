@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from app.exceptions import UnauthorizedError
 from jose import JWTError, jwt  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.exceptions import UnauthorizedError
 from app.models.user import User
 from app.services.token_blacklist import token_blacklist_service
 from app.services.user import user_service
@@ -115,7 +115,9 @@ class AuthService:
         Raises:
             UnauthorizedError: If token is invalid, expired, or wrong type
         """
-        credentials_exception = UnauthorizedError("Could not validate credentials")
+        credentials_exception = UnauthorizedError(
+            "Could not validate credentials"
+        )
 
         try:
             # Check if token is blacklisted first
@@ -138,7 +140,9 @@ class AuthService:
 
             # Check token type
             if payload.get("type") != token_type:
-                raise UnauthorizedError(f"Invalid token type. Expected {token_type}")
+                raise UnauthorizedError(
+                    f"Invalid token type. Expected {token_type}"
+                )
 
             return payload
 
