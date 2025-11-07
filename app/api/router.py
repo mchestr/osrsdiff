@@ -14,16 +14,6 @@ router.include_router(auth_router)
 router.include_router(api_router)
 
 
-@router.get("/")
-async def root() -> Dict[str, str]:
-    """Root endpoint for health check."""
-    return {
-        "message": "OSRS Diff API",
-        "version": "1.0.0",
-        "status": "running",
-    }
-
-
 @router.get("/health")
 async def health_check() -> Dict[str, str]:
     """Health check endpoint."""

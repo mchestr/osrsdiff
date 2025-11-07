@@ -45,6 +45,9 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app/app
+      # Frontend static files are built into the image, but can be overridden for dev
+      # Uncomment below if you want to serve frontend from local build during development
+      # - ./frontend/dist:/app/static:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,23 +120,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: osrs-diff-frontend
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8000
-      - VITE_API_TARGET=http://app:8000
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - app
-    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 volumes:
   postgres_data:

@@ -1,11 +1,13 @@
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 from logging.config import dictConfig
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import router
 from app.config import LogConfig, settings
@@ -63,8 +65,36 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include the main API router
+    # Include the main API router first
     app.include_router(router)
+
+    # Serve static files and SPA from frontend build
+    static_dir = Path(__file__).parent.parent / "static"
+    if static_dir.exists():
+        index_path = static_dir / "index.html"
+
+        # Mount static assets (JS, CSS, images, etc.)
+        app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="static")
+
+        # Serve SPA index.html for root and all non-API routes
+        @app.get("/")
+        async def serve_index():
+            """Serve SPA index.html at root."""
+            if index_path.exists():
+                return FileResponse(str(index_path))
+            raise HTTPException(status_code=404, detail="Frontend not found")
+
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            """Serve SPA index.html for client-side routing, excluding API routes."""
+            # Exclude API routes, docs, and static assets
+            excluded_prefixes = ("api/", "auth/", "docs", "openapi.json", "assets/", "health")
+            if any(full_path.startswith(prefix) for prefix in excluded_prefixes):
+                raise HTTPException(status_code=404, detail="Not found")
+
+            if index_path.exists():
+                return FileResponse(str(index_path))
+            raise HTTPException(status_code=404, detail="Frontend not found")
 
     # Add exception handlers for centralized exception handling
     @app.exception_handler(BaseAPIException)

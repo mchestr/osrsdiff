@@ -1,3 +1,22 @@
+# Production Dockerfile: Multi-stage build combining frontend and backend
+# Stage 1: Build frontend React application
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY frontend/package.json frontend/package-lock.json* ./
+
+# Install frontend dependencies
+RUN npm ci
+
+# Copy frontend source code
+COPY frontend/ ./
+
+# Build frontend (outputs to dist/)
+RUN npm run build
+
+# Stage 2: Backend Python application
 FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -28,6 +47,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy application code
 COPY ./app /app/app
 COPY ./migrations /app/migrations
+
+# Copy built frontend static files from frontend-builder stage
+COPY --from=frontend-builder /app/frontend/dist /app/static
 
 # Now install the project itself
 RUN --mount=type=cache,target=/root/.cache/uv \
