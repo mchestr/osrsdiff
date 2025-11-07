@@ -7,8 +7,11 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package.json frontend/package-lock.json* ./
 
-# Install frontend dependencies
-RUN npm ci
+# Clear npm cache and install frontend dependencies
+# Remove any existing node_modules to avoid version conflicts
+RUN rm -rf node_modules && \
+    npm cache clean --force && \
+    npm ci
 
 # Copy frontend source code (including generated API client if it exists)
 COPY frontend/ ./

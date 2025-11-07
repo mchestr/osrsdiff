@@ -1,7 +1,11 @@
 import axios, { AxiosInstance } from 'axios';
-import * as ApiServices from './index';
 import { ApiError } from './core/ApiError';
 import { OpenAPI } from './core/OpenAPI';
+import { AuthenticationService } from './services/AuthenticationService';
+import { HistoryService } from './services/HistoryService';
+import { PlayersService } from './services/PlayersService';
+import { StatisticsService } from './services/StatisticsService';
+import { SystemService } from './services/SystemService';
 
 // Use relative URL when served from same origin, otherwise use env var or localhost
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
@@ -62,67 +66,66 @@ async function handleTokenRefresh<T>(
 
 // Create wrapper services with token refresh handling
 export const api = {
-  ...ApiServices,
   AuthenticationService: {
-    ...ApiServices.AuthenticationService,
-    loginAuthLoginPost: (formData: Parameters<typeof ApiServices.AuthenticationService.loginAuthLoginPost>[0]) =>
-      ApiServices.AuthenticationService.loginAuthLoginPost(formData),
-    refreshTokenAuthRefreshPost: (requestBody: Parameters<typeof ApiServices.AuthenticationService.refreshTokenAuthRefreshPost>[0]) =>
-      ApiServices.AuthenticationService.refreshTokenAuthRefreshPost(requestBody),
+    ...AuthenticationService,
+    loginAuthLoginPost: (formData: Parameters<typeof AuthenticationService.loginAuthLoginPost>[0]) =>
+      AuthenticationService.loginAuthLoginPost(formData),
+    refreshTokenAuthRefreshPost: (requestBody: Parameters<typeof AuthenticationService.refreshTokenAuthRefreshPost>[0]) =>
+      AuthenticationService.refreshTokenAuthRefreshPost(requestBody),
     getCurrentUserInfoAuthMeGet: () =>
-      handleTokenRefresh(() => ApiServices.AuthenticationService.getCurrentUserInfoAuthMeGet()),
+      handleTokenRefresh(() => AuthenticationService.getCurrentUserInfoAuthMeGet()),
     logoutAuthLogoutPost: () =>
-      handleTokenRefresh(() => ApiServices.AuthenticationService.logoutAuthLogoutPost()),
+      handleTokenRefresh(() => AuthenticationService.logoutAuthLogoutPost()),
   },
   PlayersService: {
-    ...ApiServices.PlayersService,
-    addPlayerApiV1PlayersPost: (requestBody: Parameters<typeof ApiServices.PlayersService.addPlayerApiV1PlayersPost>[0]) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.addPlayerApiV1PlayersPost(requestBody)),
+    ...PlayersService,
+    addPlayerApiV1PlayersPost: (requestBody: Parameters<typeof PlayersService.addPlayerApiV1PlayersPost>[0]) =>
+      handleTokenRefresh(() => PlayersService.addPlayerApiV1PlayersPost(requestBody)),
     listPlayersApiV1PlayersGet: (activeOnly?: boolean) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.listPlayersApiV1PlayersGet(activeOnly)),
+      handleTokenRefresh(() => PlayersService.listPlayersApiV1PlayersGet(activeOnly)),
     removePlayerApiV1PlayersUsernameDelete: (username: string) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.removePlayerApiV1PlayersUsernameDelete(username)),
+      handleTokenRefresh(() => PlayersService.removePlayerApiV1PlayersUsernameDelete(username)),
     getPlayerMetadataApiV1PlayersUsernameMetadataGet: (username: string) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username)),
+      handleTokenRefresh(() => PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username)),
     triggerManualFetchApiV1PlayersUsernameFetchPost: (username: string) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username)),
+      handleTokenRefresh(() => PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username)),
     deactivatePlayerApiV1PlayersUsernameDeactivatePost: (username: string) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.deactivatePlayerApiV1PlayersUsernameDeactivatePost(username)),
+      handleTokenRefresh(() => PlayersService.deactivatePlayerApiV1PlayersUsernameDeactivatePost(username)),
     reactivatePlayerApiV1PlayersUsernameReactivatePost: (username: string) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.reactivatePlayerApiV1PlayersUsernameReactivatePost(username)),
-    updatePlayerFetchIntervalApiV1PlayersUsernameFetchIntervalPut: (username: string, requestBody: Parameters<typeof ApiServices.PlayersService.updatePlayerFetchIntervalApiV1PlayersUsernameFetchIntervalPut>[1]) =>
-      handleTokenRefresh(() => ApiServices.PlayersService.updatePlayerFetchIntervalApiV1PlayersUsernameFetchIntervalPut(username, requestBody)),
+      handleTokenRefresh(() => PlayersService.reactivatePlayerApiV1PlayersUsernameReactivatePost(username)),
+    updatePlayerFetchIntervalApiV1PlayersUsernameFetchIntervalPut: (username: string, requestBody: Parameters<typeof PlayersService.updatePlayerFetchIntervalApiV1PlayersUsernameFetchIntervalPut>[1]) =>
+      handleTokenRefresh(() => PlayersService.updatePlayerFetchIntervalApiV1PlayersUsernameFetchIntervalPut(username, requestBody)),
     listPlayerSchedulesApiV1PlayersSchedulesGet: () =>
-      handleTokenRefresh(() => ApiServices.PlayersService.listPlayerSchedulesApiV1PlayersSchedulesGet()),
+      handleTokenRefresh(() => PlayersService.listPlayerSchedulesApiV1PlayersSchedulesGet()),
     verifyAllSchedulesApiV1PlayersSchedulesVerifyPost: () =>
-      handleTokenRefresh(() => ApiServices.PlayersService.verifyAllSchedulesApiV1PlayersSchedulesVerifyPost()),
+      handleTokenRefresh(() => PlayersService.verifyAllSchedulesApiV1PlayersSchedulesVerifyPost()),
   },
   SystemService: {
-    ...ApiServices.SystemService,
+    ...SystemService,
     getSystemHealthApiV1SystemHealthGet: () =>
-      handleTokenRefresh(() => ApiServices.SystemService.getSystemHealthApiV1SystemHealthGet()),
+      handleTokenRefresh(() => SystemService.getSystemHealthApiV1SystemHealthGet()),
     getDatabaseStatsApiV1SystemStatsGet: () =>
-      handleTokenRefresh(() => ApiServices.SystemService.getDatabaseStatsApiV1SystemStatsGet()),
+      handleTokenRefresh(() => SystemService.getDatabaseStatsApiV1SystemStatsGet()),
     getPlayerDistributionApiV1SystemDistributionGet: () =>
-      handleTokenRefresh(() => ApiServices.SystemService.getPlayerDistributionApiV1SystemDistributionGet()),
+      handleTokenRefresh(() => SystemService.getPlayerDistributionApiV1SystemDistributionGet()),
     getScheduledTasksApiV1SystemScheduledTasksGet: () =>
-      handleTokenRefresh(() => ApiServices.SystemService.getScheduledTasksApiV1SystemScheduledTasksGet()),
+      handleTokenRefresh(() => SystemService.getScheduledTasksApiV1SystemScheduledTasksGet()),
     triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost: (taskName: string) =>
-      handleTokenRefresh(() => ApiServices.SystemService.triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost(taskName)),
+      handleTokenRefresh(() => SystemService.triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost(taskName)),
   },
   HistoryService: {
-    ...ApiServices.HistoryService,
+    ...HistoryService,
     getPlayerHistoryApiV1PlayersUsernameHistoryGet: (username: string, startDate?: string | null, endDate?: string | null, days?: number | null) =>
-      handleTokenRefresh(() => ApiServices.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, startDate, endDate, days)),
+      handleTokenRefresh(() => HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, startDate, endDate, days)),
     getSkillProgressApiV1PlayersUsernameHistorySkillsSkillGet: (username: string, skill: string, days?: number) =>
-      handleTokenRefresh(() => ApiServices.HistoryService.getSkillProgressApiV1PlayersUsernameHistorySkillsSkillGet(username, skill, days)),
+      handleTokenRefresh(() => HistoryService.getSkillProgressApiV1PlayersUsernameHistorySkillsSkillGet(username, skill, days)),
     getBossProgressApiV1PlayersUsernameHistoryBossesBossGet: (username: string, boss: string, days?: number) =>
-      handleTokenRefresh(() => ApiServices.HistoryService.getBossProgressApiV1PlayersUsernameHistoryBossesBossGet(username, boss, days)),
+      handleTokenRefresh(() => HistoryService.getBossProgressApiV1PlayersUsernameHistoryBossesBossGet(username, boss, days)),
   },
   StatisticsService: {
-    ...ApiServices.StatisticsService,
+    ...StatisticsService,
     getPlayerStatsApiV1PlayersUsernameStatsGet: (username: string) =>
-      handleTokenRefresh(() => ApiServices.StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username)),
+      handleTokenRefresh(() => StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username)),
   },
 };
 
