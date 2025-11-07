@@ -44,7 +44,7 @@ class TestPlayerService:
         assert isinstance(result, Player)
         assert result.username == username
         assert result.is_active is True
-        assert result.fetch_interval_minutes == 60
+        assert result.fetch_interval_minutes == 1440
         mock_osrs_client.check_player_exists.assert_called_once_with(username)
 
     @pytest.mark.asyncio

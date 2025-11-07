@@ -31,7 +31,7 @@ def create_test_player(
     id: int,
     username: str,
     is_active: bool = True,
-    fetch_interval_minutes: int = 60,
+    fetch_interval_minutes: int = 1440,
 ):
     """Create a test player with proper datetime fields."""
     player = Player(
@@ -106,7 +106,7 @@ class TestPlayerEndpoints:
         assert data["id"] == 1
         assert data["username"] == "test_player"
         assert data["is_active"] is True
-        assert data["fetch_interval_minutes"] == 60
+        assert data["fetch_interval_minutes"] == 1440
 
         # Verify service was called correctly
         mock_player_service.add_player.assert_called_once_with("test_player")

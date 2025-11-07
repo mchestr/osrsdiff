@@ -20,7 +20,7 @@ class TestPlayerModel:
 
         assert player.username == "test_player"
         assert player.is_active is True
-        assert player.fetch_interval_minutes == 60
+        assert player.fetch_interval_minutes == 1440
         assert player.last_fetched is None
         assert player.schedule_id is None
         assert player.hiscore_records == []
@@ -201,7 +201,7 @@ class TestPlayerDatabaseOperations:
         assert player.id is not None
         assert player.username == "new_player"
         assert player.is_active is True
-        assert player.fetch_interval_minutes == 60
+        assert player.fetch_interval_minutes == 1440
         assert player.schedule_id is None
         assert player.created_at is not None
 

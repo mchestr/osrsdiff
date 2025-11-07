@@ -24,7 +24,7 @@ from app.services.statistics import (
 def create_test_player(id: int, username: str):
     """Create a test player with proper datetime fields."""
     player = Player(
-        id=id, username=username, is_active=True, fetch_interval_minutes=60
+        id=id, username=username, is_active=True, fetch_interval_minutes=1440
     )
     player.created_at = datetime.now(timezone.utc)
     player.last_fetched = None

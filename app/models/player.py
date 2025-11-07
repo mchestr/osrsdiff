@@ -58,7 +58,7 @@ class Player(Base):
 
     fetch_interval_minutes: Mapped[int] = mapped_column(
         Integer,
-        default=60,
+        default=1440,
         nullable=False,
         doc="How often to fetch hiscore data (in minutes)",
     )
@@ -86,7 +86,7 @@ class Player(Base):
         if "is_active" not in kwargs:
             kwargs["is_active"] = True
         if "fetch_interval_minutes" not in kwargs:
-            kwargs["fetch_interval_minutes"] = 60
+            kwargs["fetch_interval_minutes"] = 1440
         super().__init__(**kwargs)
 
     def __repr__(self) -> str:
