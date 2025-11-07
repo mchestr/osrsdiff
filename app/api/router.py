@@ -1,5 +1,3 @@
-"""Main API router for v1 that groups all API endpoint routers."""
-
 from typing import Dict
 
 from fastapi import APIRouter

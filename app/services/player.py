@@ -1,5 +1,3 @@
-"""Player management service with CRUD operations."""
-
 import logging
 from typing import TYPE_CHECKING, List, Optional
 

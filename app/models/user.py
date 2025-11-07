@@ -1,5 +1,3 @@
-"""User model for authentication."""
-
 from datetime import datetime, timezone
 from typing import Optional
 

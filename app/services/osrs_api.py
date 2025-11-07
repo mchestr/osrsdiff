@@ -1,8 +1,6 @@
-"""OSRS Hiscores API client service."""
-
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from urllib.parse import quote
 

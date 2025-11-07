@@ -1,7 +1,5 @@
-"""Player schedule management service for TaskIQ scheduler integration."""
-
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from taskiq_redis import ListRedisScheduleSource
 

@@ -1,5 +1,3 @@
-"""HiscoreRecord model for storing OSRS hiscore data snapshots."""
-
 from __future__ import annotations
 
 from datetime import datetime

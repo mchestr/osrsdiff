@@ -1,5 +1,3 @@
-"""Database configuration and base model."""
-
 from typing import AsyncGenerator
 
 from sqlalchemy import MetaData, text

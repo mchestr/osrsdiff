@@ -1,28 +1,3 @@
-"""JWT authentication service.
-
-This module provides JWT token generation and validation functionality for the OSRS Diff API.
-
-Features implemented:
-- JWT access token creation with configurable expiration (default: 15 minutes)
-- JWT refresh token creation with configurable expiration (default: 7 days)
-- Token validation with type checking (access vs refresh)
-- Token refresh functionality using valid refresh tokens
-- FastAPI middleware integration for protected endpoints
-- Database-backed user authentication
-
-Usage:
-    from app.services.auth import auth_service
-    from app.api.auth import require_auth
-
-    # Create tokens
-    tokens = auth_service.create_token_pair({"sub": "user", "username": "test"})
-
-    # Use in FastAPI endpoints
-    @app.get("/protected")
-    async def protected_endpoint(user = Depends(require_auth)):
-        return {"user": user["username"]}
-"""
-
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 

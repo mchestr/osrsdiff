@@ -1,10 +1,5 @@
-"""Startup service for application initialization."""
-
 import asyncio
 import logging
-from typing import Optional
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.base import AsyncSessionLocal

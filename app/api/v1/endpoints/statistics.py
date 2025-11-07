@@ -1,5 +1,3 @@
-"""Statistics API endpoints."""
-
 import logging
 from typing import Any, Dict, Optional
 
@@ -10,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth_utils import require_auth
 from app.models.base import get_db_session
 from app.services.statistics import (
-    NoDataAvailableError,
     PlayerNotFoundError,
     StatisticsService,
     StatisticsServiceError,

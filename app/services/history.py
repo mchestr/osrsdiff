@@ -1,12 +1,9 @@
-"""History service for analyzing OSRS player progress over time."""
-
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player

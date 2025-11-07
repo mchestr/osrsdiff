@@ -46,38 +46,38 @@ run = "uv sync"
 
 [tasks.dev]
 description = "Start development server"
-run = "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+run = "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 [tasks.worker]
 description = "Start background worker"
-run = "taskiq worker app.workers.main:broker"
+run = "uv run taskiq worker app.workers.main:broker"
 
 [tasks.test]
 description = "Run tests"
-run = "pytest"
+run = "uv run pytest"
 
 [tasks."test:cov"]
 description = "Run tests with coverage"
-run = "pytest --cov=app --cov-report=html --cov-report=term"
+run = "uv run pytest --cov=app --cov-report=html --cov-report=term"
 
 [tasks.lint]
 description = "Run linting"
 run = """
-black --check app/ tests/
-isort --check app/ tests/
-mypy app/
+uv run black --check app/ tests/
+uv run isort --check app/ tests/
+uv run mypy app/
 """
 
 [tasks.format]
 description = "Format code"
 run = """
-black app/ tests/
-isort app/ tests/
+uv run black app/ tests/
+uv run isort app/ tests/
 """
 
 [tasks.typecheck]
 description = "Run type checking"
-run = "mypy app/"
+run = "uv run mypy app/"
 
 [tasks.clean]
 description = "Clean up build artifacts"
@@ -107,23 +107,23 @@ run = "docker-compose build"
 
 [tasks."db:upgrade"]
 description = "Run database migrations"
-run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff alembic upgrade head"
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff uv run alembic upgrade head"
 
 [tasks."db:downgrade"]
 description = "Rollback database migration"
-run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff alembic downgrade -1"
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff uv run alembic downgrade -1"
 
 [tasks."db:revision"]
 description = "Create new database migration"
-run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff alembic revision --autogenerate -m \"${MESSAGE:-New migration}\""
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff uv run alembic revision --autogenerate -m \"${MESSAGE:-New migration}\""
 
 [tasks."db:init"]
 description = "Initialize database with tables (alternative to migrations)"
-run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff python scripts/manage_db.py create"
+run = "DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff uv run python scripts/manage_db.py create"
 
 [tasks."db:reset"]
 description = "Reset database (drop and recreate tables)"
 run = """
-DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff python scripts/manage_db.py drop
-DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff python scripts/manage_db.py create
+DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff uv run python scripts/manage_db.py drop
+DATABASE_URL=postgresql+asyncpg://osrs_diff:osrs_diff_password@localhost:5432/osrs_diff uv run python scripts/manage_db.py create
 """

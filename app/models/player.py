@@ -1,5 +1,3 @@
-"""Player model for tracking OSRS characters."""
-
 from __future__ import annotations
 
 import re

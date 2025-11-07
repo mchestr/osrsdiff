@@ -1,9 +1,6 @@
-"""FastAPI application entry point."""
-
-import logging
 from contextlib import asynccontextmanager
 from logging.config import dictConfig
-from typing import AsyncGenerator, Dict
+from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

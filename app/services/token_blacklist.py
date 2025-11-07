@@ -1,8 +1,3 @@
-"""Token blacklist service using Redis for JWT token invalidation."""
-
-# mypy: disable-error-code=misc
-
-import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 

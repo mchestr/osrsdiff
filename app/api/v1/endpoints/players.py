@@ -1,8 +1,6 @@
-"""Player management API endpoints."""
-
 import logging
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -26,7 +24,6 @@ from app.services.osrs_api import (
 from app.services.player import (
     InvalidUsernameError,
     PlayerAlreadyExistsError,
-    PlayerNotFoundServiceError,
     PlayerService,
 )
 

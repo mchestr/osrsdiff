@@ -1,5 +1,3 @@
-"""Alembic migration utilities for running migrations programmatically."""
-
 import logging
 from pathlib import Path
 

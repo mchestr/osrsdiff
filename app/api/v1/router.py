@@ -1,5 +1,3 @@
-"""Main API router for v1 that groups all API endpoint routers."""
-
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import history, players, statistics, system

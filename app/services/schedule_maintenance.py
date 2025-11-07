@@ -1,10 +1,3 @@
-"""
-Schedule maintenance service for TaskIQ scheduler.
-
-This service provides programmatic access to schedule maintenance operations
-that can be used by API endpoints, background tasks, or other services.
-"""
-
 import logging
 from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional

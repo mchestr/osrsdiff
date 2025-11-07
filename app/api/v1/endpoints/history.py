@@ -1,5 +1,3 @@
-"""History and progress analysis API endpoints."""
-
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional

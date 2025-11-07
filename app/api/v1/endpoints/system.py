@@ -1,5 +1,3 @@
-"""System administration and metadata API endpoints."""
-
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
