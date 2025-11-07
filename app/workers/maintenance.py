@@ -9,8 +9,6 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, Dict
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.base import AsyncSessionLocal
 from app.services.schedule_maintenance import ScheduleMaintenanceService
 from app.services.scheduler import get_player_schedule_manager
@@ -19,7 +17,16 @@ from app.workers.main import broker, get_task_defaults
 logger = logging.getLogger(__name__)
 
 
-async def _schedule_verification_job() -> Dict[str, Any]:
+# Daily schedule verification job - runs at 3 AM UTC
+@broker.task(
+    schedule=[{"cron": "0 3 * * *"}],  # Daily at 3 AM UTC
+    **get_task_defaults(
+        retry_count=2,
+        retry_delay=30.0,
+        task_timeout=1800.0,  # 30 minutes for verification job
+    ),
+)
+async def schedule_verification_job() -> Dict[str, Any]:
     """
     Periodic job to verify schedule consistency between database and Redis.
 
@@ -240,7 +247,15 @@ async def _schedule_verification_job() -> Dict[str, Any]:
             }
 
 
-async def _cleanup_orphaned_schedules_job() -> Dict[str, Any]:
+# Manual cleanup job (no schedule - triggered manually)
+@broker.task(
+    **get_task_defaults(
+        retry_count=2,
+        retry_delay=15.0,
+        task_timeout=600.0,  # 10 minutes for cleanup
+    )
+)
+async def cleanup_orphaned_schedules_job() -> Dict[str, Any]:
     """
     Background job to clean up orphaned schedules.
 
@@ -300,70 +315,3 @@ async def _cleanup_orphaned_schedules_job() -> Dict[str, Any]:
                 "timestamp": datetime.now(UTC).isoformat(),
                 "duration_seconds": duration,
             }
-
-
-# Task definitions with schedules and configuration
-
-# Daily schedule verification job - runs at 3 AM UTC
-schedule_verification_job = broker.task(
-    schedule=[{"cron": "0 3 * * *"}],  # Daily at 3 AM UTC
-    **get_task_defaults(
-        retry_count=2,
-        retry_delay=30.0,
-        task_timeout=1800.0,  # 30 minutes for verification job
-    ),
-)(_schedule_verification_job)
-
-# Manual cleanup job (no schedule - triggered manually)
-cleanup_orphaned_schedules_job = broker.task(
-    **get_task_defaults(
-        retry_count=2,
-        retry_delay=15.0,
-        task_timeout=600.0,  # 10 minutes for cleanup
-    )
-)(_cleanup_orphaned_schedules_job)
-
-
-# Utility functions for manual triggering
-
-
-async def trigger_schedule_verification() -> Dict[str, Any]:
-    """
-    Manually trigger a schedule verification job.
-
-    Returns:
-        Dict with task execution results
-    """
-    logger.info("Manually triggering schedule verification job")
-    try:
-        result = await _schedule_verification_job()
-        return result
-    except Exception as e:
-        logger.error(f"Error in manual schedule verification: {e}")
-        return {
-            "status": "error",
-            "error": str(e),
-            "message": f"Manual verification failed: {str(e)}",
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-
-
-async def trigger_orphaned_cleanup() -> Dict[str, Any]:
-    """
-    Manually trigger an orphaned schedule cleanup job.
-
-    Returns:
-        Dict with cleanup results
-    """
-    logger.info("Manually triggering orphaned schedule cleanup")
-    try:
-        result = await _cleanup_orphaned_schedules_job()
-        return result
-    except Exception as e:
-        logger.error(f"Error in manual orphaned cleanup: {e}")
-        return {
-            "status": "error",
-            "error": str(e),
-            "message": f"Manual cleanup failed: {str(e)}",
-            "timestamp": datetime.now(UTC).isoformat(),
-        }

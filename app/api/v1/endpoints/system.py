@@ -2,7 +2,9 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
+
+from app.exceptions import InternalServerError, NotFoundError
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -168,10 +170,7 @@ async def get_database_stats(
 
     except Exception as e:
         logger.error(f"Error retrieving database stats: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve database statistics",
-        )
+        raise InternalServerError("Failed to retrieve database statistics", detail=str(e))
 
 
 @router.get("/health", response_model=SystemHealthResponse)
@@ -240,10 +239,7 @@ async def get_system_health(
 
     except Exception as e:
         logger.error(f"Error during system health check: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to perform system health check",
-        )
+        raise InternalServerError("Failed to perform system health check", detail=str(e))
 
 
 @router.get("/distribution", response_model=PlayerDistributionResponse)
@@ -339,10 +335,7 @@ async def get_player_distribution(
 
     except Exception as e:
         logger.error(f"Error retrieving player distribution: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve player distribution statistics",
-        )
+        raise InternalServerError("Failed to retrieve player distribution statistics", detail=str(e))
 
 
 class TaskTriggerResponse(BaseModel):
@@ -440,10 +433,7 @@ async def get_scheduled_tasks(
 
     except Exception as e:
         logger.error(f"Error retrieving scheduled tasks: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve scheduled tasks: {str(e)}",
-        )
+        raise InternalServerError("Failed to retrieve scheduled tasks", detail=str(e))
 
 
 @router.post("/trigger-task/{task_name}", response_model=TaskTriggerResponse)
@@ -475,18 +465,10 @@ async def trigger_scheduled_task(
         )
 
         # No scheduled tasks currently supported for manual triggering
-        raise ValueError(f"Task '{task_name}' not found")
+        raise NotFoundError(f"Task '{task_name}' not found")
 
-    except ValueError as e:
-        # Task not found
-        logger.warning(f"Task not found: {task_name}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    except NotFoundError:
+        raise
     except Exception as e:
         logger.error(f"Error triggering task {task_name}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to trigger task: {str(e)}",
-        )
+        raise InternalServerError("Failed to trigger task", detail=str(e))

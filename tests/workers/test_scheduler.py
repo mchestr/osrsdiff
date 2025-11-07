@@ -6,7 +6,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import ListRedisScheduleSource
 
 from app.workers.main import broker, redis_schedule_source
-from app.workers.scheduler_config import (
+from app.workers.scheduler import (
     label_schedule_source,
     scheduler,
 )

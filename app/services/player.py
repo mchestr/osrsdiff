@@ -1,47 +1,29 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional
 
+from fastapi import Depends
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import (
+    InvalidUsernameError,
+    OSRSAPIError,
+    OSRSPlayerNotFoundError,
+    PlayerAlreadyExistsError,
+    PlayerServiceError,
+)
+from app.models.base import get_db_session
 from app.models.player import Player
 from app.services.osrs_api import (
     OSRSAPIClient,
-    OSRSAPIError,
-)
-from app.services.osrs_api import (
-    PlayerNotFoundError as OSRSPlayerNotFoundError,
+    get_osrs_api_client,
 )
 
 if TYPE_CHECKING:
     from app.services.scheduler import PlayerScheduleManager
 
 logger = logging.getLogger(__name__)
-
-
-class PlayerServiceError(Exception):
-    """Base exception for player service errors."""
-
-    pass
-
-
-class PlayerAlreadyExistsError(PlayerServiceError):
-    """Raised when trying to add a player that already exists."""
-
-    pass
-
-
-class PlayerNotFoundServiceError(PlayerServiceError):
-    """Raised when a requested player is not found in the database."""
-
-    pass
-
-
-class InvalidUsernameError(PlayerServiceError):
-    """Raised when a username is invalid."""
-
-    pass
 
 
 class PlayerService:
@@ -105,9 +87,7 @@ class PlayerService:
             # Check if player already exists in our database
             existing_player = await self.get_player(username)
             if existing_player:
-                raise PlayerAlreadyExistsError(
-                    f"Player '{username}' is already being tracked"
-                )
+                raise PlayerAlreadyExistsError(username)
 
             # Verify player exists in OSRS hiscores
             logger.debug(
@@ -117,9 +97,7 @@ class PlayerService:
                 username
             )
             if not player_exists:
-                raise OSRSPlayerNotFoundError(
-                    f"Player '{username}' not found in OSRS hiscores"
-                )
+                raise OSRSPlayerNotFoundError(username)
 
             # Create new player entity
             new_player = Player(username=username)
@@ -165,7 +143,8 @@ class PlayerService:
                     f"Integrity error adding player {username}: {e}"
                 )
                 raise PlayerAlreadyExistsError(
-                    f"Player '{username}' was already added by another process"
+                    username,
+                    detail=f"Player '{username}' was already added by another process",
                 )
 
         except (OSRSPlayerNotFoundError, OSRSAPIError):
@@ -534,7 +513,8 @@ class PlayerService:
 
 
 async def get_player_service(
-    db_session: AsyncSession, osrs_api_client: OSRSAPIClient
+    db_session: AsyncSession = Depends(get_db_session),
+    osrs_api_client: OSRSAPIClient = Depends(get_osrs_api_client),
 ) -> PlayerService:
     """
     Dependency injection function for FastAPI.

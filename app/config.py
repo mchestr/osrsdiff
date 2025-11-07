@@ -8,7 +8,7 @@ class LogConfig(BaseModel):
     """Logging configuration to be set for the server"""
 
     LOGGER_NAME: str = "app"
-    LOG_FORMAT: str = "%(levelprefix)s | %(asctime)s | %(message)s"
+    LOG_FORMAT: str = "%(levelprefix)s | %(asctime)s | %(name)s | %(message)s"
     LOG_LEVEL: str = "DEBUG"
     version: int = 1
     disable_existing_loggers: bool = False
@@ -17,17 +17,17 @@ class LogConfig(BaseModel):
         default_factory=lambda: {
             "default": {
                 "()": "uvicorn.logging.DefaultFormatter",
-                "fmt": "%(levelprefix)s | %(asctime)s | %(message)s",
+                "fmt": "%(levelprefix)s - %(asctime)s - %(name)s - %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
             "access": {
                 "()": "uvicorn.logging.AccessFormatter",
-                "fmt": '%(levelprefix)s %(asctime)s :: %(client_addr)s - "%(request_line)s" %(status_code)s',
+                "fmt": '%(levelprefix)s %(asctime)s - %(name)s :: %(client_addr)s - "%(request_line)s" %(status_code)s',
                 "use_colors": True,
             },
             "error": {
                 "()": "uvicorn.logging.DefaultFormatter",
-                "fmt": "%(levelprefix)s | %(asctime)s | %(message)s",
+                "fmt": "%(levelprefix)s - %(asctime)s - %(name)s - %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         }
@@ -55,14 +55,14 @@ class LogConfig(BaseModel):
 
     loggers: dict = Field(
         default_factory=lambda: {
-            "": {"handlers": ["default"], "level": "DEBUG", "propagate": True},
+            "": {"handlers": ["default"], "level": "INFO", "propagate": True},
             "app": {"level": "DEBUG"},
             "uvicorn.access": {
                 "handlers": ["access"],
-                "level": "DEBUG",
+                "level": "INFO",
                 "propagate": False,
             },
-            "uvicorn.error": {"handlers": ["error"], "level": "DEBUG"},
+            "uvicorn.error": {"handlers": ["error"], "level": "INFO"},
         }
     )
 

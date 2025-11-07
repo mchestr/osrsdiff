@@ -1,29 +1,24 @@
-"""Hiscore data fetching worker tasks."""
-
-import asyncio
 import logging
-from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any, Dict, Optional
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from taskiq import Context, TaskiqDepends
 
 from app.models.base import AsyncSessionLocal
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
-from app.services.osrs_api import (
+from app.exceptions import (
     APIUnavailableError,
-    HiscoreData,
-    OSRSAPIClient,
     OSRSAPIError,
-    PlayerNotFoundError,
+    OSRSPlayerNotFoundError,
     RateLimitError,
 )
+from app.services.osrs_api import (
+    HiscoreData,
+    OSRSAPIClient,
+)
 from app.workers.main import broker, get_task_defaults
-
-if TYPE_CHECKING:
-    from taskiq import AsyncTaskiqTask
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +72,14 @@ def _hiscore_data_changed(
     return False
 
 
-async def _fetch_player_hiscores(
+@broker.task(
+    **get_task_defaults(
+        retry_count=5,  # More retries for API calls
+        retry_delay=5.0,  # Longer delay between retries for rate limiting
+        task_timeout=120.0,  # 2 minutes timeout for individual fetch
+    )
+)
+async def fetch_player_hiscores_task(
     username: str, context: Context = TaskiqDepends()
 ) -> Dict[str, Any]:
     """
@@ -190,7 +192,7 @@ async def _fetch_player_hiscores(
                         f"Successfully fetched hiscore data for {username}"
                     )
 
-                except PlayerNotFoundError as e:
+                except OSRSPlayerNotFoundError as e:
                     logger.warning(
                         f"Player {username} not found in OSRS hiscores: {e} (schedule_id: {schedule_id})"
                     )
@@ -335,7 +337,14 @@ async def _fetch_player_hiscores(
             raise
 
 
-async def _fetch_all_players() -> Dict[str, Any]:
+@broker.task(
+    **get_task_defaults(
+        retry_count=2,
+        retry_delay=15.0,
+        task_timeout=600.0,  # 10 minutes for fetching all players
+    )
+)
+async def fetch_all_players_task() -> Dict[str, Any]:
     """
     Fetch hiscore data for all active players immediately.
 
@@ -385,11 +394,6 @@ async def _fetch_all_players() -> Dict[str, Any]:
 
             for player in active_players:
                 try:
-                    # Import the task here to avoid circular imports
-                    from app.workers.tasks import (
-                        fetch_player_hiscores_task,
-                    )
-
                     await fetch_player_hiscores_task.kiq(player.username)
                     tasks_enqueued += 1
                     logger.debug(f"Enqueued fetch task for {player.username}")
@@ -425,22 +429,3 @@ async def _fetch_all_players() -> Dict[str, Any]:
             duration = (datetime.now(UTC) - start_time).total_seconds()
             logger.error(f"Error in fetch all players: {e}")
             raise
-
-
-# Task decorators and exports
-fetch_player_hiscores_task = broker.task(
-    **get_task_defaults(
-        retry_count=5,  # More retries for API calls
-        retry_delay=5.0,  # Longer delay between retries for rate limiting
-        task_timeout=120.0,  # 2 minutes timeout for individual fetch
-    )
-)(_fetch_player_hiscores)
-
-
-fetch_all_players_task = broker.task(
-    **get_task_defaults(
-        retry_count=2,
-        retry_delay=15.0,
-        task_timeout=600.0,  # 10 minutes for fetching all players
-    )
-)(_fetch_all_players)

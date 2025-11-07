@@ -17,7 +17,7 @@ from app.config import settings
 from app.models.player import Player
 from app.services.scheduler import PlayerScheduleManager
 from app.workers.main import broker
-from app.workers.scheduler_config import (
+from app.workers.scheduler import (
     create_scheduler,
     create_scheduler_sources,
 )
@@ -666,7 +666,7 @@ class TestTaskExecutionIntegration:
     @pytest.mark.asyncio
     async def test_label_schedule_source_integration(self):
         """Test that LabelScheduleSource works with static schedules."""
-        from app.workers.scheduler_config import create_scheduler_sources
+        from app.workers.scheduler import create_scheduler_sources
 
         sources = create_scheduler_sources()
 

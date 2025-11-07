@@ -8,31 +8,14 @@ import aiohttp
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
+from app.exceptions import (
+    APIUnavailableError,
+    OSRSAPIError,
+    OSRSPlayerNotFoundError,
+    RateLimitError,
+)
+
 logger = logging.getLogger(__name__)
-
-
-class OSRSAPIError(Exception):
-    """Base exception for OSRS API errors."""
-
-    pass
-
-
-class PlayerNotFoundError(OSRSAPIError):
-    """Raised when a player is not found in OSRS hiscores."""
-
-    pass
-
-
-class RateLimitError(OSRSAPIError):
-    """Raised when rate limit is exceeded."""
-
-    pass
-
-
-class APIUnavailableError(OSRSAPIError):
-    """Raised when OSRS API is unavailable."""
-
-    pass
 
 
 class HiscoreData(BaseModel):
@@ -158,19 +141,17 @@ class OSRSAPIClient:
                         try:
                             json_data: Dict[str, Any] = await response.json()
                             if not json_data:
-                                raise PlayerNotFoundError(
-                                    f"Player '{username}' not found"
-                                )
+                                raise OSRSPlayerNotFoundError(username)
                             return json_data
+                        except OSRSPlayerNotFoundError:
+                            raise
                         except Exception as e:
                             raise OSRSAPIError(
                                 f"Failed to parse JSON response: {e}"
                             )
 
                     elif response.status == 404:
-                        raise PlayerNotFoundError(
-                            f"Player '{username}' not found"
-                        )
+                        raise OSRSPlayerNotFoundError(username)
 
                     elif response.status == 429:
                         raise RateLimitError("Rate limit exceeded")
@@ -358,7 +339,7 @@ class OSRSAPIClient:
             json_data = await self._make_request(username)
             return self._parse_hiscore_data(json_data)
 
-        except (PlayerNotFoundError, RateLimitError, APIUnavailableError):
+        except (OSRSPlayerNotFoundError, RateLimitError, APIUnavailableError):
             # Re-raise known exceptions
             raise
 
@@ -381,7 +362,7 @@ class OSRSAPIClient:
         try:
             await self.fetch_player_hiscores(username)
             return True
-        except PlayerNotFoundError:
+        except OSRSPlayerNotFoundError:
             return False
         except (RateLimitError, APIUnavailableError, OSRSAPIError):
             # For other errors, we can't determine existence

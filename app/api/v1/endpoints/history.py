@@ -2,17 +2,20 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_utils import require_auth
 from app.models.base import get_db_session
-from app.services.history import (
-    HistoryService,
+from app.exceptions import (
+    BadRequestError,
     HistoryServiceError,
     InsufficientDataError,
     PlayerNotFoundError,
+)
+from app.services.history import (
+    HistoryService,
 )
 
 logger = logging.getLogger(__name__)
@@ -220,9 +223,8 @@ async def get_player_history(
                     end_date.replace("Z", "+00:00")
                 )
             except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid end_date format. Use ISO format like '2024-01-31T23:59:59Z'",
+                raise BadRequestError(
+                    "Invalid end_date format. Use ISO format like '2024-01-31T23:59:59Z'"
                 )
         else:
             parsed_end_date = now
@@ -236,9 +238,8 @@ async def get_player_history(
                     start_date.replace("Z", "+00:00")
                 )
             except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid start_date format. Use ISO format like '2024-01-01T00:00:00Z'",
+                raise BadRequestError(
+                    "Invalid start_date format. Use ISO format like '2024-01-01T00:00:00Z'"
                 )
         else:
             # Default to 30 days ago
@@ -246,17 +247,11 @@ async def get_player_history(
 
         # Validate date range
         if parsed_start_date >= parsed_end_date:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Start date must be before end date",
-            )
+            raise BadRequestError("Start date must be before end date")
 
         # Check if date range is reasonable (not more than 1 year)
         if (parsed_end_date - parsed_start_date).days > 365:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Date range cannot exceed 365 days",
-            )
+            raise BadRequestError("Date range cannot exceed 365 days")
 
         # Get progress analysis
         progress = await history_service.get_progress_between_dates(
@@ -277,33 +272,11 @@ async def get_player_history(
         logger.debug(f"Successfully retrieved history for player: {username}")
         return response
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except (BadRequestError, PlayerNotFoundError, InsufficientDataError, HistoryServiceError):
         raise
-    except PlayerNotFoundError as e:
-        logger.warning(f"Player not found: {username} - {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Player '{username}' not found in tracking system",
-        )
-    except InsufficientDataError as e:
-        logger.warning(f"Insufficient data for {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e),
-        )
-    except HistoryServiceError as e:
-        logger.error(f"History service error for player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while analyzing progress",
-        )
     except Exception as e:
         logger.error(f"Unexpected error getting history for {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while analyzing progress",
-        )
+        raise HistoryServiceError(f"Failed to analyze progress: {e}")
 
 
 @router.get(
@@ -350,10 +323,7 @@ async def get_skill_progress(
         # Validate skill name
         skill = skill.lower().strip()
         if not skill:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Skill name cannot be empty",
-            )
+            raise BadRequestError("Skill name cannot be empty")
 
         # Get skill progress
         progress = await history_service.get_skill_progress(
@@ -380,35 +350,13 @@ async def get_skill_progress(
         )
         return response
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except (BadRequestError, PlayerNotFoundError, InsufficientDataError, HistoryServiceError):
         raise
-    except PlayerNotFoundError as e:
-        logger.warning(f"Player not found: {username} - {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Player '{username}' not found in tracking system",
-        )
-    except InsufficientDataError as e:
-        logger.warning(f"Insufficient data for {username} {skill}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e),
-        )
-    except HistoryServiceError as e:
-        logger.error(f"History service error for {username} {skill}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while analyzing skill progress",
-        )
     except Exception as e:
         logger.error(
             f"Unexpected error getting {skill} progress for {username}: {e}"
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while analyzing skill progress",
-        )
+        raise HistoryServiceError(f"Failed to analyze skill progress: {e}")
 
 
 @router.get(
@@ -454,10 +402,7 @@ async def get_boss_progress(
         # Validate boss name
         boss = boss.lower().strip()
         if not boss:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Boss name cannot be empty",
-            )
+            raise BadRequestError("Boss name cannot be empty")
 
         # Get boss progress
         progress = await history_service.get_boss_progress(
@@ -484,32 +429,10 @@ async def get_boss_progress(
         )
         return response
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except (BadRequestError, PlayerNotFoundError, InsufficientDataError, HistoryServiceError):
         raise
-    except PlayerNotFoundError as e:
-        logger.warning(f"Player not found: {username} - {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Player '{username}' not found in tracking system",
-        )
-    except InsufficientDataError as e:
-        logger.warning(f"Insufficient data for {username} {boss}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e),
-        )
-    except HistoryServiceError as e:
-        logger.error(f"History service error for {username} {boss}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while analyzing boss progress",
-        )
     except Exception as e:
         logger.error(
             f"Unexpected error getting {boss} progress for {username}: {e}"
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while analyzing boss progress",
-        )
+        raise HistoryServiceError(f"Failed to analyze boss progress: {e}")

@@ -1,14 +1,19 @@
+import logging
 from contextlib import asynccontextmanager
 from logging.config import dictConfig
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import router
 from app.config import LogConfig, settings
+from app.exceptions import BaseAPIException
 from app.models.base import init_db
 from app.services.startup import startup_service
+
+logger = logging.getLogger(__name__)
 
 dictConfig(LogConfig().model_dump())
 
@@ -60,6 +65,35 @@ def create_app() -> FastAPI:
 
     # Include the main API router
     app.include_router(router)
+
+    # Add exception handlers for centralized exception handling
+    @app.exception_handler(BaseAPIException)
+    async def api_exception_handler(request: Request, exc: BaseAPIException):
+        """Handle all BaseAPIException instances with consistent formatting."""
+        logger.warning(
+            f"API exception: {exc.status_code} - {exc.message} "
+            f"(path: {request.url.path})"
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "message": exc.message},
+        )
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """Handle unexpected exceptions."""
+        logger.error(
+            f"Unexpected exception: {type(exc).__name__}: {exc} "
+            f"(path: {request.url.path})",
+            exc_info=True,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "detail": "An unexpected error occurred",
+                "message": "Internal server error",
+            },
+        )
 
     return app
 

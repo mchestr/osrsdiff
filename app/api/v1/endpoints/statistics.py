@@ -1,16 +1,18 @@
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth_utils import require_auth
 from app.models.base import get_db_session
-from app.services.statistics import (
+from app.exceptions import (
     PlayerNotFoundError,
-    StatisticsService,
     StatisticsServiceError,
+)
+from app.services.statistics import (
+    StatisticsService,
 )
 
 logger = logging.getLogger(__name__)
@@ -147,21 +149,8 @@ async def get_player_stats(
         logger.debug(f"Successfully retrieved stats for player: {username}")
         return response
 
-    except PlayerNotFoundError as e:
-        logger.warning(f"Player not found: {username} - {e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Player '{username}' not found in tracking system",
-        )
-    except StatisticsServiceError as e:
-        logger.error(f"Statistics service error for player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while retrieving statistics",
-        )
+    except (PlayerNotFoundError, StatisticsServiceError):
+        raise
     except Exception as e:
         logger.error(f"Unexpected error getting stats for {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while retrieving statistics",
-        )
+        raise StatisticsServiceError(f"Failed to retrieve statistics: {e}")

@@ -1,6 +1,8 @@
 from typing import Any, Dict, Optional
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
+
+from app.exceptions import UnauthorizedError
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     HTTPBearer,
@@ -94,7 +96,7 @@ async def get_optional_current_user(
 
     try:
         return await auth_service.validate_token(token, token_type="access")
-    except HTTPException:
+    except UnauthorizedError:
         return None
 
 

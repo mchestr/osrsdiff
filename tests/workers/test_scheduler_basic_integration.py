@@ -23,7 +23,7 @@ class TestBasicSchedulerIntegration:
 
     def test_scheduler_configuration_creation(self):
         """Test that scheduler configuration can be created successfully."""
-        from app.workers.scheduler_config import (
+        from app.workers.scheduler import (
             create_scheduler,
             create_scheduler_sources,
         )

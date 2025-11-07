@@ -38,7 +38,7 @@ broker.add_middlewares(
 from taskiq_redis import ListRedisScheduleSource
 
 # Import scheduler from dedicated configuration module
-from app.workers.scheduler_config import scheduler
+from app.workers.scheduler import scheduler
 
 redis_schedule_source = ListRedisScheduleSource(
     url=settings.redis.url,
@@ -103,5 +103,5 @@ def get_task_defaults(**kwargs: Any) -> Dict[str, Any]:
 # Import all task modules to ensure tasks are registered with the broker
 # This must happen after broker is defined and before worker starts
 from app.workers import fetch  # noqa: F401, E402
-from app.workers import schedule_maintenance  # noqa: F401, E402
+from app.workers import maintenance  # noqa: F401, E402
 from app.workers import tasks  # noqa: F401, E402

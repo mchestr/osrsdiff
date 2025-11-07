@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import HTTPException, status
+from app.exceptions import UnauthorizedError
 from jose import JWTError, jwt  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -113,22 +113,14 @@ class AuthService:
             The decoded token payload
 
         Raises:
-            HTTPException: If token is invalid, expired, or wrong type
+            UnauthorizedError: If token is invalid, expired, or wrong type
         """
-        credentials_exception = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        credentials_exception = UnauthorizedError("Could not validate credentials")
 
         try:
             # Check if token is blacklisted first
             if await token_blacklist_service.is_token_blacklisted(token):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has been revoked",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise UnauthorizedError("Token has been revoked")
 
             payload: Dict[str, Any] = jwt.decode(
                 token, self.secret_key, algorithms=[self.algorithm]
@@ -142,19 +134,11 @@ class AuthService:
             if datetime.now(timezone.utc) > datetime.fromtimestamp(
                 exp, tz=timezone.utc
             ):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has expired",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise UnauthorizedError("Token has expired")
 
             # Check token type
             if payload.get("type") != token_type:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Invalid token type. Expected {token_type}",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise UnauthorizedError(f"Invalid token type. Expected {token_type}")
 
             return payload
 

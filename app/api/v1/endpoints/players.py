@@ -2,7 +2,7 @@ import logging
 import sys
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,20 +11,21 @@ from app.api.auth_utils import require_auth
 from app.models.base import get_db_session
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.exceptions import (
+    InvalidUsernameError,
+    OSRSAPIError,
+    OSRSPlayerNotFoundError,
+    PlayerAlreadyExistsError,
+    PlayerNotFoundError,
+    PlayerServiceError,
+)
 from app.services.osrs_api import (
     OSRSAPIClient,
-    OSRSAPIError,
-)
-from app.services.osrs_api import (
-    PlayerNotFoundError as OSRSPlayerNotFoundError,
-)
-from app.services.osrs_api import (
     get_osrs_api_client,
 )
 from app.services.player import (
-    InvalidUsernameError,
-    PlayerAlreadyExistsError,
     PlayerService,
+    get_player_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -204,12 +205,6 @@ class PlayerMetadataResponse(BaseModel):
 router = APIRouter(prefix="/players", tags=["players"])
 
 
-async def get_player_service(
-    db_session: AsyncSession = Depends(get_db_session),
-    osrs_api_client: OSRSAPIClient = Depends(get_osrs_api_client),
-) -> PlayerService:
-    """Dependency injection for PlayerService."""
-    return PlayerService(db_session, osrs_api_client)
 
 
 @router.post(
@@ -288,35 +283,12 @@ async def add_player(
 
         return PlayerResponse.from_player(player)
 
-    except InvalidUsernameError as e:
-        logger.warning(f"Invalid username format: {request.username} - {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        )
-    except PlayerAlreadyExistsError as e:
-        logger.warning(f"Player already exists: {request.username} - {e}")
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(e)
-        )
-    except OSRSPlayerNotFoundError as e:
-        logger.warning(
-            f"Player not found in OSRS hiscores: {request.username} - {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
-    except OSRSAPIError as e:
-        logger.error(f"OSRS API error for player {request.username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"OSRS API unavailable: {e}",
-        )
+    except (InvalidUsernameError, PlayerAlreadyExistsError, OSRSPlayerNotFoundError, OSRSAPIError):
+        # These exceptions are handled by the exception handler in main.py
+        raise
     except Exception as e:
         logger.error(f"Unexpected error adding player {request.username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while adding player",
-        )
+        raise PlayerServiceError(f"Failed to add player: {e}")
 
 
 @router.delete("/{username}", response_model=MessageResponse)
@@ -352,26 +324,18 @@ async def remove_player(
         removed = await player_service.remove_player(username)
 
         if not removed:
-            logger.warning(f"Player not found for removal: {username}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
+            raise PlayerNotFoundError(username)
 
         logger.info(f"Successfully removed player: {username}")
         return MessageResponse(
             message=f"Player '{username}' has been removed from tracking"
         )
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except (PlayerNotFoundError, PlayerServiceError):
         raise
     except Exception as e:
         logger.error(f"Unexpected error removing player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while removing player",
-        )
+        raise PlayerServiceError(f"Failed to remove player: {e}")
 
 
 @router.get("", response_model=PlayersListResponse)
@@ -414,10 +378,7 @@ async def list_players(
 
     except Exception as e:
         logger.error(f"Unexpected error listing players: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while listing players",
-        )
+        raise PlayerServiceError(f"Failed to list players: {e}")
 
 
 @router.post("/{username}/fetch", response_model=FetchTriggerResponse)
@@ -453,11 +414,7 @@ async def trigger_manual_fetch(
         # Verify player exists in our system
         player = await player_service.get_player(username)
         if not player:
-            logger.warning(f"Player not found for manual fetch: {username}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
+            raise PlayerNotFoundError(username)
 
         # Import and enqueue the fetch task
         try:
@@ -485,22 +442,15 @@ async def trigger_manual_fetch(
 
         except Exception as e:
             logger.error(f"Failed to enqueue fetch task for {username}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to enqueue fetch task: {e}",
-            )
+            raise PlayerServiceError(f"Failed to enqueue fetch task: {e}")
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except (PlayerNotFoundError, PlayerServiceError):
         raise
     except Exception as e:
         logger.error(
             f"Unexpected error triggering manual fetch for {username}: {e}"
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error occurred while triggering manual fetch",
-        )
+        raise PlayerServiceError(f"Failed to trigger manual fetch: {e}")
 
 
 @router.get("/{username}/metadata", response_model=PlayerMetadataResponse)
@@ -540,10 +490,7 @@ async def get_player_metadata(
         player = player_result.scalar_one_or_none()
 
         if not player:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
+            raise PlayerNotFoundError(username)
 
         # Get record count
         total_records_result = await db_session.execute(
@@ -618,15 +565,11 @@ async def get_player_metadata(
         logger.info(f"Successfully retrieved metadata for player: {username}")
         return response
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except PlayerNotFoundError:
         raise
     except Exception as e:
         logger.error(f"Error retrieving metadata for player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve player metadata",
-        )
+        raise PlayerServiceError(f"Failed to retrieve player metadata: {e}")
 
 
 @router.post("/{username}/deactivate", response_model=MessageResponse)
@@ -661,25 +604,18 @@ async def deactivate_player(
         deactivated = await player_service.deactivate_player(username)
 
         if not deactivated:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
+            raise PlayerNotFoundError(username)
 
         logger.info(f"Successfully deactivated player: {username}")
         return MessageResponse(
             message=f"Player '{username}' has been deactivated (automatic fetching stopped)"
         )
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except (PlayerNotFoundError, PlayerServiceError):
         raise
     except Exception as e:
         logger.error(f"Error deactivating player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to deactivate player",
-        )
+        raise PlayerServiceError(f"Failed to deactivate player: {e}")
 
 
 @router.post("/{username}/reactivate", response_model=MessageResponse)
@@ -714,25 +650,18 @@ async def reactivate_player(
         reactivated = await player_service.reactivate_player(username)
 
         if not reactivated:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
+            raise PlayerNotFoundError(username)
 
         logger.info(f"Successfully reactivated player: {username}")
         return MessageResponse(
             message=f"Player '{username}' has been reactivated (automatic fetching resumed)"
         )
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except (PlayerNotFoundError, PlayerServiceError):
         raise
     except Exception as e:
         logger.error(f"Error reactivating player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to reactivate player",
-        )
+        raise PlayerServiceError(f"Failed to reactivate player: {e}")
 
 
 @router.put("/{username}/fetch-interval", response_model=PlayerResponse)
@@ -774,18 +703,12 @@ async def update_player_fetch_interval(
         )
 
         if not updated:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
+            raise PlayerNotFoundError(username)
 
         # Get updated player to return
         player = await player_service.get_player(username)
         if not player:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to retrieve updated player information",
-            )
+            raise PlayerServiceError("Failed to retrieve updated player information")
 
         logger.info(
             f"Successfully updated fetch interval for player {username} "
@@ -796,20 +719,14 @@ async def update_player_fetch_interval(
 
     except ValueError as e:
         logger.warning(f"Invalid fetch interval for player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        )
-    except HTTPException:
-        # Re-raise HTTP exceptions
+        raise InvalidUsernameError(str(e))
+    except (PlayerNotFoundError, PlayerServiceError, InvalidUsernameError):
         raise
     except Exception as e:
         logger.error(
             f"Error updating fetch interval for player {username}: {e}"
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update player fetch interval",
-        )
+        raise PlayerServiceError(f"Failed to update player fetch interval: {e}")
 
 
 @router.get("/schedules", response_model=ScheduleListResponse)
@@ -912,182 +829,7 @@ async def list_player_schedules(
 
     except Exception as e:
         logger.error(f"Error listing player schedules: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to list player schedules",
-        )
-
-
-@router.post("/{username}/pause", response_model=MessageResponse)
-async def pause_player_schedule(
-    username: str,
-    player_service: PlayerService = Depends(get_player_service),
-    current_user: Dict[str, Any] = Depends(require_auth),
-) -> MessageResponse:
-    """
-    Pause a player's scheduled task without deactivating the player.
-
-    This endpoint removes the player's schedule from TaskIQ but keeps the
-    player active in the system. The schedule can be resumed later.
-
-    Args:
-        username: OSRS player username to pause
-        player_service: Player service dependency
-        current_user: Authenticated user information
-
-    Returns:
-        MessageResponse: Confirmation message
-
-    Raises:
-        404 Not Found: Player not found in system
-        500 Internal Server Error: Service errors
-    """
-    try:
-        logger.info(
-            f"User {current_user.get('username')} pausing schedule for player: {username}"
-        )
-
-        # Get player
-        player = await player_service.get_player(username)
-        if not player:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
-
-        # Get schedule manager
-        from app.services.scheduler import get_player_schedule_manager
-
-        try:
-            schedule_manager = get_player_schedule_manager()
-        except Exception as e:
-            logger.error(f"Failed to get schedule manager: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Schedule management is not available",
-            )
-
-        # Unschedule the player
-        if player.schedule_id:
-            try:
-                await schedule_manager.unschedule_player(player)
-                player.schedule_id = None
-                await player_service.db_session.commit()
-                logger.info(f"Paused schedule for player {username}")
-            except Exception as e:
-                logger.error(
-                    f"Failed to pause schedule for player {username}: {e}"
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Failed to pause schedule: {e}",
-                )
-        else:
-            logger.info(f"Player {username} has no active schedule to pause")
-
-        return MessageResponse(
-            message=f"Schedule paused for player '{username}' (player remains active)"
-        )
-
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Error pausing schedule for player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to pause player schedule",
-        )
-
-
-@router.post("/{username}/resume", response_model=MessageResponse)
-async def resume_player_schedule(
-    username: str,
-    player_service: PlayerService = Depends(get_player_service),
-    current_user: Dict[str, Any] = Depends(require_auth),
-) -> MessageResponse:
-    """
-    Resume a player's scheduled task.
-
-    This endpoint recreates the player's schedule in TaskIQ if they are
-    active but don't have a current schedule.
-
-    Args:
-        username: OSRS player username to resume
-        player_service: Player service dependency
-        current_user: Authenticated user information
-
-    Returns:
-        MessageResponse: Confirmation message
-
-    Raises:
-        404 Not Found: Player not found in system
-        400 Bad Request: Player is not active
-        500 Internal Server Error: Service errors
-    """
-    try:
-        logger.info(
-            f"User {current_user.get('username')} resuming schedule for player: {username}"
-        )
-
-        # Get player
-        player = await player_service.get_player(username)
-        if not player:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Player '{username}' not found in tracking system",
-            )
-
-        if not player.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Player '{username}' is not active. Activate the player first.",
-            )
-
-        # Get schedule manager
-        from app.services.scheduler import get_player_schedule_manager
-
-        try:
-            schedule_manager = get_player_schedule_manager()
-        except Exception as e:
-            logger.error(f"Failed to get schedule manager: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Schedule management is not available",
-            )
-
-        # Ensure player is scheduled
-        try:
-            schedule_id = await schedule_manager.ensure_player_scheduled(
-                player
-            )
-            player.schedule_id = schedule_id
-            await player_service.db_session.commit()
-            logger.info(
-                f"Resumed schedule for player {username} (schedule_id: {schedule_id})"
-            )
-        except Exception as e:
-            logger.error(
-                f"Failed to resume schedule for player {username}: {e}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to resume schedule: {e}",
-            )
-
-        return MessageResponse(
-            message=f"Schedule resumed for player '{username}' (schedule_id: {schedule_id})"
-        )
-
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    except Exception as e:
-        logger.error(f"Error resuming schedule for player {username}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to resume player schedule",
-        )
+        raise PlayerServiceError(f"Failed to list player schedules: {e}")
 
 
 @router.post("/schedules/verify", response_model=ScheduleVerificationResponse)
@@ -1121,10 +863,7 @@ async def verify_all_schedules(
             schedule_manager = get_player_schedule_manager()
         except Exception as e:
             logger.error(f"Failed to get schedule manager: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Schedule management is not available",
-            )
+            raise PlayerServiceError("Schedule management is not available")
 
         # Run verification
         try:
@@ -1162,17 +901,10 @@ async def verify_all_schedules(
 
         except Exception as e:
             logger.error(f"Failed to verify schedules: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to verify schedules: {e}",
-            )
+            raise PlayerServiceError(f"Failed to verify schedules: {e}")
 
-    except HTTPException:
-        # Re-raise HTTP exceptions
+    except PlayerServiceError:
         raise
     except Exception as e:
         logger.error(f"Error during schedule verification: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to perform schedule verification",
-        )
+        raise PlayerServiceError(f"Failed to perform schedule verification: {e}")

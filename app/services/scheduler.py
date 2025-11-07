@@ -635,7 +635,7 @@ _player_schedule_manager: Optional[PlayerScheduleManager] = None
 
 def _get_redis_schedule_source() -> ListRedisScheduleSource:
     """Lazy import to avoid circular dependency."""
-    from app.workers.scheduler_config import redis_schedule_source
+    from app.workers.scheduler import redis_schedule_source
 
     return redis_schedule_source
 

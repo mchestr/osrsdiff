@@ -5,28 +5,15 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import (
+    HistoryServiceError,
+    InsufficientDataError,
+    PlayerNotFoundError,
+)
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 
 logger = logging.getLogger(__name__)
-
-
-class HistoryServiceError(Exception):
-    """Base exception for history service errors."""
-
-    pass
-
-
-class PlayerNotFoundError(HistoryServiceError):
-    """Raised when a requested player is not found."""
-
-    pass
-
-
-class InsufficientDataError(HistoryServiceError):
-    """Raised when there is insufficient data for progress analysis."""
-
-    pass
 
 
 class ProgressAnalysis:
@@ -312,7 +299,7 @@ class HistoryService:
             HistoryServiceError: For other service errors
         """
         if not username:
-            raise PlayerNotFoundError("Username cannot be empty")
+            raise PlayerNotFoundError("", detail="Username cannot be empty")
 
         if start_date >= end_date:
             raise HistoryServiceError("Start date must be before end date")
@@ -330,7 +317,7 @@ class HistoryService:
             player = player_result.scalar_one_or_none()
 
             if not player:
-                raise PlayerNotFoundError(f"Player '{username}' not found")
+                raise PlayerNotFoundError(username)
 
             # Find records closest to start and end dates
             start_record = await self._get_record_closest_to_date(
@@ -391,7 +378,7 @@ class HistoryService:
             HistoryServiceError: For other service errors
         """
         if not username:
-            raise PlayerNotFoundError("Username cannot be empty")
+            raise PlayerNotFoundError("", detail="Username cannot be empty")
 
         if not skill:
             raise HistoryServiceError("Skill name cannot be empty")
@@ -413,7 +400,7 @@ class HistoryService:
             player = player_result.scalar_one_or_none()
 
             if not player:
-                raise PlayerNotFoundError(f"Player '{username}' not found")
+                raise PlayerNotFoundError(username)
 
             # Get records from the last N days
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
@@ -479,7 +466,7 @@ class HistoryService:
             HistoryServiceError: For other service errors
         """
         if not username:
-            raise PlayerNotFoundError("Username cannot be empty")
+            raise PlayerNotFoundError("", detail="Username cannot be empty")
 
         if not boss:
             raise HistoryServiceError("Boss name cannot be empty")
@@ -501,7 +488,7 @@ class HistoryService:
             player = player_result.scalar_one_or_none()
 
             if not player:
-                raise PlayerNotFoundError(f"Player '{username}' not found")
+                raise PlayerNotFoundError(username)
 
             # Get records from the last N days
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)

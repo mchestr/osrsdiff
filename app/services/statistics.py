@@ -6,22 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.exceptions import PlayerNotFoundError, StatisticsServiceError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 
 logger = logging.getLogger(__name__)
-
-
-class StatisticsServiceError(Exception):
-    """Base exception for statistics service errors."""
-
-    pass
-
-
-class PlayerNotFoundError(StatisticsServiceError):
-    """Raised when a requested player is not found."""
-
-    pass
 
 
 class NoDataAvailableError(StatisticsServiceError):
@@ -59,7 +48,7 @@ class StatisticsService:
             StatisticsServiceError: For database or other service errors
         """
         if not username:
-            raise PlayerNotFoundError("Username cannot be empty")
+            raise PlayerNotFoundError("", detail="Username cannot be empty")
 
         username = username.strip()
 
@@ -76,7 +65,7 @@ class StatisticsService:
             player = result.scalar_one_or_none()
 
             if not player:
-                raise PlayerNotFoundError(f"Player '{username}' not found")
+                raise PlayerNotFoundError(username)
 
             # Get the latest hiscore record (already ordered by fetched_at desc)
             latest_record = player.latest_hiscore
@@ -124,7 +113,7 @@ class StatisticsService:
             StatisticsServiceError: For database or other service errors
         """
         if not username:
-            raise PlayerNotFoundError("Username cannot be empty")
+            raise PlayerNotFoundError("", detail="Username cannot be empty")
 
         username = username.strip()
 
@@ -139,7 +128,7 @@ class StatisticsService:
             player = player_result.scalar_one_or_none()
 
             if not player:
-                raise PlayerNotFoundError(f"Player '{username}' not found")
+                raise PlayerNotFoundError(username)
 
             # Query for the most recent hiscore record on or before the date
             stmt = (

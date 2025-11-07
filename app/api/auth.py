@@ -1,6 +1,8 @@
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
+
+from app.exceptions import UnauthorizedError
 from fastapi.security import (
     HTTPAuthorizationCredentials,
     OAuth2PasswordRequestForm,
@@ -66,11 +68,7 @@ async def login(
     )
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise UnauthorizedError("Invalid username or password")
 
     user_data = auth_service.create_user_token_data(user)
     tokens = auth_service.create_token_pair(user_data)
@@ -89,11 +87,10 @@ async def refresh_token(request: TokenRefreshRequest) -> TokenRefreshResponse:
         return TokenRefreshResponse(
             access_token=new_access_token, token_type="bearer"
         )
-    except HTTPException:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-        )
+    except UnauthorizedError:
+        raise
+    except Exception as e:
+        raise UnauthorizedError("Invalid refresh token", detail=str(e))
 
 
 @router.get("/me", response_model=UserResponse)
