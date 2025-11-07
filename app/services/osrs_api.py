@@ -93,7 +93,7 @@ class OSRSAPIClient:
                 timeout=timeout,
                 connector=connector,
                 headers={
-                    "User-Agent": "OSRS-Diff/1.0.0 (https://github.com/osrs-diff/backend)"
+                    "User-Agent": "OSRSDiff/1.0.0 (https://github.com/mchestr/osrsdiff)"
                 },
             )
 
