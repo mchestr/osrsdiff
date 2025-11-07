@@ -28,7 +28,7 @@ interface SystemHealth {
   status: string;
   database_connected: boolean;
   total_storage_mb: number | null;
-  uptime_info: Record<string, any>;
+  uptime_info: Record<string, unknown>;
 }
 
 export const AdminDashboard: React.FC = () => {
@@ -72,8 +72,10 @@ export const AdminDashboard: React.FC = () => {
       });
       setNewPlayerUsername('');
       await fetchData();
-    } catch (error: any) {
-      alert(error.body?.detail || error.message || 'Failed to add player');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add player';
+      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+      alert(errorDetail || errorMessage);
     } finally {
       setAddingPlayer(false);
     }
@@ -87,8 +89,10 @@ export const AdminDashboard: React.FC = () => {
         await api.PlayersService.reactivatePlayerApiV1PlayersUsernameReactivatePost(username);
       }
       await fetchData();
-    } catch (error: any) {
-      alert(error.body?.detail || error.message || 'Failed to update player');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update player';
+      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+      alert(errorDetail || errorMessage);
     }
   };
 
@@ -100,8 +104,10 @@ export const AdminDashboard: React.FC = () => {
     try {
       await api.PlayersService.removePlayerApiV1PlayersUsernameDelete(username);
       await fetchData();
-    } catch (error: any) {
-      alert(error.body?.detail || error.message || 'Failed to delete player');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete player';
+      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+      alert(errorDetail || errorMessage);
     }
   };
 
@@ -109,8 +115,10 @@ export const AdminDashboard: React.FC = () => {
     try {
       await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
       alert('Fetch task enqueued successfully');
-    } catch (error: any) {
-      alert(error.body?.detail || error.message || 'Failed to trigger fetch');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetch';
+      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+      alert(errorDetail || errorMessage);
     }
   };
 

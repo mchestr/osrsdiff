@@ -18,8 +18,9 @@ export const Login: React.FC = () => {
     try {
       await login(username, password);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid username or password');
+    } catch (err: unknown) {
+      const errorDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(errorDetail || 'Invalid username or password');
     } finally {
       setLoading(false);
     }

@@ -28,8 +28,10 @@ export const PlayerStats: React.FC = () => {
         if (progressRes) {
           setProgress(progressRes);
         }
-      } catch (err: any) {
-        setError(err.body?.detail || err.message || 'Failed to load player stats');
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load player stats';
+        const errorDetail = (err as { body?: { detail?: string } })?.body?.detail;
+        setError(errorDetail || errorMessage);
       } finally {
         setLoading(false);
       }
@@ -57,15 +59,29 @@ export const PlayerStats: React.FC = () => {
   const skillNames = Object.keys(stats.skills || {});
   const bossNames = Object.keys(stats.bosses || {});
 
+  // Type definitions for skill and boss data
+  interface SkillData {
+    level?: number;
+    experience?: number;
+    rank?: number;
+  }
+
+  interface BossData {
+    kc?: number | null;
+    kill_count?: number | null;
+    kills?: number | null;
+    rank?: number | null;
+  }
+
   // Prepare data for charts
   const topSkills = skillNames
     .map((name) => {
-      const skillData = stats.skills?.[name];
+      const skillData = stats.skills?.[name] as SkillData | undefined;
       if (!skillData || typeof skillData !== 'object') return null;
       return {
         name: name.charAt(0).toUpperCase() + name.slice(1),
-        level: (skillData as any).level || 0,
-        experience: (skillData as any).experience || 0,
+        level: skillData.level ?? 0,
+        experience: skillData.experience ?? 0,
       };
     })
     .filter((skill): skill is { name: string; level: number; experience: number } => skill !== null)
@@ -74,11 +90,11 @@ export const PlayerStats: React.FC = () => {
 
   const topBosses = bossNames
     .map((name) => {
-      const bossData = stats.bosses?.[name];
+      const bossData = stats.bosses?.[name] as BossData | undefined;
       if (!bossData || typeof bossData !== 'object') return null;
       // Boss data structure: {rank: number | null, kc: number | null}
       // The API uses "kc" for kill count
-      const kills = (bossData as any).kc ?? (bossData as any).kill_count ?? (bossData as any).kills ?? 0;
+      const kills = bossData.kc ?? bossData.kill_count ?? bossData.kills ?? 0;
       return {
         name: name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
         kills: typeof kills === 'number' && kills !== null ? kills : 0,
@@ -213,10 +229,10 @@ export const PlayerStats: React.FC = () => {
         <h2 className="text-xl font-bold mb-4">All Skills</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {skillNames.map((skill) => {
-            const skillData = stats.skills?.[skill];
+            const skillData = stats.skills?.[skill] as SkillData | undefined;
             if (!skillData || typeof skillData !== 'object') return null;
-            const level = (skillData as any).level || 0;
-            const experience = (skillData as any).experience || 0;
+            const level = skillData.level ?? 0;
+            const experience = skillData.experience ?? 0;
             return (
               <div key={skill} className="p-3 bg-gray-50 rounded-lg">
                 <h3 className="text-sm font-medium text-gray-700 mb-1">
