@@ -6,6 +6,42 @@ import { api } from '../api/apiClient';
 import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
 
+// OSRS skill order matching the game interface (6 columns x 4 rows)
+const OSRS_SKILL_ORDER = [
+  'attack', 'hitpoints', 'mining', 'strength', 'agility', 'smithing',
+  'defence', 'herblore', 'fishing', 'ranged', 'thieving', 'cooking',
+  'prayer', 'crafting', 'firemaking', 'magic', 'fletching', 'woodcutting',
+  'runecraft', 'slayer', 'farming', 'construction', 'hunter', 'sailing',
+];
+
+// Skill icons (using Unicode/emoji representations)
+const SKILL_ICONS: Record<string, string> = {
+  attack: '⚔️',
+  hitpoints: '❤️',
+  mining: '⛏️',
+  strength: '💪',
+  agility: '🏃',
+  smithing: '🔨',
+  defence: '🛡️',
+  herblore: '🌿',
+  fishing: '🐟',
+  ranged: '🏹',
+  thieving: '🎭',
+  cooking: '🍲',
+  prayer: '⭐',
+  crafting: '🔧',
+  firemaking: '🔥',
+  magic: '🔮',
+  fletching: '🏹',
+  woodcutting: '🪵',
+  runecraft: '✨',
+  slayer: '💀',
+  farming: '🌾',
+  construction: '🏗️',
+  hunter: '🐾',
+  sailing: '⚓',
+};
+
 export const PlayerStats: React.FC = () => {
   const { username } = useParams<{ username: string }>();
   const [stats, setStats] = useState<PlayerStatsResponse | null>(null);
@@ -73,6 +109,21 @@ export const PlayerStats: React.FC = () => {
     rank?: number | null;
   }
 
+  // Get skills in OSRS order, filtering to only include skills that exist
+  const orderedSkills = OSRS_SKILL_ORDER
+    .map((skillName) => {
+      const skillData = stats.skills?.[skillName] as SkillData | undefined;
+      if (!skillData || typeof skillData !== 'object') return null;
+      return {
+        name: skillName,
+        displayName: skillName.charAt(0).toUpperCase() + skillName.slice(1),
+        level: skillData.level ?? 0,
+        experience: skillData.experience ?? 0,
+        maxLevel: 99, // OSRS max level is 99 for most skills, but some have different maxes
+      };
+    })
+    .filter((skill): skill is { name: string; displayName: string; level: number; experience: number; maxLevel: number } => skill !== null);
+
   // Prepare data for charts
   const topSkills = skillNames
     .map((name) => {
@@ -129,25 +180,55 @@ export const PlayerStats: React.FC = () => {
         )}
       </div>
 
-      {/* Overall Stats */}
-      {stats.overall && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="card">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Total Level</h3>
-            <p className="text-3xl font-bold text-primary-600">{stats.overall.level ?? 'N/A'}</p>
-          </div>
-          <div className="card">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Total Experience</h3>
-            <p className="text-3xl font-bold text-primary-600">
-              {stats.overall.experience?.toLocaleString() ?? 'N/A'}
-            </p>
-          </div>
-          <div className="card">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Combat Level</h3>
-            <p className="text-3xl font-bold text-primary-600">{stats.combat_level ?? 'N/A'}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* OSRS Skills Grid - Main Feature */}
+        <div className="lg:col-span-2">
+          <div className="osrs-skills-panel">
+            <div className="osrs-skills-grid">
+              {orderedSkills.map((skill) => {
+                const icon = SKILL_ICONS[skill.name] || '❓';
+                const maxLevel = skill.name === 'sailing' ? 1 : 99; // Sailing has max level 1
+                return (
+                  <div key={skill.name} className="osrs-skill-cell">
+                    <div className="osrs-skill-icon">{icon}</div>
+                    <div className="osrs-skill-level">
+                      {skill.level}/{maxLevel}
+                    </div>
+                    <div className="osrs-skill-name">{skill.displayName}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="osrs-total-level">
+              Total level: {stats.overall?.level ?? 0}
+            </div>
           </div>
         </div>
-      )}
+
+        {/* Overall Stats Sidebar */}
+        <div className="space-y-4">
+          {stats.overall && (
+            <div className="card">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Total Level</h3>
+              <p className="text-3xl font-bold text-primary-600">{stats.overall.level ?? 'N/A'}</p>
+            </div>
+          )}
+          {stats.overall && (
+            <div className="card">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Total Experience</h3>
+              <p className="text-3xl font-bold text-primary-600">
+                {stats.overall.experience?.toLocaleString() ?? 'N/A'}
+              </p>
+            </div>
+          )}
+          {stats.combat_level && (
+            <div className="card">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Combat Level</h3>
+              <p className="text-3xl font-bold text-primary-600">{stats.combat_level}</p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Progress Summary */}
       {progress && (
@@ -171,14 +252,26 @@ export const PlayerStats: React.FC = () => {
             </div>
           </div>
           {progressData.length > 0 && (
-            <div className="h-64">
+            <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={progressData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="skill" angle={-45} textAnchor="end" height={100} />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
+                <BarChart data={progressData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="skill"
+                    angle={-45}
+                    textAnchor="end"
+                    height={120}
+                    tick={{ fontSize: 12, fill: '#374151' }}
+                    interval={0}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: '#374151' }}
+                    label={{ value: 'Experience', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#374151' } }}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="experience" fill="#0ea5e9" name="Experience Gained" />
                   <Bar dataKey="levels" fill="#10b981" name="Levels Gained" />
                 </BarChart>
@@ -188,63 +281,63 @@ export const PlayerStats: React.FC = () => {
         </div>
       )}
 
-      {/* Top Skills */}
+      {/* Top Skills Chart */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Top Skills</h2>
-        <div className="h-64">
+        <h2 className="text-xl font-bold mb-4">Top Skills by Level</h2>
+        <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topSkills} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={100} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="level" fill="#0ea5e9" name="Level" />
+            <BarChart data={topSkills} layout="vertical" margin={{ top: 5, right: 30, left: 120, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis
+                type="number"
+                tick={{ fontSize: 12, fill: '#374151' }}
+                label={{ value: 'Level', position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#374151' } }}
+              />
+              <YAxis
+                dataKey="name"
+                type="category"
+                width={110}
+                tick={{ fontSize: 12, fill: '#374151' }}
+              />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+              />
+              <Legend wrapperStyle={{ paddingTop: '20px' }} />
+              <Bar dataKey="level" fill="#0ea5e9" name="Level" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Top Bosses */}
+      {/* Top Bosses Chart */}
       {topBosses.length > 0 && (
         <div className="card">
-          <h2 className="text-xl font-bold mb-4">Top Bosses</h2>
-          <div className="h-64">
+          <h2 className="text-xl font-bold mb-4">Top Bosses by Kill Count</h2>
+          <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topBosses} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={100} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="kills" fill="#10b981" name="Kills" />
+              <BarChart data={topBosses} layout="vertical" margin={{ top: 5, right: 30, left: 120, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 12, fill: '#374151' }}
+                  label={{ value: 'Kill Count', position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#374151' } }}
+                />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  width={110}
+                  tick={{ fontSize: 12, fill: '#374151' }}
+                />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar dataKey="kills" fill="#10b981" name="Kills" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
-
-      {/* Skills Grid */}
-      <div className="card">
-        <h2 className="text-xl font-bold mb-4">All Skills</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {skillNames.map((skill) => {
-            const skillData = stats.skills?.[skill] as SkillData | undefined;
-            if (!skillData || typeof skillData !== 'object') return null;
-            const level = skillData.level ?? 0;
-            const experience = skillData.experience ?? 0;
-            return (
-              <div key={skill} className="p-3 bg-gray-50 rounded-lg">
-                <h3 className="text-sm font-medium text-gray-700 mb-1">
-                  {skill.charAt(0).toUpperCase() + skill.slice(1)}
-                </h3>
-                <p className="text-lg font-bold text-primary-600">{level}</p>
-                <p className="text-xs text-gray-500">{experience.toLocaleString()} XP</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 };

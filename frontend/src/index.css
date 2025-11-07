@@ -32,5 +32,73 @@
   .card {
     @apply bg-white rounded-lg shadow-md p-6;
   }
+
+  /* OSRS Skills Panel Styles */
+  .osrs-skills-panel {
+    @apply bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 rounded-lg shadow-lg p-4 border-2 border-gray-700;
+    background-image:
+      radial-gradient(circle at 20% 50%, rgba(139, 69, 19, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(101, 67, 33, 0.1) 0%, transparent 50%);
+  }
+
+  .osrs-skills-grid {
+    @apply grid grid-cols-6 gap-2 mb-4;
+  }
+
+  .osrs-skill-cell {
+    @apply relative bg-gradient-to-br from-gray-700 to-gray-800 rounded border-2 border-gray-600 p-2 min-h-[80px] flex flex-col;
+    background-image:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+      linear-gradient(225deg, rgba(0, 0, 0, 0.2) 0%, transparent 50%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 2px 4px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+  }
+
+  .osrs-skill-cell:hover {
+    @apply border-gray-500;
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.15),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 4px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .osrs-skill-icon {
+    @apply text-2xl mb-1;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  }
+
+  .osrs-skill-level {
+    @apply text-white font-bold text-sm absolute top-1 right-1;
+    text-shadow:
+      1px 1px 2px rgba(0, 0, 0, 0.8),
+      -1px -1px 2px rgba(0, 0, 0, 0.8);
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  .osrs-skill-name {
+    @apply text-white text-xs font-semibold mt-auto;
+    text-shadow:
+      1px 1px 2px rgba(0, 0, 0, 0.8),
+      -1px -1px 2px rgba(0, 0, 0, 0.8);
+    letter-spacing: 0.3px;
+  }
+
+  .osrs-total-level {
+    @apply bg-gradient-to-r from-gray-900 to-gray-800 border-2 border-gray-700 rounded px-4 py-3 text-center;
+    @apply text-white font-bold text-lg;
+    text-shadow:
+      1px 1px 2px rgba(0, 0, 0, 0.8),
+      -1px -1px 2px rgba(0, 0, 0, 0.8);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+      0 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+  }
 }
 

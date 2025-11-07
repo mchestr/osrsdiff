@@ -9,7 +9,8 @@ echo ""
 echo "Development:"
 echo "  mise run install      - Install production dependencies"
 echo "  mise run dev-install  - Install development dependencies"
-echo "  mise run dev          - Start development server"
+echo "  mise run dev          - Start backend development server on port 8000"
+echo "  mise run frontend     - Run frontend development server"
 echo "  mise run worker       - Start background worker"
 echo ""
 echo "Code Quality:"
@@ -45,8 +46,12 @@ description = "Install development dependencies"
 run = "uv sync"
 
 [tasks.dev]
-description = "Start development server"
+description = "Start backend development server on port 8000"
 run = "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+[tasks.frontend]
+description = "Run frontend development server (configured to call API on port 8000)"
+run = "cd frontend && npm run dev"
 
 [tasks.worker]
 description = "Start background worker"

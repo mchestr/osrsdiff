@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
 
 // Get API target from environment or default to localhost
 const API_TARGET = process.env.VITE_API_TARGET || 'http://localhost:8000'
@@ -14,14 +14,17 @@ export default defineConfig({
       '/api': {
         target: API_TARGET,
         changeOrigin: true,
+        secure: false,
       },
       '/auth': {
         target: API_TARGET,
         changeOrigin: true,
+        secure: false,
       },
       '/openapi.json': {
         target: API_TARGET,
         changeOrigin: true,
+        secure: false,
       },
     },
   },

@@ -8,8 +8,10 @@ import { StatisticsService } from './services/StatisticsService';
 import { SystemService } from './services/SystemService';
 
 // Use relative URL when served from same origin, otherwise use env var or localhost
+// In development, use empty string to leverage Vite proxy
+// In production, use empty string if served from same origin, otherwise use env var
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.PROD ? '' : 'http://localhost:8000');
+  (import.meta.env.PROD ? '' : '');
 
 // Create axios instance for token refresh
 const axiosInstance: AxiosInstance = axios.create({
