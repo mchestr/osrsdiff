@@ -1,7 +1,7 @@
 import logging
-from pathlib import Path
 from contextlib import asynccontextmanager
 from logging.config import dictConfig
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -74,22 +74,35 @@ def create_app() -> FastAPI:
         index_path = static_dir / "index.html"
 
         # Mount static assets (JS, CSS, images, etc.)
-        app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="static")
+        app.mount(
+            "/assets",
+            StaticFiles(directory=str(static_dir / "assets")),
+            name="static",
+        )
 
         # Serve SPA index.html for root and all non-API routes
         @app.get("/")
-        async def serve_index():
+        async def serve_index() -> FileResponse:
             """Serve SPA index.html at root."""
             if index_path.exists():
                 return FileResponse(str(index_path))
             raise HTTPException(status_code=404, detail="Frontend not found")
 
         @app.get("/{full_path:path}")
-        async def serve_spa(full_path: str):
+        async def serve_spa(full_path: str) -> FileResponse:
             """Serve SPA index.html for client-side routing, excluding API routes."""
             # Exclude API routes, docs, and static assets
-            excluded_prefixes = ("api/", "auth/", "docs", "openapi.json", "assets/", "health")
-            if any(full_path.startswith(prefix) for prefix in excluded_prefixes):
+            excluded_prefixes = (
+                "api/",
+                "auth/",
+                "docs",
+                "openapi.json",
+                "assets/",
+                "health",
+            )
+            if any(
+                full_path.startswith(prefix) for prefix in excluded_prefixes
+            ):
                 raise HTTPException(status_code=404, detail="Not found")
 
             if index_path.exists():
