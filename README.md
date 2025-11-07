@@ -13,12 +13,20 @@ A backend service for tracking Old School RuneScape character progression by per
 
 ## Tech Stack
 
+### Backend
 - **FastAPI** - Modern async web framework
 - **PostgreSQL** - Primary database with async SQLAlchemy
 - **Redis** - Task queue broker and caching
 - **TaskIQ** - Async task queue for background jobs
 - **uv** - Fast Python package manager and project manager
 - **Docker** - Containerized development and deployment
+
+### Frontend
+- **React 18** - Modern UI library
+- **TypeScript** - Type-safe development
+- **Vite** - Fast build tool and dev server
+- **TailwindCSS** - Utility-first CSS framework
+- **Recharts** - Data visualization library
 
 ## Quick Start
 
@@ -45,9 +53,16 @@ cp .env.example .env
 3. Start the development environment:
 ```bash
 mise run docker:up
+# Or use docker-compose directly:
+docker-compose up
 ```
 
-4. The API will be available at `http://localhost:8000`
+4. Services will be available at:
+   - API: `http://localhost:8000`
+   - Frontend: `http://localhost:3000`
+   - API Docs: `http://localhost:8000/docs`
+   - PgAdmin: `http://localhost:8080`
+   - Redis Commander: `http://localhost:8081`
 
 ### Local Development (without Docker)
 
@@ -75,6 +90,27 @@ mise run dev
 mise run worker
 ```
 
+### Frontend Setup
+
+1. Navigate to the frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
+```bash
+npm run dev
+```
+
+The frontend will be available at `http://localhost:3000`
+
+See `frontend/README.md` for more details.
+
 ## API Documentation
 
 Once the application is running, visit:
@@ -84,14 +120,20 @@ Once the application is running, visit:
 ## Project Structure
 
 ```
-src/
+app/              # Backend application
 ├── api/          # FastAPI endpoints and routing
 ├── models/       # SQLAlchemy database models
 ├── services/     # Business logic services
 ├── workers/      # Background task workers
 └── main.py       # Application entry point
 
-scripts/          # Database and deployment scripts
+frontend/         # React frontend application
+├── src/
+│   ├── components/  # React components
+│   ├── pages/       # Page components
+│   ├── contexts/    # React contexts
+│   └── lib/         # Utilities and API client
+
 migrations/       # Alembic database migrations
 tests/           # Test suite
 ```
