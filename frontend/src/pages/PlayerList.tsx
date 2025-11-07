@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '../lib/api';
+import { api } from '../lib/apiClient';
 
 interface Player {
   id: number;
@@ -23,8 +23,8 @@ export const PlayerList: React.FC = () => {
 
   const fetchPlayers = async () => {
     try {
-      const response = await apiClient.get('/api/v1/players?active_only=false');
-      setPlayers(response.data.players);
+      const response = await api.PlayersService.listPlayersApiV1PlayersGet(false);
+      setPlayers(response.players);
     } catch (error) {
       console.error('Failed to fetch players:', error);
     } finally {

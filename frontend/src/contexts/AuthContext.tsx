@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi, decodeToken } from '../lib/api';
+import { api, decodeToken } from '../lib/apiClient';
 
 interface User {
   username: string;
@@ -29,9 +29,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
           const decoded = decodeToken(token);
           if (decoded && decoded.exp * 1000 > Date.now()) {
-            const userData = await authApi.getCurrentUser();
+            const userData = await api.AuthenticationService.getCurrentUserInfoAuthMeGet();
             setUser({
-              ...userData,
+              username: userData.username,
+              user_id: userData.user_id,
               is_admin: decoded.is_admin || false,
             });
           } else {
@@ -51,24 +52,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (username: string, password: string) => {
-    const response = await authApi.login(username, password);
+    const formData = {
+      username,
+      password,
+      grant_type: 'password',
+    };
+    const response = await api.AuthenticationService.loginAuthLoginPost(formData);
     localStorage.setItem('access_token', response.access_token);
     localStorage.setItem('refresh_token', response.refresh_token);
 
     const decoded = decodeToken(response.access_token);
-    const userData = await authApi.getCurrentUser();
+    const userData = await api.AuthenticationService.getCurrentUserInfoAuthMeGet();
     setUser({
-      ...userData,
+      username: userData.username,
+      user_id: userData.user_id,
       is_admin: decoded.is_admin || false,
     });
   };
 
   const logout = async () => {
     try {
-      await authApi.logout();
+      await api.AuthenticationService.logoutAuthLogoutPost();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       setUser(null);
     }
   };

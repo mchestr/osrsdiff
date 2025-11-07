@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "generate-api": "openapi-typescript-codegen --input http://localhost:8000/openapi.json --output ./src/api --client axios"
+    "generate-api": "openapi-typescript-codegen --input ${VITE_API_BASE_URL:-http://localhost:8000}/openapi.json --output ./src/api --client axios",
+    "generate-api:local": "openapi-typescript-codegen --input http://localhost:8000/openapi.json --output ./src/api --client axios"
   },
   "dependencies": {
     "react": "^18.2.0",

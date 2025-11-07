@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import apiClient from '../lib/api';
+import { api } from '../lib/apiClient';
 
 interface Player {
   id: number;
@@ -46,14 +46,14 @@ export const AdminDashboard: React.FC = () => {
   const fetchData = async () => {
     try {
       const [playersRes, statsRes, healthRes] = await Promise.all([
-        apiClient.get('/api/v1/players?active_only=false'),
-        apiClient.get('/api/v1/system/stats'),
-        apiClient.get('/api/v1/system/health'),
+        api.PlayersService.listPlayersApiV1PlayersGet(false),
+        api.SystemService.getDatabaseStatsApiV1SystemStatsGet(),
+        api.SystemService.getSystemHealthApiV1SystemHealthGet(),
       ]);
 
-      setPlayers(playersRes.data.players);
-      setStats(statsRes.data);
-      setHealth(healthRes.data);
+      setPlayers(playersRes.players);
+      setStats(statsRes);
+      setHealth(healthRes);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -67,13 +67,13 @@ export const AdminDashboard: React.FC = () => {
 
     setAddingPlayer(true);
     try {
-      await apiClient.post('/api/v1/players', {
+      await api.PlayersService.addPlayerApiV1PlayersPost({
         username: newPlayerUsername.trim(),
       });
       setNewPlayerUsername('');
       await fetchData();
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to add player');
+      alert(error.body?.detail || error.message || 'Failed to add player');
     } finally {
       setAddingPlayer(false);
     }
@@ -82,13 +82,13 @@ export const AdminDashboard: React.FC = () => {
   const handleToggleActive = async (username: string, isActive: boolean) => {
     try {
       if (isActive) {
-        await apiClient.post(`/api/v1/players/${username}/deactivate`);
+        await api.PlayersService.deactivatePlayerApiV1PlayersUsernameDeactivatePost(username);
       } else {
-        await apiClient.post(`/api/v1/players/${username}/reactivate`);
+        await api.PlayersService.reactivatePlayerApiV1PlayersUsernameReactivatePost(username);
       }
       await fetchData();
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to update player');
+      alert(error.body?.detail || error.message || 'Failed to update player');
     }
   };
 
@@ -98,19 +98,19 @@ export const AdminDashboard: React.FC = () => {
     }
 
     try {
-      await apiClient.delete(`/api/v1/players/${username}`);
+      await api.PlayersService.removePlayerApiV1PlayersUsernameDelete(username);
       await fetchData();
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to delete player');
+      alert(error.body?.detail || error.message || 'Failed to delete player');
     }
   };
 
   const handleTriggerFetch = async (username: string) => {
     try {
-      await apiClient.post(`/api/v1/players/${username}/fetch`);
+      await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
       alert('Fetch task enqueued successfully');
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to trigger fetch');
+      alert(error.body?.detail || error.message || 'Failed to trigger fetch');
     }
   };
 
