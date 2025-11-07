@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api, decodeToken } from '../lib/apiClient';
+import { api, decodeToken } from '../api/apiClient';
 
 interface User {
   username: string;

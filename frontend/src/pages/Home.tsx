@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/apiClient';
+import { api } from '../api/apiClient';
 
 interface Player {
   id: number;

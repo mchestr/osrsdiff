@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { api } from '../lib/apiClient';
+import { api } from '../api/apiClient';
 
 interface Player {
   id: number;

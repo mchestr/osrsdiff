@@ -2,9 +2,9 @@ import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { api } from '../api/apiClient';
 import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
-import { api } from '../lib/apiClient';
 
 export const PlayerStats: React.FC = () => {
   const { username } = useParams<{ username: string }>();

@@ -22,9 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Generated API client (committed because it's needed for Docker builds)
-# src/api
-# Note: The generated API client is committed to ensure Docker builds work
-# Regenerate with: npm run generate-api:local
-

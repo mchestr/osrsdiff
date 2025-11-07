@@ -1,7 +1,7 @@
 /* generated using openapi-typescript-codegen -- do no edit */
 /* istanbul ignore file */
 /* tslint:disable */
- 
+
 export { ApiError } from './core/ApiError';
 export { CancelablePromise, CancelError } from './core/CancelablePromise';
 export { OpenAPI } from './core/OpenAPI';
@@ -51,3 +51,6 @@ export { HistoryService } from './services/HistoryService';
 export { PlayersService } from './services/PlayersService';
 export { StatisticsService } from './services/StatisticsService';
 export { SystemService } from './services/SystemService';
+
+// Export the configured API client with token refresh handling
+export { api, axiosInstance, decodeToken } from './apiClient';
