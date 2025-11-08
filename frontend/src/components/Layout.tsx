@@ -15,25 +15,25 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b border-gray-200">
+    <div className="min-h-screen" style={{ backgroundColor: '#1d1611' }}>
+      <nav className="osrs-card border-b-0 rounded-none" style={{ borderBottom: '3px solid #1d1611', marginBottom: 0 }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex">
-              <Link to="/" className="flex items-center px-2 py-2 text-xl font-bold text-primary-600">
+              <Link to="/" className="flex items-center px-2 py-2 text-xl font-bold osrs-card-title">
                 OSRS Diff
               </Link>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 <Link
                   to="/"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-primary-600"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium osrs-text hover:opacity-80 transition-opacity"
                 >
                   Player Stats
                 </Link>
                 {isAdmin && (
                   <Link
                     to="/admin"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-primary-600"
+                    className="inline-flex items-center px-1 pt-1 text-sm font-medium osrs-text hover:opacity-80 transition-opacity"
                   >
                     Admin Dashboard
                   </Link>
@@ -41,15 +41,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">Welcome, {user?.username}</span>
+              <span className="text-sm osrs-text">Welcome, {user?.username}</span>
               {isAdmin && (
-                <span className="px-2 py-1 text-xs font-semibold text-primary-800 bg-primary-100 rounded-full">
+                <span className="px-2 py-1 text-xs font-semibold osrs-text" style={{ backgroundColor: 'rgba(255, 215, 0, 0.2)', border: '1px solid #ffd700' }}>
                   Admin
                 </span>
               )}
               <button
                 onClick={handleLogout}
-                className="btn btn-secondary text-sm"
+                className="osrs-btn text-sm"
               >
                 Logout
               </button>
@@ -57,7 +57,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8" style={{ backgroundColor: '#1d1611' }}>
         {children}
       </main>
     </div>

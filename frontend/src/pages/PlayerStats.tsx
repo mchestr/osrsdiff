@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api/apiClient';
+import type { PlayerMetadataResponse } from '../api/models/PlayerMetadataResponse';
 import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
@@ -156,11 +157,14 @@ export const PlayerStats: React.FC = () => {
   const [progressDay, setProgressDay] = useState<ProgressAnalysisResponse | null>(null);
   const [progressWeek, setProgressWeek] = useState<ProgressAnalysisResponse | null>(null);
   const [progressMonth, setProgressMonth] = useState<ProgressAnalysisResponse | null>(null);
+  const [metadata, setMetadata] = useState<PlayerMetadataResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [skillProgress, setSkillProgress] = useState<SkillProgressResponse | null>(null);
   const [skillProgressLoading, setSkillProgressLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [metadataExpanded, setMetadataExpanded] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -168,17 +172,19 @@ export const PlayerStats: React.FC = () => {
 
       try {
         setLoading(true);
-        const [statsRes, progressDayRes, progressWeekRes, progressMonthRes] = await Promise.all([
+        const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes] = await Promise.all([
           api.StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username),
           api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 1).catch(() => null),
           api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 7).catch(() => null),
           api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 30).catch(() => null),
+          api.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username).catch(() => null),
         ]);
 
         setStats(statsRes);
         setProgressDay(progressDayRes);
         setProgressWeek(progressWeekRes);
         setProgressMonth(progressMonthRes);
+        setMetadata(metadataRes);
         if (progressMonthRes) {
           setProgress(progressMonthRes);
         }
@@ -193,6 +199,45 @@ export const PlayerStats: React.FC = () => {
 
     fetchData();
   }, [username]);
+
+  const handleTriggerFetch = async () => {
+    if (!username) return;
+
+    setFetching(true);
+    try {
+      await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
+      alert('Fetch task enqueued successfully. Refreshing data...');
+      // Refresh data after a short delay
+      setTimeout(async () => {
+        try {
+          const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes] = await Promise.all([
+            api.StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username),
+            api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 1).catch(() => null),
+            api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 7).catch(() => null),
+            api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 30).catch(() => null),
+            api.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username).catch(() => null),
+          ]);
+
+          setStats(statsRes);
+          setProgressDay(progressDayRes);
+          setProgressWeek(progressWeekRes);
+          setProgressMonth(progressMonthRes);
+          setMetadata(metadataRes);
+          if (progressMonthRes) {
+            setProgress(progressMonthRes);
+          }
+        } catch (err) {
+          console.error('Failed to refresh data:', err);
+        }
+      }, 2000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetch';
+      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+      alert(errorDetail || errorMessage);
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const handleSkillClick = async (skillName: string) => {
     if (!username) return;
@@ -272,10 +317,11 @@ export const PlayerStats: React.FC = () => {
 
   const progressData = progress
     ? (Object.entries(progress.progress.experience_gained) as [string, number][])
+        .filter(([skill]) => skill !== 'overall')
         .map(([skill, exp]) => ({
           skill: skill.charAt(0).toUpperCase() + skill.slice(1),
-          experience: exp,
-          levels: progress.progress.levels_gained[skill] || 0,
+          experience: Number(exp) || 0,
+          levels: Number(progress.progress.levels_gained[skill]) || 0,
         }))
         .filter((item) => item.experience > 0)
         .sort((a, b) => b.experience - a.experience)
@@ -283,21 +329,30 @@ export const PlayerStats: React.FC = () => {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4" style={{ padding: '1rem' }}>
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="osrs-card-title text-2xl">
           {stats.username}
         </h1>
-        {stats.fetched_at && (
-          <p className="text-sm text-gray-500">
-            Last updated: {format(new Date(stats.fetched_at), 'PPpp')}
-          </p>
-        )}
+        <div className="flex items-center gap-3">
+          {stats.fetched_at && (
+            <p className="osrs-text-secondary text-xs">
+              Last updated: {format(new Date(stats.fetched_at), 'PPpp')}
+            </p>
+          )}
+          <button
+            onClick={handleTriggerFetch}
+            disabled={fetching}
+            className="osrs-btn text-sm px-3 py-1.5"
+          >
+            {fetching ? 'Fetching...' : 'Fetch Now'}
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-x-1 gap-y-3">
         {/* OSRS Skills Grid - Main Feature */}
-        <div>
+        <div className="lg:col-span-2">
           <div className="osrs-skills-panel">
             <div className="osrs-skills-grid">
               {orderedSkills.map((skill) => {
@@ -345,45 +400,40 @@ export const PlayerStats: React.FC = () => {
           </div>
         </div>
 
-        {/* Overall Stats Sidebar */}
-        <div className="space-y-4">
-          {stats.overall && (
-            <div className="card">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Total Level</h3>
-              <p className="text-3xl font-bold text-primary-600">{stats.overall.level ?? 'N/A'}</p>
+        {/* Overall Stats - Compact */}
+        <div className="lg:col-span-1">
+          <div className="osrs-card h-full">
+            <div className="space-y-4">
+              {stats.overall && (
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Total Level</h3>
+                  <p className="osrs-stat-value">{stats.overall.level ?? 'N/A'}</p>
+                </div>
+              )}
+              {stats.overall && (
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Total Experience</h3>
+                  <p className="osrs-stat-value">
+                    {stats.overall.experience?.toLocaleString() ?? 'N/A'}
+                  </p>
+                </div>
+              )}
+              {stats.combat_level && (
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Combat Level</h3>
+                  <p className="osrs-stat-value">{stats.combat_level}</p>
+                </div>
+              )}
             </div>
-          )}
-          {stats.overall && (
-            <div className="card">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Total Experience</h3>
-              <p className="text-3xl font-bold text-primary-600">
-                {stats.overall.experience?.toLocaleString() ?? 'N/A'}
-              </p>
-            </div>
-          )}
-          {stats.combat_level && (
-            <div className="card">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Combat Level</h3>
-              <p className="text-3xl font-bold text-primary-600">{stats.combat_level}</p>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Most Progressed Skills */}
-        <div className="space-y-4">
-          <MostProgressedSkills
-            title="Last Day"
-            progress={progressDay}
-            skillIcons={SKILL_ICONS}
-          />
-          <MostProgressedSkills
-            title="Last Week"
-            progress={progressWeek}
-            skillIcons={SKILL_ICONS}
-          />
-          <MostProgressedSkills
-            title="Last Month"
-            progress={progressMonth}
+        {/* Recent Progress - Compact Combined */}
+        <div className="lg:col-span-1">
+          <CompactProgressCards
+            progressDay={progressDay}
+            progressWeek={progressWeek}
+            progressMonth={progressMonth}
             skillIcons={SKILL_ICONS}
           />
         </div>
@@ -391,48 +441,64 @@ export const PlayerStats: React.FC = () => {
 
       {/* Progress Summary */}
       {progress && (
-        <div className="card">
-          <h2 className="text-xl font-bold mb-4">30-Day Progress</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="osrs-card">
+          <h2 className="osrs-card-title mb-3">30-Day Progress</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Total Experience Gained</h3>
-              <p className="text-2xl font-bold">
-                {(Object.values(progress.progress.experience_gained) as number[])
-                  .reduce((sum: number, exp: number) => sum + exp, 0)
+              <h3 className="osrs-stat-label mb-2">Total Experience Gained</h3>
+              <p className="osrs-stat-value text-2xl">
+                {(Object.entries(progress.progress.experience_gained) as [string, number][])
+                  .filter(([skill]) => skill !== 'overall')
+                  .reduce((sum: number, [, exp]: [string, number]) => sum + exp, 0)
                   .toLocaleString()}
               </p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Total Levels Gained</h3>
-              <p className="text-2xl font-bold">
-                {(Object.values(progress.progress.levels_gained) as number[])
-                  .reduce((sum: number, levels: number) => sum + levels, 0)}
+              <h3 className="osrs-stat-label mb-2">Total Levels Gained</h3>
+              <p className="osrs-stat-value text-2xl">
+                {(Object.entries(progress.progress.levels_gained) as [string, number][])
+                  .filter(([skill]) => skill !== 'overall')
+                  .reduce((sum: number, [, levels]: [string, number]) => sum + levels, 0)}
               </p>
             </div>
           </div>
           {progressData.length > 0 && (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={progressData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <div style={{ width: '100%', height: '400px', backgroundColor: '#1d1611' }}>
+              <ResponsiveContainer>
+                <BarChart data={progressData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
                   <XAxis
                     dataKey="skill"
                     angle={-45}
                     textAnchor="end"
-                    height={120}
-                    tick={{ fontSize: 12, fill: '#374151' }}
-                    interval={0}
+                    height={100}
+                    tick={{ fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace', fontSize: 12 }}
+                    stroke="#8b7355"
                   />
                   <YAxis
-                    tick={{ fontSize: 12, fill: '#374151' }}
-                    label={{ value: 'Experience', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fill: '#374151' } }}
+                    tick={{ fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace', fontSize: 12 }}
+                    stroke="#8b7355"
+                    tickFormatter={(value) => {
+                      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                      if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                      return value.toString();
+                    }}
                   />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                    contentStyle={{
+                      backgroundColor: '#2d2418',
+                      border: '2px solid #8b7355',
+                      borderRadius: '0',
+                      color: '#ffd700',
+                      fontFamily: 'Courier New, Courier, monospace'
+                    }}
+                    labelStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                    formatter={(value: number) => [value.toLocaleString(), 'Experience']}
                   />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="experience" fill="#0ea5e9" name="Experience Gained" />
-                  <Bar dataKey="levels" fill="#10b981" name="Levels Gained" />
+                  <Legend
+                    wrapperStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                  />
+                  <Bar dataKey="experience" fill="#ffd700" stroke="#8b7355" strokeWidth={1} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -442,28 +508,37 @@ export const PlayerStats: React.FC = () => {
 
       {/* Top Bosses Chart */}
       {topBosses.length > 0 && (
-        <div className="card">
-          <h2 className="text-xl font-bold mb-4">Top Bosses by Kill Count</h2>
-          <div className="h-80">
+        <div className="osrs-card">
+          <h2 className="osrs-card-title mb-3">Top Bosses by Kill Count</h2>
+          <div className="h-80" style={{ backgroundColor: '#1d1611' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topBosses} layout="vertical" margin={{ top: 5, right: 30, left: 120, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
                 <XAxis
                   type="number"
-                  tick={{ fontSize: 12, fill: '#374151' }}
-                  label={{ value: 'Kill Count', position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#374151' } }}
+                  tick={{ fontSize: 12, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                  stroke="#8b7355"
+                  label={{ value: 'Kill Count', position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' } }}
                 />
                 <YAxis
                   dataKey="name"
                   type="category"
                   width={110}
-                  tick={{ fontSize: 12, fill: '#374151' }}
+                  tick={{ fontSize: 12, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                  stroke="#8b7355"
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  contentStyle={{
+                    backgroundColor: '#2d2418',
+                    border: '2px solid #8b7355',
+                    borderRadius: '0',
+                    color: '#ffd700',
+                    fontFamily: 'Courier New, Courier, monospace'
+                  }}
+                  labelStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
                 />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar dataKey="kills" fill="#10b981" name="Kills" radius={[0, 4, 4, 0]} />
+                <Legend wrapperStyle={{ paddingTop: '20px', color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }} />
+                <Bar dataKey="kills" fill="#ffd700" stroke="#8b7355" strokeWidth={1} name="Kills" radius={[0, 0, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -473,16 +548,16 @@ export const PlayerStats: React.FC = () => {
       {/* Skill Detail Modal */}
       {selectedSkill && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
           onClick={closeSkillModal}
         >
           <div
-            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            className="osrs-card max-w-4xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {skillProgressLoading ? (
               <div className="p-8 text-center">
-                <div className="text-xl">Loading skill details...</div>
+                <div className="osrs-text text-xl">Loading skill details...</div>
               </div>
             ) : skillProgress && stats ? (
               <SkillDetailModal
@@ -495,102 +570,280 @@ export const PlayerStats: React.FC = () => {
             ) : (
               <div className="p-8">
                 <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">
+                  <h2 className="osrs-card-title text-2xl">
                     {selectedSkill.charAt(0).toUpperCase() + selectedSkill.slice(1)}
                   </h2>
                   <button
                     onClick={closeSkillModal}
-                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                    className="osrs-text hover:opacity-70 text-3xl leading-none"
                   >
                     ×
                   </button>
                 </div>
-                <div className="text-red-600">Failed to load skill progress data.</div>
+                <div className="osrs-text">Failed to load skill progress data.</div>
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Player Metadata - Collapsible */}
+      {metadata && (
+        <div className="osrs-card">
+          <button
+            onClick={() => setMetadataExpanded(!metadataExpanded)}
+            className="w-full flex justify-between items-center text-left"
+          >
+            <h2 className="osrs-card-title text-sm">Player Information</h2>
+            <span className="osrs-text text-lg">
+              {metadataExpanded ? '−' : '+'}
+            </span>
+          </button>
+          {metadataExpanded && (
+            <div className="mt-3 pt-3 border-t border-8b7355" style={{ borderColor: '#8b7355' }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Status</h3>
+                  <p>
+                    <span
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold ${
+                        metadata.is_active
+                          ? 'osrs-text'
+                          : 'osrs-text-secondary'
+                      }`}
+                      style={{
+                        backgroundColor: metadata.is_active ? 'rgba(255, 215, 0, 0.2)' : 'rgba(139, 115, 85, 0.2)',
+                        border: `1px solid ${metadata.is_active ? '#ffd700' : '#8b7355'}`
+                      }}
+                    >
+                      {metadata.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Fetch Interval</h3>
+                  <p className="osrs-text">
+                    {metadata.fetch_interval_minutes} minutes
+                    {metadata.fetch_interval_minutes >= 60 && (
+                      <span className="osrs-text-secondary ml-1">
+                        ({Math.round(metadata.fetch_interval_minutes / 60 * 10) / 10} hours)
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Total Records</h3>
+                  <p className="osrs-text">
+                    {metadata.total_records.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Created</h3>
+                  <p className="osrs-text">
+                    {format(new Date(metadata.created_at), 'MMM d, yyyy')}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Last Fetched</h3>
+                  <p className="osrs-text">
+                    {metadata.last_fetched
+                      ? format(new Date(metadata.last_fetched), 'MMM d, yyyy HH:mm')
+                      : 'Never'}
+                  </p>
+                </div>
+                {metadata.avg_fetch_frequency_hours && (
+                  <div>
+                    <h3 className="osrs-stat-label mb-1">Avg Fetch Frequency</h3>
+                    <p className="osrs-text">
+                      {Math.round(metadata.avg_fetch_frequency_hours * 10) / 10} hours
+                    </p>
+                  </div>
+                )}
+                {metadata.first_record && (
+                  <div>
+                    <h3 className="osrs-stat-label mb-1">First Record</h3>
+                    <p className="osrs-text">
+                      {format(new Date(metadata.first_record), 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                )}
+                {metadata.latest_record && (
+                  <div>
+                    <h3 className="osrs-stat-label mb-1">Latest Record</h3>
+                    <p className="osrs-text">
+                      {format(new Date(metadata.latest_record), 'MMM d, yyyy HH:mm')}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Records (24h)</h3>
+                  <p className="osrs-text">
+                    {metadata.records_last_24h}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="osrs-stat-label mb-1">Records (7d)</h3>
+                  <p className="osrs-text">
+                    {metadata.records_last_7d}
+                  </p>
+                </div>
+                {metadata.schedule_id && (
+                  <div>
+                    <h3 className="osrs-stat-label mb-1">Schedule ID</h3>
+                    <p className="osrs-text-secondary text-xs font-mono break-all">
+                      {metadata.schedule_id}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-// Most Progressed Skills Component
-interface MostProgressedSkillsProps {
-  title: string;
-  progress: ProgressAnalysisResponse | null;
+// Compact Progress Cards Component
+interface CompactProgressCardsProps {
+  progressDay: ProgressAnalysisResponse | null;
+  progressWeek: ProgressAnalysisResponse | null;
+  progressMonth: ProgressAnalysisResponse | null;
   skillIcons: Record<string, string>;
 }
 
-const MostProgressedSkills: React.FC<MostProgressedSkillsProps> = ({
-  title,
-  progress,
+const CompactProgressCards: React.FC<CompactProgressCardsProps> = ({
+  progressDay,
+  progressWeek,
+  progressMonth,
   skillIcons,
 }) => {
-  if (!progress) {
-    return (
-      <div className="card">
-        <h3 className="text-sm font-medium text-gray-500 mb-2">{title}</h3>
-        <p className="text-sm text-gray-400">No data available</p>
-      </div>
-    );
-  }
+  const getTopSkill = (progress: ProgressAnalysisResponse | null) => {
+    if (!progress) return null;
+    const topSkill = Object.entries(progress.progress.experience_gained)
+      .filter(([skill]) => skill !== 'overall')
+      .map(([skill, exp]) => ({
+        skill,
+        experience: exp,
+        levels: progress.progress.levels_gained[skill] || 0,
+      }))
+      .filter((item) => item.experience > 0)
+      .sort((a, b) => b.experience - a.experience)[0];
+    return topSkill || null;
+  };
 
-  // Get top 5 skills by experience gained
-  const topSkills = Object.entries(progress.progress.experience_gained)
-    .map(([skill, exp]) => ({
-      skill,
-      experience: exp,
-      levels: progress.progress.levels_gained[skill] || 0,
-    }))
-    .filter((item) => item.experience > 0)
-    .sort((a, b) => b.experience - a.experience)
-    .slice(0, 5);
-
-  if (topSkills.length === 0) {
-    return (
-      <div className="card">
-        <h3 className="text-sm font-medium text-gray-500 mb-2">{title}</h3>
-        <p className="text-sm text-gray-400">No progress recorded</p>
-      </div>
-    );
-  }
+  const dayTop = getTopSkill(progressDay);
+  const weekTop = getTopSkill(progressWeek);
+  const monthTop = getTopSkill(progressMonth);
 
   return (
-    <div className="card">
-      <h3 className="text-sm font-medium text-gray-500 mb-3">{title}</h3>
-      <div className="space-y-2">
-        {topSkills.map(({ skill, experience, levels }) => {
-          const skillName = skill.charAt(0).toUpperCase() + skill.slice(1);
-          const iconUrl = skillIcons[skill];
-          return (
-            <div
-              key={skill}
-              className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 transition-colors"
-            >
-              {iconUrl && iconUrl !== '⚓' ? (
+    <div className="osrs-card h-full">
+      <h3 className="osrs-card-title text-sm mb-3">Recent Progress</h3>
+      <div className="space-y-4">
+        {/* Day */}
+        <div className="border-l-2 border-blue-500 pl-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="osrs-text-secondary text-xs font-medium">Last 24h</span>
+            {dayTop && (
+              <span className="osrs-text text-xs">
+                {dayTop.experience.toLocaleString()} XP
+              </span>
+            )}
+          </div>
+          {dayTop ? (
+            <div className="flex items-center gap-2">
+              {skillIcons[dayTop.skill] && skillIcons[dayTop.skill] !== '⚓' ? (
                 <img
-                  src={iconUrl}
-                  alt={skillName}
-                  className="w-6 h-6 flex-shrink-0"
+                  src={skillIcons[dayTop.skill]}
+                  alt={dayTop.skill}
+                  className="w-5 h-5 flex-shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                   }}
                 />
               ) : (
-                <span className="w-6 h-6 flex items-center justify-center text-sm">{iconUrl || '❓'}</span>
+                <span className="w-5 h-5 flex items-center justify-center text-xs">{skillIcons[dayTop.skill] || '❓'}</span>
               )}
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-gray-900 truncate">{skillName}</div>
-                <div className="text-xs text-gray-500">
-                  {experience.toLocaleString()} XP
-                  {levels > 0 && ` • +${levels} level${levels !== 1 ? 's' : ''}`}
-                </div>
-              </div>
+              <span className="osrs-text text-sm font-semibold capitalize">{dayTop.skill}</span>
+              {dayTop.levels > 0 && (
+                <span className="osrs-text text-xs font-medium">+{dayTop.levels}</span>
+              )}
             </div>
-          );
-        })}
+          ) : (
+            <span className="osrs-text-secondary text-xs">No progress</span>
+          )}
+        </div>
+
+        {/* Week */}
+        <div className="border-l-2 border-green-500 pl-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="osrs-text-secondary text-xs font-medium">Last 7d</span>
+            {weekTop && (
+              <span className="osrs-text text-xs">
+                {weekTop.experience.toLocaleString()} XP
+              </span>
+            )}
+          </div>
+          {weekTop ? (
+            <div className="flex items-center gap-2">
+              {skillIcons[weekTop.skill] && skillIcons[weekTop.skill] !== '⚓' ? (
+                <img
+                  src={skillIcons[weekTop.skill]}
+                  alt={weekTop.skill}
+                  className="w-5 h-5 flex-shrink-0"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <span className="w-5 h-5 flex items-center justify-center text-xs">{skillIcons[weekTop.skill] || '❓'}</span>
+              )}
+              <span className="osrs-text text-sm font-semibold capitalize">{weekTop.skill}</span>
+              {weekTop.levels > 0 && (
+                <span className="osrs-text text-xs font-medium">+{weekTop.levels}</span>
+              )}
+            </div>
+          ) : (
+            <span className="osrs-text-secondary text-xs">No progress</span>
+          )}
+        </div>
+
+        {/* Month */}
+        <div className="border-l-2 border-purple-500 pl-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="osrs-text-secondary text-xs font-medium">Last 30d</span>
+            {monthTop && (
+              <span className="osrs-text text-xs">
+                {monthTop.experience.toLocaleString()} XP
+              </span>
+            )}
+          </div>
+          {monthTop ? (
+            <div className="flex items-center gap-2">
+              {skillIcons[monthTop.skill] && skillIcons[monthTop.skill] !== '⚓' ? (
+                <img
+                  src={skillIcons[monthTop.skill]}
+                  alt={monthTop.skill}
+                  className="w-5 h-5 flex-shrink-0"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <span className="w-5 h-5 flex items-center justify-center text-xs">{skillIcons[monthTop.skill] || '❓'}</span>
+              )}
+              <span className="osrs-text text-sm font-semibold capitalize">{monthTop.skill}</span>
+              {monthTop.levels > 0 && (
+                <span className="osrs-text text-xs font-medium">+{monthTop.levels}</span>
+              )}
+            </div>
+          ) : (
+            <span className="osrs-text-secondary text-xs">No progress</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -648,17 +901,17 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
             <span className="text-4xl">{skillIcon || '❓'}</span>
           )}
           <div>
-            <h2 className="text-3xl font-bold">
+            <h2 className="osrs-card-title text-3xl">
               {skill.charAt(0).toUpperCase() + skill.slice(1)}
             </h2>
-            <p className="text-gray-500">
+            <p className="osrs-text-secondary">
               {skillProgress.period_days} days of history • {skillProgress.total_records} records
             </p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
+          className="osrs-text hover:opacity-70 text-3xl leading-none"
         >
           ×
         </button>
@@ -666,27 +919,27 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 
       {/* Current Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-1">Current Level</h3>
-          <p className="text-2xl font-bold text-primary-600">
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-1">Current Level</h3>
+          <p className="osrs-stat-value text-2xl">
             {currentLevel}/{maxLevel}
           </p>
         </div>
-        <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-1">Experience</h3>
-          <p className="text-2xl font-bold text-primary-600">
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-1">Experience</h3>
+          <p className="osrs-stat-value text-2xl">
             {currentExp.toLocaleString()}
           </p>
         </div>
-        <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-1">Daily XP Rate</h3>
-          <p className="text-2xl font-bold text-primary-600">
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-1">Daily XP Rate</h3>
+          <p className="osrs-stat-value text-2xl">
             {dailyRate > 0 ? Math.round(dailyRate).toLocaleString() : 'N/A'}
           </p>
         </div>
-        <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-1">Levels Gained</h3>
-          <p className="text-2xl font-bold text-primary-600">
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-1">Levels Gained</h3>
+          <p className="osrs-stat-value text-2xl">
             {skillProgress.progress.levels_gained}
           </p>
         </div>
@@ -694,23 +947,23 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 
       {/* Time Estimates */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Time to Next Level</h3>
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-2">Time to Next Level</h3>
           <div className="space-y-1">
-            <p className="text-xl font-bold text-primary-600">{timeToNextLevel}</p>
+            <p className="osrs-stat-value text-xl">{timeToNextLevel}</p>
             {!isMaxLevel && dailyRate > 0 && (
-              <p className="text-sm text-gray-500">
+              <p className="osrs-text-secondary text-sm">
                 {expToNextLevel.toLocaleString()} XP needed
               </p>
             )}
           </div>
         </div>
-        <div className="card">
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Time to Max Level</h3>
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-2">Time to Max Level</h3>
           <div className="space-y-1">
-            <p className="text-xl font-bold text-primary-600">{timeToMax}</p>
+            <p className="osrs-stat-value text-xl">{timeToMax}</p>
             {!isMaxLevel && dailyRate > 0 && (
-              <p className="text-sm text-gray-500">
+              <p className="osrs-text-secondary text-sm">
                 {expToMax.toLocaleString()} XP needed
               </p>
             )}
@@ -719,18 +972,18 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
       </div>
 
       {/* Progress Summary */}
-      <div className="card mb-6">
-        <h3 className="text-lg font-bold mb-4">Progress Summary ({skillProgress.period_days} days)</h3>
+      <div className="osrs-card mb-6">
+        <h3 className="osrs-card-title mb-4">Progress Summary ({skillProgress.period_days} days)</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-500 mb-1">Experience Gained</p>
-            <p className="text-2xl font-bold">
+            <p className="osrs-stat-label mb-1">Experience Gained</p>
+            <p className="osrs-stat-value text-2xl">
               {skillProgress.progress.experience_gained.toLocaleString()}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500 mb-1">Average Daily XP</p>
-            <p className="text-2xl font-bold">
+            <p className="osrs-stat-label mb-1">Average Daily XP</p>
+            <p className="osrs-stat-value text-2xl">
               {Math.round(skillProgress.progress.daily_experience_rate).toLocaleString()}
             </p>
           </div>
@@ -739,30 +992,31 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 
       {/* History Chart */}
       {timelineData.length > 0 && (
-        <div className="card">
-          <h3 className="text-lg font-bold mb-4">Experience History</h3>
-          <div className="h-80">
+        <div className="osrs-card">
+          <h3 className="osrs-card-title mb-4">Experience History</h3>
+          <div className="h-80" style={{ backgroundColor: '#1d1611' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={timelineData} margin={{ top: 10, right: 60, left: 80, bottom: 80 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <LineChart data={timelineData} margin={{ top: 20, right: 60, left: 100 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
                 <XAxis
                   dataKey="date"
                   angle={-45}
                   textAnchor="end"
-                  height={120}
-                  tick={{ fontSize: 14, fill: '#1f2937', fontWeight: 500 }}
+                  height={100}
+                  tick={{ fontSize: 14, fill: '#ffd700', fontWeight: 500 }}
                   interval="preserveStartEnd"
-                  stroke="#6b7280"
+                  stroke="#8b7355"
                 />
                 <YAxis
                   yAxisId="exp"
-                  tick={{ fontSize: 14, fill: '#1f2937', fontWeight: 500 }}
-                  stroke="#6b7280"
+                  tick={{ fontSize: 14, fill: '#ffd700', fontWeight: 500 }}
+                  stroke="#8b7355"
                   label={{
                     value: 'Experience',
                     angle: -90,
                     position: 'insideLeft',
-                    style: { textAnchor: 'middle', fill: '#1f2937', fontSize: 16, fontWeight: 600 }
+                    offset: -10,
+                    style: { textAnchor: 'middle', fill: '#ffd700', fontSize: 16, fontWeight: 600 }
                   }}
                   tickFormatter={(value) => {
                     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
@@ -773,30 +1027,31 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
                 <YAxis
                   yAxisId="level"
                   orientation="right"
-                  tick={{ fontSize: 14, fill: '#059669', fontWeight: 600 }}
-                  stroke="#059669"
+                  tick={{ fontSize: 14, fill: '#ffd700', fontWeight: 600 }}
+                  stroke="#8b7355"
                   label={{
                     value: 'Level',
                     angle: 90,
                     position: 'insideRight',
-                    style: { textAnchor: 'middle', fill: '#059669', fontSize: 16, fontWeight: 600 }
+                    style: { textAnchor: 'middle', fill: '#ffd700', fontSize: 16, fontWeight: 600 }
                   }}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '8px',
+                    backgroundColor: '#2d2418',
+                    border: '2px solid #8b7355',
+                    borderRadius: '0',
                     fontSize: '14px',
                     fontWeight: 500,
                     padding: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    color: '#ffd700'
                   }}
                   labelStyle={{
                     marginBottom: '8px',
                     fontSize: '15px',
                     fontWeight: 600,
-                    color: '#1f2937'
+                    color: '#ffd700'
                   }}
                   formatter={(value: number, name: string) => {
                     if (name === 'experience') {
@@ -806,27 +1061,27 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
                   }}
                 />
                 <Legend
-                  wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 500 }}
+                  wrapperStyle={{ paddingTop: '0px', marginTop: '0px', fontSize: '14px', fontWeight: 500, color: '#ffd700' }}
                   iconType="line"
                 />
                 <Line
                   type="monotone"
                   dataKey="experience"
-                  stroke="#0ea5e9"
+                  stroke="#ffd700"
                   strokeWidth={2.5}
                   name="Experience"
                   yAxisId="exp"
-                  dot={{ r: 4, fill: '#0ea5e9' }}
+                  dot={{ r: 4, fill: '#ffd700' }}
                   activeDot={{ r: 6 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="level"
-                  stroke="#10b981"
+                  stroke="#d4af37"
                   strokeWidth={2.5}
                   name="Level"
                   yAxisId="level"
-                  dot={{ r: 4, fill: '#10b981' }}
+                  dot={{ r: 4, fill: '#d4af37' }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>
