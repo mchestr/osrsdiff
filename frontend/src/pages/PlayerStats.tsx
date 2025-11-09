@@ -153,7 +153,6 @@ const formatDuration = (days: number): string => {
 export const PlayerStats: React.FC = () => {
   const { username } = useParams<{ username: string }>();
   const [stats, setStats] = useState<PlayerStatsResponse | null>(null);
-  const [progress, setProgress] = useState<ProgressAnalysisResponse | null>(null);
   const [progressDay, setProgressDay] = useState<ProgressAnalysisResponse | null>(null);
   const [progressWeek, setProgressWeek] = useState<ProgressAnalysisResponse | null>(null);
   const [progressMonth, setProgressMonth] = useState<ProgressAnalysisResponse | null>(null);
@@ -185,9 +184,6 @@ export const PlayerStats: React.FC = () => {
         setProgressWeek(progressWeekRes);
         setProgressMonth(progressMonthRes);
         setMetadata(metadataRes);
-        if (progressMonthRes) {
-          setProgress(progressMonthRes);
-        }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load player stats';
         const errorDetail = (err as { body?: { detail?: string } })?.body?.detail;
@@ -223,9 +219,6 @@ export const PlayerStats: React.FC = () => {
           setProgressWeek(progressWeekRes);
           setProgressMonth(progressMonthRes);
           setMetadata(metadataRes);
-          if (progressMonthRes) {
-            setProgress(progressMonthRes);
-          }
         } catch (err) {
           console.error('Failed to refresh data:', err);
         }
@@ -315,19 +308,6 @@ export const PlayerStats: React.FC = () => {
     .sort((a, b) => b.kills - a.kills)
     .slice(0, 10);
 
-  const progressData = progress
-    ? (Object.entries(progress.progress.experience_gained) as [string, number][])
-        .filter(([skill]) => skill !== 'overall')
-        .map(([skill, exp]) => ({
-          skill: skill.charAt(0).toUpperCase() + skill.slice(1),
-          experience: Number(exp) || 0,
-          levels: Number(progress.progress.levels_gained[skill]) || 0,
-        }))
-        .filter((item) => item.experience > 0)
-        .sort((a, b) => b.experience - a.experience)
-        .slice(0, 10)
-    : [];
-
   return (
     <div className="space-y-4" style={{ padding: '1rem' }}>
       <div className="flex justify-between items-center">
@@ -340,6 +320,15 @@ export const PlayerStats: React.FC = () => {
               Last updated: {format(new Date(stats.fetched_at), 'PPpp')}
             </p>
           )}
+          <a
+            href={`https://secure.runescape.com/m=hiscore_oldschool/hiscorepersonal.ws?user1=${encodeURIComponent(stats.username)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="osrs-btn text-sm px-3 py-1.5"
+            title="View on official OSRS hiscore"
+          >
+            View on OSRS
+          </a>
           <button
             onClick={handleTriggerFetch}
             disabled={fetching}
@@ -428,83 +417,23 @@ export const PlayerStats: React.FC = () => {
           </div>
         </div>
 
-        {/* Recent Progress - Compact Combined */}
+        {/* Top 5 Progress Highlights - Last 7 Days */}
         <div className="lg:col-span-1">
-          <CompactProgressCards
-            progressDay={progressDay}
+          <TopProgressHighlights
             progressWeek={progressWeek}
-            progressMonth={progressMonth}
             skillIcons={SKILL_ICONS}
           />
         </div>
       </div>
 
-      {/* Progress Summary */}
-      {progress && (
-        <div className="osrs-card">
-          <h2 className="osrs-card-title mb-3">30-Day Progress</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <h3 className="osrs-stat-label mb-2">Total Experience Gained</h3>
-              <p className="osrs-stat-value text-2xl">
-                {(Object.entries(progress.progress.experience_gained) as [string, number][])
-                  .filter(([skill]) => skill !== 'overall')
-                  .reduce((sum: number, [, exp]: [string, number]) => sum + exp, 0)
-                  .toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <h3 className="osrs-stat-label mb-2">Total Levels Gained</h3>
-              <p className="osrs-stat-value text-2xl">
-                {(Object.entries(progress.progress.levels_gained) as [string, number][])
-                  .filter(([skill]) => skill !== 'overall')
-                  .reduce((sum: number, [, levels]: [string, number]) => sum + levels, 0)}
-              </p>
-            </div>
-          </div>
-          {progressData.length > 0 && (
-            <div style={{ width: '100%', height: '400px', backgroundColor: '#1d1611' }}>
-              <ResponsiveContainer>
-                <BarChart data={progressData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
-                  <XAxis
-                    dataKey="skill"
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                    tick={{ fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace', fontSize: 12 }}
-                    stroke="#8b7355"
-                  />
-                  <YAxis
-                    tick={{ fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace', fontSize: 12 }}
-                    stroke="#8b7355"
-                    tickFormatter={(value) => {
-                      if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                      if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                      return value.toString();
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#2d2418',
-                      border: '2px solid #8b7355',
-                      borderRadius: '0',
-                      color: '#ffd700',
-                      fontFamily: 'Courier New, Courier, monospace'
-                    }}
-                    labelStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
-                    formatter={(value: number) => [value.toLocaleString(), 'Experience']}
-                  />
-                  <Legend
-                    wrapperStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
-                  />
-                  <Bar dataKey="experience" fill="#ffd700" stroke="#8b7355" strokeWidth={1} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Skills Summary Table */}
+      <SkillsSummaryTable
+        progressDay={progressDay}
+        progressWeek={progressWeek}
+        progressMonth={progressMonth}
+        skillIcons={SKILL_ICONS}
+        orderedSkills={orderedSkills}
+      />
 
       {/* Top Bosses Chart */}
       {topBosses.length > 0 && (
@@ -704,23 +633,19 @@ export const PlayerStats: React.FC = () => {
   );
 };
 
-// Compact Progress Cards Component
-interface CompactProgressCardsProps {
-  progressDay: ProgressAnalysisResponse | null;
+// Top Progress Highlights Component - Top 5 stats from last 7 days
+interface TopProgressHighlightsProps {
   progressWeek: ProgressAnalysisResponse | null;
-  progressMonth: ProgressAnalysisResponse | null;
   skillIcons: Record<string, string>;
 }
 
-const CompactProgressCards: React.FC<CompactProgressCardsProps> = ({
-  progressDay,
+const TopProgressHighlights: React.FC<TopProgressHighlightsProps> = ({
   progressWeek,
-  progressMonth,
   skillIcons,
 }) => {
-  const getTopSkill = (progress: ProgressAnalysisResponse | null) => {
-    if (!progress) return null;
-    const topSkill = Object.entries(progress.progress.experience_gained)
+  const getTopSkills = (progress: ProgressAnalysisResponse | null, count: number = 5) => {
+    if (!progress) return [];
+    return Object.entries(progress.progress.experience_gained)
       .filter(([skill]) => skill !== 'overall')
       .map(([skill, exp]) => ({
         skill,
@@ -728,123 +653,184 @@ const CompactProgressCards: React.FC<CompactProgressCardsProps> = ({
         levels: progress.progress.levels_gained[skill] || 0,
       }))
       .filter((item) => item.experience > 0)
-      .sort((a, b) => b.experience - a.experience)[0];
-    return topSkill || null;
+      .sort((a, b) => b.experience - a.experience)
+      .slice(0, count);
   };
 
-  const dayTop = getTopSkill(progressDay);
-  const weekTop = getTopSkill(progressWeek);
-  const monthTop = getTopSkill(progressMonth);
+  const topSkills = getTopSkills(progressWeek, 5);
 
   return (
     <div className="osrs-card h-full">
-      <h3 className="osrs-card-title text-sm mb-3">Recent Progress</h3>
-      <div className="space-y-4">
-        {/* Day */}
-        <div className="border-l-2 border-blue-500 pl-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="osrs-text-secondary text-xs font-medium">Last 24h</span>
-            {dayTop && (
-              <span className="osrs-text text-xs">
-                {dayTop.experience.toLocaleString()} XP
-              </span>
-            )}
-          </div>
-          {dayTop ? (
-            <div className="flex items-center gap-2">
-              {skillIcons[dayTop.skill] && skillIcons[dayTop.skill] !== '⚓' ? (
+      <h3 className="osrs-card-title text-sm mb-3">Top 5 Progress</h3>
+      {topSkills.length > 0 ? (
+        <div className="space-y-3">
+          {topSkills.map((skillData, index) => (
+            <div key={skillData.skill} className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center osrs-text text-xs font-bold">
+                #{index + 1}
+              </div>
+              {skillIcons[skillData.skill] && skillIcons[skillData.skill] !== '⚓' ? (
                 <img
-                  src={skillIcons[dayTop.skill]}
-                  alt={dayTop.skill}
-                  className="w-5 h-5 flex-shrink-0"
+                  src={skillIcons[skillData.skill]}
+                  alt={skillData.skill}
+                  className="w-6 h-6 flex-shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                   }}
                 />
               ) : (
-                <span className="w-5 h-5 flex items-center justify-center text-xs">{skillIcons[dayTop.skill] || '❓'}</span>
+                <span className="w-6 h-6 flex items-center justify-center text-xs">{skillIcons[skillData.skill] || '❓'}</span>
               )}
-              <span className="osrs-text text-sm font-semibold capitalize">{dayTop.skill}</span>
-              {dayTop.levels > 0 && (
-                <span className="osrs-text text-xs font-medium">+{dayTop.levels}</span>
-              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="osrs-text text-sm font-semibold capitalize truncate">{skillData.skill}</span>
+                  <span className="osrs-text text-xs font-medium whitespace-nowrap">
+                    {skillData.experience.toLocaleString()} XP
+                  </span>
+                </div>
+                {skillData.levels > 0 && (
+                  <div className="osrs-text-secondary text-xs mt-0.5">
+                    +{skillData.levels} level{skillData.levels !== 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
             </div>
-          ) : (
-            <span className="osrs-text-secondary text-xs">No progress</span>
-          )}
+          ))}
         </div>
+      ) : (
+        <div className="osrs-text-secondary text-sm text-center py-4">No progress</div>
+      )}
+    </div>
+  );
+};
 
-        {/* Week */}
-        <div className="border-l-2 border-green-500 pl-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="osrs-text-secondary text-xs font-medium">Last 7d</span>
-            {weekTop && (
-              <span className="osrs-text text-xs">
-                {weekTop.experience.toLocaleString()} XP
-              </span>
-            )}
-          </div>
-          {weekTop ? (
-            <div className="flex items-center gap-2">
-              {skillIcons[weekTop.skill] && skillIcons[weekTop.skill] !== '⚓' ? (
-                <img
-                  src={skillIcons[weekTop.skill]}
-                  alt={weekTop.skill}
-                  className="w-5 h-5 flex-shrink-0"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-              ) : (
-                <span className="w-5 h-5 flex items-center justify-center text-xs">{skillIcons[weekTop.skill] || '❓'}</span>
-              )}
-              <span className="osrs-text text-sm font-semibold capitalize">{weekTop.skill}</span>
-              {weekTop.levels > 0 && (
-                <span className="osrs-text text-xs font-medium">+{weekTop.levels}</span>
-              )}
-            </div>
-          ) : (
-            <span className="osrs-text-secondary text-xs">No progress</span>
-          )}
-        </div>
+// Skills Summary Table Component
+interface SkillsSummaryTableProps {
+  progressDay: ProgressAnalysisResponse | null;
+  progressWeek: ProgressAnalysisResponse | null;
+  progressMonth: ProgressAnalysisResponse | null;
+  skillIcons: Record<string, string>;
+  orderedSkills: Array<{ name: string; displayName: string; level: number; experience: number; maxLevel: number }>;
+}
 
-        {/* Month */}
-        <div className="border-l-2 border-purple-500 pl-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="osrs-text-secondary text-xs font-medium">Last 30d</span>
-            {monthTop && (
-              <span className="osrs-text text-xs">
-                {monthTop.experience.toLocaleString()} XP
-              </span>
-            )}
-          </div>
-          {monthTop ? (
-            <div className="flex items-center gap-2">
-              {skillIcons[monthTop.skill] && skillIcons[monthTop.skill] !== '⚓' ? (
-                <img
-                  src={skillIcons[monthTop.skill]}
-                  alt={monthTop.skill}
-                  className="w-5 h-5 flex-shrink-0"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-              ) : (
-                <span className="w-5 h-5 flex items-center justify-center text-xs">{skillIcons[monthTop.skill] || '❓'}</span>
-              )}
-              <span className="osrs-text text-sm font-semibold capitalize">{monthTop.skill}</span>
-              {monthTop.levels > 0 && (
-                <span className="osrs-text text-xs font-medium">+{monthTop.levels}</span>
-              )}
-            </div>
-          ) : (
-            <span className="osrs-text-secondary text-xs">No progress</span>
-          )}
-        </div>
+const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
+  progressDay,
+  progressWeek,
+  progressMonth,
+  skillIcons,
+  orderedSkills,
+}) => {
+  const [selectedPeriod, setSelectedPeriod] = useState<number>(7);
+
+  const getProgressForPeriod = (period: number): ProgressAnalysisResponse | null => {
+    switch (period) {
+      case 1:
+        return progressDay;
+      case 7:
+        return progressWeek;
+      case 30:
+        return progressMonth;
+      default:
+        return progressWeek;
+    }
+  };
+
+  const currentProgress = getProgressForPeriod(selectedPeriod);
+
+  const getSkillProgress = (skillName: string) => {
+    if (!currentProgress) {
+      return { experience: 0, levels: 0 };
+    }
+    return {
+      experience: currentProgress.progress.experience_gained[skillName] || 0,
+      levels: currentProgress.progress.levels_gained[skillName] || 0,
+    };
+  };
+
+  return (
+    <div className="osrs-card">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="osrs-card-title">Skills Progress Summary</h2>
+        <select
+          value={selectedPeriod}
+          onChange={(e) => setSelectedPeriod(Number(e.target.value))}
+          className="osrs-btn bg-transparent border border-8b7355 text-ffd700 px-3 py-1.5 text-sm"
+          style={{ borderColor: '#8b7355', color: '#ffd700' }}
+        >
+          <option value={1}>Last 1 Day</option>
+          <option value={7}>Last 7 Days</option>
+          <option value={30}>Last 30 Days</option>
+        </select>
       </div>
+
+      {currentProgress ? (
+        <div className="overflow-x-auto">
+          <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #8b7355' }}>
+                <th className="osrs-text text-left py-2 px-3 font-semibold" style={{ minWidth: '200px' }}>Skill</th>
+                <th className="osrs-text text-right py-2 px-3 font-semibold">Current Level</th>
+                <th className="osrs-text text-right py-2 px-3 font-semibold">Levels Gained</th>
+                <th className="osrs-text text-right py-2 px-3 font-semibold">Experience Gained</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orderedSkills.map((skill) => {
+                const progress = getSkillProgress(skill.name);
+                const iconUrl = skillIcons[skill.name];
+                return (
+                  <tr
+                    key={skill.name}
+                    className="hover:bg-opacity-10"
+                    style={{ borderBottom: '1px solid #8b7355', backgroundColor: progress.experience > 0 ? 'rgba(255, 215, 0, 0.05)' : 'transparent' }}
+                  >
+                    <td className="py-2 px-3">
+                      <div className="flex items-center gap-2">
+                        {iconUrl && iconUrl !== '⚓' ? (
+                          <img
+                            src={iconUrl}
+                            alt={skill.displayName}
+                            className="w-5 h-5 flex-shrink-0"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <span className="w-5 h-5 flex items-center justify-center text-xs">{iconUrl || '❓'}</span>
+                        )}
+                        <span className="osrs-text font-medium">{skill.displayName}</span>
+                      </div>
+                    </td>
+                    <td className="osrs-text text-right py-2 px-3">
+                      <span className="font-semibold">{skill.level}</span>
+                    </td>
+                    <td className="osrs-text text-right py-2 px-3">
+                      {progress.levels > 0 ? (
+                        <span className="font-semibold text-green-400">+{progress.levels}</span>
+                      ) : (
+                        <span className="osrs-text-secondary">0</span>
+                      )}
+                    </td>
+                    <td className="osrs-text text-right py-2 px-3">
+                      {progress.experience > 0 ? (
+                        <span className="font-semibold">{progress.experience.toLocaleString()}</span>
+                      ) : (
+                        <span className="osrs-text-secondary">0</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="osrs-text-secondary text-center py-8">
+          No progress data available for the selected period
+        </div>
+      )}
     </div>
   );
 };
