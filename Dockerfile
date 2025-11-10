@@ -1,6 +1,6 @@
 # Production Dockerfile: Multi-stage build combining frontend and backend
 # Stage 1: Build frontend React application
-FROM node:20-alpine AS frontend-builder
+FROM node:25-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
