@@ -31,6 +31,8 @@ services:
     command: redis-server --appendonly yes
 
   app:
+    profiles:
+      - app
     build:
       context: .
       dockerfile: Dockerfile
