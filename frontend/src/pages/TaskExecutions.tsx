@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
@@ -10,9 +10,11 @@ const STATUS_COLORS: Record<string, string> = {
   failure: '#d32f2f',
   retry: '#ff9800',
   pending: '#2196f3',
+  running: '#9c27b0',
   cancelled: '#9e9e9e',
   skipped: '#9e9e9e',
   warning: '#ff9800',
+  timeout: '#f44336',
 };
 
 const STATUS_OPTIONS = ['success', 'failure', 'retry', 'pending', 'cancelled', 'skipped', 'warning'];
@@ -38,7 +40,6 @@ export const TaskExecutions: React.FC = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
   const [modalType, setModalType] = useState<'info' | 'error' | 'success' | 'warning'>('info');
-  const [selectedExecution, setSelectedExecution] = useState<TaskExecutionResponse | null>(null);
 
   // Update URL params when filters change
   useEffect(() => {
@@ -50,11 +51,7 @@ export const TaskExecutions: React.FC = () => {
     setSearchParams(params, { replace: true });
   }, [taskNameFilter, statusFilter, scheduleIdFilter, playerIdFilter, setSearchParams]);
 
-  useEffect(() => {
-    fetchExecutions();
-  }, [limit, offset, taskNameFilter, statusFilter, scheduleIdFilter, playerIdFilter]);
-
-  const fetchExecutions = async () => {
+  const fetchExecutions = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(
@@ -74,7 +71,11 @@ export const TaskExecutions: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, offset, taskNameFilter, statusFilter, scheduleIdFilter, playerIdFilter]);
+
+  useEffect(() => {
+    fetchExecutions();
+  }, [fetchExecutions]);
 
   const showModal = (
     title: string,
@@ -89,11 +90,9 @@ export const TaskExecutions: React.FC = () => {
 
   const handleModalClose = () => {
     setModalOpen(false);
-    setSelectedExecution(null);
   };
 
   const handleViewDetails = (execution: TaskExecutionResponse) => {
-    setSelectedExecution(execution);
     const details = (
       <div className="space-y-4 text-left">
         <div>

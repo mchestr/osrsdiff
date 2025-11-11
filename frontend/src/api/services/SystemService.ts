@@ -6,7 +6,6 @@ import type { DatabaseStatsResponse } from '../models/DatabaseStatsResponse';
 import type { PlayerDistributionResponse } from '../models/PlayerDistributionResponse';
 import type { ScheduledTasksResponse } from '../models/ScheduledTasksResponse';
 import type { SystemHealthResponse } from '../models/SystemHealthResponse';
-import type { TaskExecutionResponse } from '../models/TaskExecutionResponse';
 import type { TaskExecutionsListResponse } from '../models/TaskExecutionsListResponse';
 import type { TaskTriggerResponse } from '../models/TaskTriggerResponse';
 

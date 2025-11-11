@@ -1,7 +1,9 @@
 import { format } from 'date-fns';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api/apiClient';
+import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
 import { Modal } from '../components/Modal';
 
 interface Player {
@@ -38,12 +40,23 @@ const STATUS_COLORS: Record<string, string> = {
   failure: '#d32f2f',
   retry: '#ff9800',
   pending: '#2196f3',
+  running: '#9c27b0',
   cancelled: '#9e9e9e',
   skipped: '#9e9e9e',
   warning: '#ff9800',
+  timeout: '#f44336',
 };
 
-const STATUS_OPTIONS = ['success', 'failure', 'retry', 'pending', 'cancelled', 'skipped', 'warning'];
+// Helper function to format large numbers
+const formatNumber = (num: number): string => {
+  if (num >= 1000000) {
+    return `${(num / 1000000).toFixed(1)}M`;
+  }
+  if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}K`;
+  }
+  return num.toString();
+};
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -74,6 +87,7 @@ export const AdminDashboard: React.FC = () => {
     statusBreakdown: Record<string, number>;
   } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [executionsForGraph, setExecutionsForGraph] = useState<TaskExecutionResponse[]>([]);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -102,6 +116,7 @@ export const AdminDashboard: React.FC = () => {
       );
 
       const allExecutions = response.executions;
+      setExecutionsForGraph(allExecutions);
       const now = new Date();
       const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -158,6 +173,65 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Calculate time-series data for executions over time
+  const timeSeriesData = useMemo(() => {
+    if (executionsForGraph.length === 0) return [];
+
+    // Sort executions by started_at
+    const sorted = [...executionsForGraph].sort((a, b) =>
+      new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
+    );
+
+    // Determine time grouping based on data range
+    const firstTime = new Date(sorted[0].started_at).getTime();
+    const lastTime = new Date(sorted[sorted.length - 1].started_at).getTime();
+    const timeRange = lastTime - firstTime;
+    const daysRange = timeRange / (1000 * 60 * 60 * 24);
+
+    // Group by hour if less than 7 days, otherwise by day
+    const groupByHour = daysRange < 7;
+
+    // Create time buckets
+    const timeBuckets: Record<string, { time: string; total: number; success: number; failure: number; retry: number; other: number }> = {};
+
+    sorted.forEach((execution) => {
+      const date = new Date(execution.started_at);
+      let bucketKey: string;
+
+      if (groupByHour) {
+        // Group by hour - use more compact format
+        bucketKey = format(date, 'MMM d HH:mm');
+      } else {
+        // Group by day - use more compact format
+        bucketKey = format(date, 'MMM d');
+      }
+
+      if (!timeBuckets[bucketKey]) {
+        timeBuckets[bucketKey] = {
+          time: bucketKey,
+          total: 0,
+          success: 0,
+          failure: 0,
+          retry: 0,
+          other: 0,
+        };
+      }
+
+      timeBuckets[bucketKey].total++;
+      const status = execution.status || 'unknown';
+      if (status === 'success') {
+        timeBuckets[bucketKey].success++;
+      } else if (status === 'failure') {
+        timeBuckets[bucketKey].failure++;
+      } else if (status === 'retry') {
+        timeBuckets[bucketKey].retry++;
+      } else {
+        timeBuckets[bucketKey].other++;
+      }
+    });
+
+    return Object.values(timeBuckets);
+  }, [executionsForGraph]);
 
   const showModal = (
     title: string,
@@ -399,37 +473,73 @@ export const AdminDashboard: React.FC = () => {
     <div className="space-y-6">
       <h1 className="osrs-card-title text-3xl">Admin Dashboard</h1>
 
-      {/* System Health */}
-      {health && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="osrs-card">
-            <h3 className="osrs-stat-label mb-2">System Status</h3>
-            <p
-              className="osrs-stat-value"
-              style={{ color: health.status === 'healthy' ? '#ffd700' : '#d4af37' }}
-            >
-              {health.status.toUpperCase()}
-            </p>
-          </div>
-          <div className="osrs-card">
-            <h3 className="osrs-stat-label mb-2">Database</h3>
-            <p
-              className="osrs-stat-value"
-              style={{ color: health.database_connected ? '#ffd700' : '#d4af37' }}
-            >
-              {health.database_connected ? 'Connected' : 'Disconnected'}
-            </p>
-          </div>
-          {health.total_storage_mb && (
+      {/* System Health & Database Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6">
+        {health && (
+          <>
             <div className="osrs-card">
-              <h3 className="osrs-stat-label mb-2">Storage</h3>
-              <p className="osrs-stat-value">
-                {health.total_storage_mb.toFixed(2)} MB
+              <h3 className="osrs-stat-label mb-2">System Status</h3>
+              <div className="flex items-center justify-center">
+                <span
+                  className="text-4xl"
+                  style={{ color: health.status === 'healthy' ? '#4caf50' : '#d32f2f' }}
+                  title={health.status.toUpperCase()}
+                >
+                  {health.status === 'healthy' ? '✓' : '✗'}
+                </span>
+              </div>
+            </div>
+            <div className="osrs-card">
+              <h3 className="osrs-stat-label mb-2">Database</h3>
+              <div className="flex items-center justify-center">
+                <span
+                  className="text-4xl"
+                  style={{ color: health.database_connected ? '#4caf50' : '#d32f2f' }}
+                  title={health.database_connected ? 'Connected' : 'Disconnected'}
+                >
+                  {health.database_connected ? '✓' : '✗'}
+                </span>
+              </div>
+            </div>
+            {health.total_storage_mb && (
+              <div className="osrs-card">
+                <h3 className="osrs-stat-label mb-2">Storage</h3>
+                <p className="osrs-stat-value" title={`${health.total_storage_mb.toFixed(2)} MB`}>
+                  {formatNumber(Math.round(health.total_storage_mb))} MB
+                </p>
+              </div>
+            )}
+          </>
+        )}
+        {stats && (
+          <>
+            <div className="osrs-card">
+              <h3 className="osrs-stat-label mb-2">Total Players</h3>
+              <p className="osrs-stat-value" title={stats.total_players.toString()}>
+                {formatNumber(stats.total_players)}
               </p>
             </div>
-          )}
-        </div>
-      )}
+            <div className="osrs-card">
+              <h3 className="osrs-stat-label mb-2">Active Players</h3>
+              <p className="osrs-stat-value" style={{ color: '#ffd700' }} title={stats.active_players.toString()}>
+                {formatNumber(stats.active_players)}
+              </p>
+            </div>
+            <div className="osrs-card">
+              <h3 className="osrs-stat-label mb-2">Total Records</h3>
+              <p className="osrs-stat-value" title={stats.total_hiscore_records.toLocaleString()}>
+                {formatNumber(stats.total_hiscore_records)}
+              </p>
+            </div>
+            <div className="osrs-card">
+              <h3 className="osrs-stat-label mb-2">Records (24h)</h3>
+              <p className="osrs-stat-value" title={stats.records_last_24h.toString()}>
+                {formatNumber(stats.records_last_24h)}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Task Execution Health Summary */}
       <div className="osrs-card">
@@ -449,6 +559,85 @@ export const AdminDashboard: React.FC = () => {
           </div>
         ) : executionSummary ? (
           <div className="space-y-4">
+            {/* Task Executions Over Time Graph */}
+            {executionsForGraph.length > 0 && timeSeriesData.length > 0 && (
+              <div className="pb-4 border-b" style={{ borderColor: '#8b7355' }}>
+                <h3 className="osrs-stat-label mb-4">Task Executions Over Time</h3>
+                <div className="h-96" style={{ backgroundColor: '#1d1611' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={timeSeriesData} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
+                      <XAxis
+                        dataKey="time"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                        tick={{ fontSize: 9, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                        stroke="#8b7355"
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                        stroke="#8b7355"
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#2d2418',
+                          border: '2px solid #8b7355',
+                          borderRadius: '0',
+                          color: '#ffd700',
+                          fontFamily: 'Courier New, Courier, monospace'
+                        }}
+                        labelStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                      />
+                      <Legend
+                        wrapperStyle={{
+                          paddingTop: '5px',
+                          paddingBottom: '5px',
+                          color: '#ffd700',
+                          fontFamily: 'Courier New, Courier, monospace',
+                          fontSize: '11px'
+                        }}
+                        iconSize={12}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="total"
+                        stroke="#ffd700"
+                        strokeWidth={2}
+                        name="Total"
+                        dot={{ fill: '#ffd700', r: 3 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="success"
+                        stroke={STATUS_COLORS.success}
+                        strokeWidth={2}
+                        name="Success"
+                        dot={{ fill: STATUS_COLORS.success, r: 3 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="failure"
+                        stroke={STATUS_COLORS.failure}
+                        strokeWidth={2}
+                        name="Failure"
+                        dot={{ fill: STATUS_COLORS.failure, r: 3 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="retry"
+                        stroke={STATUS_COLORS.retry}
+                        strokeWidth={2}
+                        name="Retry"
+                        dot={{ fill: STATUS_COLORS.retry, r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               <div>
                 <h3 className="osrs-stat-label mb-1">Total Executions</h3>
@@ -599,31 +788,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Database Stats */}
-      {stats && (
-        <div className="osrs-card">
-          <h2 className="osrs-card-title mb-4">Database Statistics</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <h3 className="osrs-stat-label mb-1">Total Players</h3>
-              <p className="osrs-stat-value">{stats.total_players}</p>
-            </div>
-            <div>
-              <h3 className="osrs-stat-label mb-1">Active Players</h3>
-              <p className="osrs-stat-value" style={{ color: '#ffd700' }}>{stats.active_players}</p>
-            </div>
-            <div>
-              <h3 className="osrs-stat-label mb-1">Total Records</h3>
-              <p className="osrs-stat-value">{stats.total_hiscore_records.toLocaleString()}</p>
-            </div>
-            <div>
-              <h3 className="osrs-stat-label mb-1">Records (24h)</h3>
-              <p className="osrs-stat-value">{stats.records_last_24h}</p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Quick Actions & Player Management */}
       <div className="osrs-card">
