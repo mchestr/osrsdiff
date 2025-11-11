@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
@@ -8,48 +8,67 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  const isActive = (path: string) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#1d1611' }}>
-      <nav className="osrs-card border-b-0 rounded-none" style={{ borderBottom: '3px solid #1d1611', marginBottom: 0 }}>
+      <nav className="osrs-nav-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <Link to="/" className="flex items-center px-2 py-2 text-xl font-bold osrs-card-title">
+          <div className="flex justify-between items-center h-20">
+            {/* Logo and Navigation */}
+            <div className="flex items-center space-x-8">
+              <Link
+                to="/"
+                className="osrs-nav-logo"
+              >
                 OSRS Diff
               </Link>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              <div className="hidden md:flex items-center space-x-1">
                 <Link
                   to="/"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium osrs-text hover:opacity-80 transition-opacity"
+                  className={`osrs-nav-link ${isActive('/') ? 'osrs-nav-link-active' : ''}`}
                 >
-                  Player Stats
+                  Players
                 </Link>
                 {isAdmin && (
-                  <Link
-                    to="/admin"
-                    className="inline-flex items-center px-1 pt-1 text-sm font-medium osrs-text hover:opacity-80 transition-opacity"
-                  >
-                    Admin Dashboard
-                  </Link>
+                  <>
+                    <Link
+                      to="/admin"
+                      className={`osrs-nav-link ${isActive('/admin') ? 'osrs-nav-link-active' : ''}`}
+                    >
+                      Admin
+                    </Link>
+                    <Link
+                      to="/task-executions"
+                      className={`osrs-nav-link ${isActive('/task-executions') ? 'osrs-nav-link-active' : ''}`}
+                    >
+                      Task Executions
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm osrs-text">Welcome, {user?.username}</span>
+
+            {/* User Section */}
+            <div className="flex items-center space-x-3">
               {isAdmin && (
-                <span className="px-2 py-1 text-xs font-semibold osrs-text" style={{ backgroundColor: 'rgba(255, 215, 0, 0.2)', border: '1px solid #ffd700' }}>
-                  Admin
-                </span>
+                <span className="osrs-nav-badge">Admin</span>
               )}
               <button
                 onClick={handleLogout}
-                className="osrs-btn text-sm"
+                className="osrs-nav-logout"
               >
                 Logout
               </button>
@@ -57,7 +76,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8" style={{ backgroundColor: '#1d1611' }}>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{ backgroundColor: '#1d1611', minHeight: 'calc(100vh - 80px)' }}>
         {children}
       </main>
     </div>

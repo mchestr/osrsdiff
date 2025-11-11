@@ -102,7 +102,7 @@ export const api = {
     verifyAllSchedulesApiV1PlayersSchedulesVerifyPost: () =>
       handleTokenRefresh(() => PlayersService.verifyAllSchedulesApiV1PlayersSchedulesVerifyPost()),
   },
-  SystemService: {
+    SystemService: {
     ...SystemService,
     getSystemHealthApiV1SystemHealthGet: () =>
       handleTokenRefresh(() => SystemService.getSystemHealthApiV1SystemHealthGet()),
@@ -114,6 +114,8 @@ export const api = {
       handleTokenRefresh(() => SystemService.getScheduledTasksApiV1SystemScheduledTasksGet()),
     triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost: (taskName: string) =>
       handleTokenRefresh(() => SystemService.triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost(taskName)),
+    getTaskExecutionsApiV1SystemTaskExecutionsGet: (taskName?: string | null, status?: string | null, scheduleId?: string | null, playerId?: number | null, limit?: number, offset?: number) =>
+      handleTokenRefresh(() => SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(taskName, status, scheduleId, playerId, limit, offset)),
   },
   HistoryService: {
     ...HistoryService,

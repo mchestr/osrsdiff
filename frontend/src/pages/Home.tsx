@@ -42,14 +42,14 @@ export const Home: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="osrs-card-title text-3xl">Player Statistics</h1>
         <input
           type="text"
           placeholder="Search players..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="osrs-btn max-w-xs"
+          className="osrs-btn w-full sm:max-w-xs"
           style={{ backgroundColor: '#3a3024', color: '#ffd700' }}
         />
       </div>

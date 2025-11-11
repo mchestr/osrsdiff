@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import { Modal } from '../components/Modal';
 
@@ -33,6 +33,18 @@ interface SystemHealth {
   uptime_info: Record<string, unknown>;
 }
 
+const STATUS_COLORS: Record<string, string> = {
+  success: '#4caf50',
+  failure: '#d32f2f',
+  retry: '#ff9800',
+  pending: '#2196f3',
+  cancelled: '#9e9e9e',
+  skipped: '#9e9e9e',
+  warning: '#ff9800',
+};
+
+const STATUS_OPTIONS = ['success', 'failure', 'retry', 'pending', 'cancelled', 'skipped', 'warning'];
+
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<Player[]>([]);
@@ -46,6 +58,23 @@ export const AdminDashboard: React.FC = () => {
   const [verifyingSchedules, setVerifyingSchedules] = useState(false);
   const [fetchingAllPlayers, setFetchingAllPlayers] = useState(false);
 
+
+  // Task execution summary state
+  const [executionSummary, setExecutionSummary] = useState<{
+    total: number;
+    successCount: number;
+    failureCount: number;
+    retryCount: number;
+    pendingCount: number;
+    successRate: number;
+    failureRate: number;
+    avgDuration: number;
+    recentFailures24h: number;
+    recentFailures7d: number;
+    statusBreakdown: Record<string, number>;
+  } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
@@ -56,7 +85,79 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+    fetchExecutionSummary();
   }, []);
+
+  const fetchExecutionSummary = async () => {
+    setSummaryLoading(true);
+    try {
+      // Fetch recent executions for summary (last 1000 to get good stats)
+      const response = await api.SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(
+        null,
+        null,
+        null,
+        null,
+        1000,
+        0
+      );
+
+      const allExecutions = response.executions;
+      const now = new Date();
+      const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      // Calculate statistics
+      const total = response.total;
+      const successCount = allExecutions.filter(e => e.status === 'success').length;
+      const failureCount = allExecutions.filter(e => e.status === 'failure').length;
+      const retryCount = allExecutions.filter(e => e.status === 'retry').length;
+      const pendingCount = allExecutions.filter(e => e.status === 'pending').length;
+
+      const successRate = total > 0 ? (successCount / total) * 100 : 0;
+      const failureRate = total > 0 ? (failureCount / total) * 100 : 0;
+
+      // Calculate average duration from completed executions
+      const completedExecutions = allExecutions.filter(
+        e => e.duration_seconds !== null && e.duration_seconds !== undefined
+      );
+      const avgDuration = completedExecutions.length > 0
+        ? completedExecutions.reduce((sum, e) => sum + (e.duration_seconds || 0), 0) / completedExecutions.length
+        : 0;
+
+      // Count recent failures
+      const recentFailures24h = allExecutions.filter(
+        e => e.status === 'failure' && new Date(e.started_at) >= last24h
+      ).length;
+      const recentFailures7d = allExecutions.filter(
+        e => e.status === 'failure' && new Date(e.started_at) >= last7d
+      ).length;
+
+      // Status breakdown
+      const statusBreakdown: Record<string, number> = {};
+      allExecutions.forEach(e => {
+        statusBreakdown[e.status] = (statusBreakdown[e.status] || 0) + 1;
+      });
+
+      setExecutionSummary({
+        total,
+        successCount,
+        failureCount,
+        retryCount,
+        pendingCount,
+        successRate,
+        failureRate,
+        avgDuration,
+        recentFailures24h,
+        recentFailures7d,
+        statusBreakdown,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to fetch execution summary:', error);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
 
   const showModal = (
     title: string,
@@ -285,8 +386,13 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+
   if (loading) {
-    return <div className="text-center py-8 osrs-text">Loading dashboard...</div>;
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="osrs-text text-xl">Loading dashboard...</div>
+      </div>
+    );
   }
 
   return (
@@ -325,6 +431,175 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Task Execution Health Summary */}
+      <div className="osrs-card">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="osrs-card-title mb-0">Task Execution Health</h2>
+          <Link
+            to="/task-executions"
+            className="osrs-btn text-sm"
+            style={{ minWidth: 'auto', padding: '0.5rem 1rem' }}
+          >
+            View All →
+          </Link>
+        </div>
+        {summaryLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <div className="osrs-text-secondary">Loading summary...</div>
+          </div>
+        ) : executionSummary ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div>
+                <h3 className="osrs-stat-label mb-1">Total Executions</h3>
+                <Link
+                  to="/task-executions"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{ textDecoration: 'none' }}
+                >
+                  {executionSummary.total.toLocaleString()}
+                </Link>
+              </div>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Success Rate</h3>
+                <Link
+                  to="/task-executions?status=success"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{
+                    color: executionSummary.successRate >= 95 ? '#4caf50' : executionSummary.successRate >= 80 ? '#ff9800' : '#d32f2f',
+                    textDecoration: 'none'
+                  }}
+                >
+                  {executionSummary.successRate.toFixed(1)}%
+                </Link>
+              </div>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Failure Rate</h3>
+                <Link
+                  to="/task-executions?status=failure"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{
+                    color: executionSummary.failureRate <= 5 ? '#4caf50' : executionSummary.failureRate <= 20 ? '#ff9800' : '#d32f2f',
+                    textDecoration: 'none'
+                  }}
+                >
+                  {executionSummary.failureRate.toFixed(1)}%
+                </Link>
+              </div>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Avg Duration</h3>
+                <p className="osrs-stat-value">
+                  {executionSummary.avgDuration > 0
+                    ? `${executionSummary.avgDuration.toFixed(2)}s`
+                    : '-'}
+                </p>
+              </div>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Failures (24h)</h3>
+                <Link
+                  to="/task-executions?status=failure"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{
+                    color: executionSummary.recentFailures24h === 0 ? '#4caf50' : executionSummary.recentFailures24h <= 5 ? '#ff9800' : '#d32f2f',
+                    textDecoration: 'none'
+                  }}
+                >
+                  {executionSummary.recentFailures24h}
+                </Link>
+              </div>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Failures (7d)</h3>
+                <Link
+                  to="/task-executions?status=failure"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{
+                    color: executionSummary.recentFailures7d === 0 ? '#4caf50' : executionSummary.recentFailures7d <= 20 ? '#ff9800' : '#d32f2f',
+                    textDecoration: 'none'
+                  }}
+                >
+                  {executionSummary.recentFailures7d}
+                </Link>
+              </div>
+            </div>
+
+            {/* Status Breakdown */}
+            <div>
+              <h3 className="osrs-stat-label mb-3">Status Breakdown</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {Object.entries(executionSummary.statusBreakdown).map(([status, count]) => {
+                  const percentage = executionSummary.total > 0
+                    ? ((count / executionSummary.total) * 100).toFixed(1)
+                    : '0.0';
+                  return (
+                    <Link
+                      key={status}
+                      to={`/task-executions?status=${status}`}
+                      className="p-3 rounded hover:opacity-90 transition-opacity cursor-pointer block"
+                      style={{
+                        backgroundColor: `${STATUS_COLORS[status] || '#fff'}15`,
+                        border: `1px solid ${STATUS_COLORS[status] || '#fff'}40`,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span
+                          className="text-sm font-semibold capitalize"
+                          style={{ color: STATUS_COLORS[status] || '#fff' }}
+                        >
+                          {status}
+                        </span>
+                        <span className="text-xs osrs-text-secondary">{percentage}%</span>
+                      </div>
+                      <p className="text-lg font-bold" style={{ color: STATUS_COLORS[status] || '#fff' }}>
+                        {count.toLocaleString()}
+                      </p>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t" style={{ borderColor: '#8b7355' }}>
+              <div>
+                <h4 className="osrs-stat-label mb-1">Successes</h4>
+                <Link
+                  to="/task-executions?status=success"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{ color: '#4caf50', textDecoration: 'none' }}
+                >
+                  {executionSummary.successCount.toLocaleString()}
+                </Link>
+              </div>
+              <div>
+                <h4 className="osrs-stat-label mb-1">Failures</h4>
+                <Link
+                  to="/task-executions?status=failure"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{ color: '#d32f2f', textDecoration: 'none' }}
+                >
+                  {executionSummary.failureCount.toLocaleString()}
+                </Link>
+              </div>
+              <div>
+                <h4 className="osrs-stat-label mb-1">Retries</h4>
+                <Link
+                  to="/task-executions?status=retry"
+                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
+                  style={{ color: '#ff9800', textDecoration: 'none' }}
+                >
+                  {executionSummary.retryCount.toLocaleString()}
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-4">
+            <div className="osrs-text-secondary">No execution data available</div>
+          </div>
+        )}
+      </div>
+
       {/* Database Stats */}
       {stats && (
         <div className="osrs-card">
@@ -350,51 +625,109 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Admin Actions */}
+      {/* Quick Actions & Player Management */}
       <div className="osrs-card">
-        <h2 className="osrs-card-title mb-4">Admin Actions</h2>
-        <div className="flex gap-4 flex-wrap">
-          <button
-            onClick={handleVerifySchedules}
-            disabled={verifyingSchedules}
-            className="osrs-btn"
-            style={{ minWidth: '200px' }}
-          >
-            {verifyingSchedules ? 'Verifying...' : 'Verify Schedules'}
-          </button>
-          <button
-            onClick={handleFetchAllPlayers}
-            disabled={fetchingAllPlayers}
-            className="osrs-btn"
-            style={{ minWidth: '200px' }}
-          >
-            {fetchingAllPlayers ? 'Triggering...' : 'Fetch All Active Players'}
-          </button>
-        </div>
-      </div>
+        <h2 className="osrs-card-title mb-6">Quick Actions</h2>
+        <div className="space-y-6">
+          {/* Add Player Section */}
+          <div>
+            <h3 className="osrs-stat-label mb-3 flex items-center gap-2">
+              <span style={{ color: '#ffd700' }}>➕</span>
+              Add New Player
+            </h3>
+            <form onSubmit={handleAddPlayer} className="flex gap-3">
+              <input
+                type="text"
+                value={newPlayerUsername}
+                onChange={(e) => setNewPlayerUsername(e.target.value)}
+                placeholder="Enter OSRS username (max 12 chars)"
+                className="osrs-btn flex-1"
+                style={{
+                  backgroundColor: '#3a3024',
+                  color: '#ffd700',
+                  border: '1px solid #8b7355',
+                  padding: '0.75rem 1rem'
+                }}
+                maxLength={12}
+                required
+              />
+              <button
+                type="submit"
+                disabled={addingPlayer || !newPlayerUsername.trim()}
+                className="osrs-btn"
+                style={{
+                  minWidth: '140px',
+                  opacity: addingPlayer || !newPlayerUsername.trim() ? 0.6 : 1,
+                  cursor: addingPlayer || !newPlayerUsername.trim() ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {addingPlayer ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin">⏳</span>
+                    Adding...
+                  </span>
+                ) : (
+                  'Add Player'
+                )}
+              </button>
+            </form>
+          </div>
 
-      {/* Add Player */}
-      <div className="osrs-card">
-        <h2 className="osrs-card-title mb-4">Add New Player</h2>
-        <form onSubmit={handleAddPlayer} className="flex gap-4">
-          <input
-            type="text"
-            value={newPlayerUsername}
-            onChange={(e) => setNewPlayerUsername(e.target.value)}
-            placeholder="Enter OSRS username"
-            className="osrs-btn flex-1"
-            style={{ backgroundColor: '#3a3024', color: '#ffd700' }}
-            maxLength={12}
-            required
-          />
-          <button
-            type="submit"
-            disabled={addingPlayer}
-            className="osrs-btn"
-          >
-            {addingPlayer ? 'Adding...' : 'Add Player'}
-          </button>
-        </form>
+          {/* Divider */}
+          <div className="border-t" style={{ borderColor: '#8b7355' }}></div>
+
+          {/* Admin Actions */}
+          <div>
+            <h3 className="osrs-stat-label mb-3 flex items-center gap-2">
+              <span style={{ color: '#ffd700' }}>⚙️</span>
+              System Actions
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={handleVerifySchedules}
+                disabled={verifyingSchedules}
+                className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
+                style={{
+                  backgroundColor: '#3a3024',
+                  border: '1px solid #8b7355',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  minHeight: '80px'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold osrs-text">Verify Schedules</span>
+                  <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>🔍</span>
+                </div>
+                <span className="text-xs osrs-text-secondary">
+                  {verifyingSchedules ? 'Checking schedule integrity...' : 'Validate all player fetch schedules'}
+                </span>
+              </button>
+              <button
+                onClick={handleFetchAllPlayers}
+                disabled={fetchingAllPlayers}
+                className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
+                style={{
+                  backgroundColor: '#3a3024',
+                  border: '1px solid #8b7355',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  minHeight: '80px'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold osrs-text">Fetch All Players</span>
+                  <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>🚀</span>
+                </div>
+                <span className="text-xs osrs-text-secondary">
+                  {fetchingAllPlayers ? 'Triggering fetches...' : 'Manually trigger fetch for all active players'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Players List */}

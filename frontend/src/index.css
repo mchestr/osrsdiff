@@ -55,6 +55,31 @@
     opacity: 0.7;
   }
 
+  /* OSRS-themed select styling */
+  select.osrs-btn {
+    @apply px-4 py-2 font-bold transition-colors duration-200;
+    background-color: #3a3024;
+    border: 2px solid #8b7355;
+    border-radius: 0;
+    color: #ffd700;
+    font-family: 'Courier New', 'Courier', monospace;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.1),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+  }
+
+  select.osrs-btn:focus {
+    outline: none;
+    border-color: #9b8365;
+    background-color: #4a4034;
+  }
+
+  select.osrs-btn option {
+    background-color: #2d2418;
+    color: #ffd700;
+  }
+
   .card {
     @apply bg-white rounded-lg shadow-md p-6;
   }
@@ -324,6 +349,129 @@
   .osrs-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* Modern Navigation Header */
+  .osrs-nav-header {
+    background: linear-gradient(180deg, #2d2418 0%, #251e15 100%);
+    border-bottom: 2px solid #1a1510;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .osrs-nav-logo {
+    @apply text-2xl font-bold;
+    color: #ffd700;
+    font-family: 'Courier New', 'Courier', monospace;
+    text-shadow:
+      1px 1px 0px rgba(0, 0, 0, 0.8);
+    letter-spacing: 1px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .osrs-nav-logo:hover {
+    color: #ffed4e;
+    transform: translateY(-1px);
+  }
+
+  .osrs-nav-link {
+    @apply px-4 py-2 text-sm font-semibold;
+    color: #d4af37;
+    font-family: 'Courier New', 'Courier', monospace;
+    text-decoration: none;
+    position: relative;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .osrs-nav-link::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ffd700, transparent);
+    transition: width 0.3s ease;
+  }
+
+  .osrs-nav-link:hover {
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.08);
+  }
+
+  .osrs-nav-link:hover::before {
+    width: 80%;
+  }
+
+  .osrs-nav-link-active {
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.12);
+  }
+
+  .osrs-nav-link-active::before {
+    width: 80%;
+    background: linear-gradient(90deg, transparent, #ffd700, #ffed4e, #ffd700, transparent);
+  }
+
+  .osrs-nav-user {
+    @apply text-sm font-medium;
+    color: #d4af37;
+    font-family: 'Courier New', 'Courier', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  .osrs-nav-badge {
+    @apply px-2.5 py-1 text-xs font-bold;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 215, 0, 0.15));
+    border: 1px solid #ffd700;
+    color: #ffd700;
+    font-family: 'Courier New', 'Courier', monospace;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    letter-spacing: 0.5px;
+    border-radius: 3px;
+  }
+
+  .osrs-nav-logout {
+    @apply px-4 py-2 text-sm font-semibold;
+    background: linear-gradient(135deg, #3a3024, #2d2418);
+    border: 1.5px solid #8b7355;
+    color: #ffd700;
+    font-family: 'Courier New', 'Courier', monospace;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.08),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.3),
+      0 2px 4px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+  }
+
+  .osrs-nav-logout:hover {
+    background: linear-gradient(135deg, #4a4034, #3a3024);
+    border-color: #9b8365;
+    color: #ffed4e;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.12),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.3),
+      0 3px 6px rgba(0, 0, 0, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .osrs-nav-logout:active {
+    transform: translateY(0);
+    box-shadow:
+      inset 0 2px 3px rgba(0, 0, 0, 0.4),
+      inset 0 -1px 1px rgba(255, 255, 255, 0.05);
   }
 }
 

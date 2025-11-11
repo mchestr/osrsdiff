@@ -29,18 +29,18 @@ export const Login: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#1d1611' }}>
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold osrs-card-title">
+        <div className="text-center">
+          <h2 className="text-3xl font-extrabold osrs-card-title mb-2">
             OSRS Diff
           </h2>
-          <p className="mt-2 text-center text-sm osrs-text-secondary">
+          <p className="text-sm osrs-text-secondary">
             Sign in to your account
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="osrs-card border-red-500" style={{ borderColor: '#8b7355', backgroundColor: 'rgba(139, 115, 85, 0.2)' }}>
-              <p className="osrs-text" style={{ color: '#d4af37' }}>{error}</p>
+            <div className="osrs-card" style={{ borderColor: '#d32f2f', backgroundColor: 'rgba(211, 47, 47, 0.1)' }}>
+              <p className="osrs-text" style={{ color: '#d32f2f' }}>{error}</p>
             </div>
           )}
           <div className="space-y-2">

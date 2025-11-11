@@ -261,15 +261,15 @@ export const PlayerStats: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading...</div>
+        <div className="osrs-text text-xl">Loading...</div>
       </div>
     );
   }
 
   if (error || !stats) {
     return (
-      <div className="card">
-        <div className="text-red-600">{error || 'Player not found'}</div>
+      <div className="osrs-card">
+        <div className="osrs-text" style={{ color: '#d32f2f' }}>{error || 'Player not found'}</div>
       </div>
     );
   }
@@ -309,12 +309,12 @@ export const PlayerStats: React.FC = () => {
     .slice(0, 10);
 
   return (
-    <div className="space-y-4" style={{ padding: '1rem' }}>
-      <div className="flex justify-between items-center">
-        <h1 className="osrs-card-title text-2xl">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="osrs-card-title text-2xl sm:text-3xl">
           {stats.username}
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {stats.fetched_at && (
             <p className="osrs-text-secondary text-xs">
               Last updated: {format(new Date(stats.fetched_at), 'PPpp')}
@@ -755,8 +755,7 @@ const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
         <select
           value={selectedPeriod}
           onChange={(e) => setSelectedPeriod(Number(e.target.value))}
-          className="osrs-btn bg-transparent border border-8b7355 text-ffd700 px-3 py-1.5 text-sm"
-          style={{ borderColor: '#8b7355', color: '#ffd700' }}
+          className="osrs-btn px-3 py-1.5 text-sm"
         >
           <option value={1}>Last 1 Day</option>
           <option value={7}>Last 7 Days</option>

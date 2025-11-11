@@ -6,14 +6,15 @@ import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { PlayerStats } from './pages/PlayerStats';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { TaskExecutions } from './pages/TaskExecutions';
 
 const AppRoutes = () => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#1d1611' }}>
+        <div className="osrs-text text-xl">Loading...</div>
       </div>
     );
   }
@@ -52,6 +53,16 @@ const AppRoutes = () => {
           <ProtectedRoute requireAdmin>
             <Layout>
               <AdminDashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/task-executions"
+        element={
+          <ProtectedRoute requireAdmin>
+            <Layout>
+              <TaskExecutions />
             </Layout>
           </ProtectedRoute>
         }
