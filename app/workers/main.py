@@ -37,6 +37,11 @@ broker.add_middlewares(
     )
 )
 
+# Add task execution tracking middleware
+from app.workers.middleware import TaskExecutionTrackingMiddleware
+
+broker.add_middlewares(TaskExecutionTrackingMiddleware())
+
 # Create a redis schedule source for use by services
 from taskiq_redis import ListRedisScheduleSource
 

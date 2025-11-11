@@ -12,6 +12,7 @@ from app.exceptions import InternalServerError, NotFoundError
 from app.models.base import get_db_session
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.models.task_execution import TaskExecution, TaskExecutionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -479,3 +480,188 @@ async def trigger_scheduled_task(
     except Exception as e:
         logger.error(f"Error triggering task {task_name}: {e}")
         raise InternalServerError("Failed to trigger task", detail=str(e))
+
+
+class TaskExecutionResponse(BaseModel):
+    """Response model for a single task execution."""
+
+    id: int = Field(description="Task execution ID")
+    task_name: str = Field(description="Name of the task function")
+    task_args: Optional[Dict[str, Any]] = Field(
+        None, description="Task arguments as JSON"
+    )
+    status: str = Field(description="Execution status")
+    retry_count: int = Field(description="Number of retry attempts")
+    schedule_id: Optional[str] = Field(
+        None, description="TaskIQ schedule ID if scheduled"
+    )
+    schedule_type: Optional[str] = Field(None, description="Type of schedule")
+    player_id: Optional[int] = Field(
+        None, description="Player ID if related to a player"
+    )
+    started_at: str = Field(description="When the task started")
+    completed_at: Optional[str] = Field(
+        None, description="When the task completed"
+    )
+    duration_seconds: Optional[float] = Field(
+        None, description="Task execution duration in seconds"
+    )
+    error_type: Optional[str] = Field(
+        None, description="Type/class name of the error"
+    )
+    error_message: Optional[str] = Field(None, description="Error message")
+    error_traceback: Optional[str] = Field(
+        None, description="Full error traceback"
+    )
+    result_data: Optional[Dict[str, Any]] = Field(
+        None, description="Task result data"
+    )
+    execution_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Additional execution metadata"
+    )
+    created_at: str = Field(description="When this record was created")
+
+    @classmethod
+    def from_task_execution(
+        cls, execution: TaskExecution
+    ) -> "TaskExecutionResponse":
+        """Create response model from TaskExecution entity."""
+        # Handle status: it may be a string (from DB) or enum instance
+        status_value = (
+            execution.status.value
+            if hasattr(execution.status, "value")
+            else str(execution.status)
+        )
+        return cls(
+            id=execution.id,
+            task_name=execution.task_name,
+            task_args=execution.task_args,
+            status=status_value,
+            retry_count=execution.retry_count,
+            schedule_id=execution.schedule_id,
+            schedule_type=execution.schedule_type,
+            player_id=execution.player_id,
+            started_at=execution.started_at.isoformat(),
+            completed_at=(
+                execution.completed_at.isoformat()
+                if execution.completed_at
+                else None
+            ),
+            duration_seconds=execution.duration_seconds,
+            error_type=execution.error_type,
+            error_message=execution.error_message,
+            error_traceback=execution.error_traceback,
+            result_data=execution.result_data,
+            execution_metadata=execution.execution_metadata,
+            created_at=execution.created_at.isoformat(),
+        )
+
+
+class TaskExecutionsListResponse(BaseModel):
+    """Response model for listing task executions."""
+
+    total: int = Field(
+        description="Total number of executions matching filters"
+    )
+    limit: int = Field(description="Maximum number of results returned")
+    offset: int = Field(description="Number of results skipped")
+    executions: List[TaskExecutionResponse] = Field(
+        description="List of task executions"
+    )
+
+
+@router.get("/task-executions", response_model=TaskExecutionsListResponse)
+async def get_task_executions(
+    task_name: Optional[str] = None,
+    status: Optional[str] = None,
+    schedule_id: Optional[str] = None,
+    player_id: Optional[int] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> TaskExecutionsListResponse:
+    """
+    Get task execution history with filtering options.
+
+    This endpoint allows querying task execution history to debug why tasks
+    may not have executed at scheduled times. Supports filtering by task name,
+    status, schedule_id, and player_id.
+
+    Args:
+        task_name: Filter by task name (e.g., 'fetch_player_hiscores_task')
+        status: Filter by status (e.g., 'failure', 'success', 'retry')
+        schedule_id: Filter by schedule ID
+        player_id: Filter by player ID
+        limit: Maximum number of results to return (default: 50, max: 200)
+        offset: Number of results to skip for pagination
+        db_session: Database session dependency
+        current_user: Authenticated user information
+
+    Returns:
+        TaskExecutionsListResponse: List of task executions with metadata
+
+    Raises:
+        500 Internal Server Error: Database query errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} querying task executions "
+            f"(task_name={task_name}, status={status}, schedule_id={schedule_id}, "
+            f"player_id={player_id}, limit={limit}, offset={offset})"
+        )
+
+        # Validate and clamp limit
+        limit = min(max(1, limit), 200)
+
+        # Build query
+        query = select(TaskExecution)
+
+        # Apply filters
+        if task_name:
+            query = query.where(TaskExecution.task_name == task_name)
+        if status:
+            try:
+                status_enum = TaskExecutionStatus(status)
+                query = query.where(TaskExecution.status == status_enum)
+            except ValueError:
+                # Invalid status, return empty results
+                return TaskExecutionsListResponse(
+                    total=0,
+                    limit=limit,
+                    offset=offset,
+                    executions=[],
+                )
+        if schedule_id:
+            query = query.where(TaskExecution.schedule_id == schedule_id)
+        if player_id:
+            query = query.where(TaskExecution.player_id == player_id)
+
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await db_session.execute(count_query)
+        total = count_result.scalar_one()
+
+        # Apply ordering and pagination
+        query = query.order_by(TaskExecution.started_at.desc())
+        query = query.limit(limit).offset(offset)
+
+        # Execute query
+        result = await db_session.execute(query)
+        executions = result.scalars().all()
+
+        return TaskExecutionsListResponse(
+            total=total,
+            limit=limit,
+            offset=offset,
+            executions=[
+                TaskExecutionResponse.from_task_execution(exec)
+                for exec in executions
+            ],
+        )
+
+    except Exception as e:
+        logger.error(f"Error querying task executions: {e}", exc_info=True)
+        raise InternalServerError(
+            "Failed to query task executions", detail=str(e)
+        )

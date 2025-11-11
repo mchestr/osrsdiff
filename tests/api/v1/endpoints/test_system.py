@@ -177,3 +177,240 @@ class TestPlayerDistribution:
         assert data["never_fetched"] == 2
         assert "60min" in data["by_fetch_interval"]
         assert "120min" in data["by_fetch_interval"]
+
+
+class TestTaskExecutions:
+    """Test task execution tracking endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_task_executions_success(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test successful retrieval of task executions."""
+        from datetime import UTC, datetime
+
+        from app.models.task_execution import (
+            TaskExecution,
+            TaskExecutionStatus,
+        )
+
+        # Create test task executions
+        execution1 = TaskExecution(
+            task_name="app.workers.fetch.fetch_player_hiscores_task",
+            status=TaskExecutionStatus.SUCCESS,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            duration_seconds=1.5,
+            task_args={"username": "test_user"},
+            schedule_id="test_schedule_123",
+            player_id=42,
+            result_data={"status": "success"},
+        )
+
+        execution2 = TaskExecution(
+            task_name="app.workers.fetch.fetch_player_hiscores_task",
+            status=TaskExecutionStatus.FAILURE,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            duration_seconds=0.5,
+            task_args={"username": "test_user2"},
+            schedule_id="test_schedule_456",
+            player_id=43,
+            error_type="ValueError",
+            error_message="Test error",
+        )
+
+        test_session.add(execution1)
+        test_session.add(execution2)
+        await test_session.commit()
+
+        # Override dependencies
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        response = client.get("/system/task-executions")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["total"] == 2
+        assert data["limit"] == 50
+        assert data["offset"] == 0
+        assert len(data["executions"]) == 2
+
+        # Check first execution (should be most recent)
+        exec1 = data["executions"][0]
+        assert (
+            exec1["task_name"]
+            == "app.workers.fetch.fetch_player_hiscores_task"
+        )
+        assert exec1["status"] == "failure"
+        assert exec1["player_id"] == 43
+
+        # Check second execution
+        exec2 = data["executions"][1]
+        assert exec2["status"] == "success"
+        assert exec2["player_id"] == 42
+
+    @pytest.mark.asyncio
+    async def test_get_task_executions_with_filters(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test filtering task executions by various criteria."""
+        from datetime import UTC, datetime
+
+        from app.models.task_execution import (
+            TaskExecution,
+            TaskExecutionStatus,
+        )
+
+        # Create test executions
+        execution1 = TaskExecution(
+            task_name="app.workers.fetch.fetch_player_hiscores_task",
+            status=TaskExecutionStatus.SUCCESS,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            schedule_id="schedule_123",
+            player_id=42,
+        )
+
+        execution2 = TaskExecution(
+            task_name="app.workers.maintenance.schedule_verification_job",
+            status=TaskExecutionStatus.SUCCESS,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            schedule_id="schedule_456",
+        )
+
+        execution3 = TaskExecution(
+            task_name="app.workers.fetch.fetch_player_hiscores_task",
+            status=TaskExecutionStatus.FAILURE,
+            started_at=datetime.now(UTC),
+            completed_at=datetime.now(UTC),
+            schedule_id="schedule_123",
+            player_id=42,
+        )
+
+        test_session.add(execution1)
+        test_session.add(execution2)
+        test_session.add(execution3)
+        await test_session.commit()
+
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        # Filter by task_name
+        response = client.get(
+            "/system/task-executions?task_name=app.workers.fetch.fetch_player_hiscores_task"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert all(
+            e["task_name"] == "app.workers.fetch.fetch_player_hiscores_task"
+            for e in data["executions"]
+        )
+
+        # Filter by status
+        response = client.get("/system/task-executions?status=failure")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["executions"][0]["status"] == "failure"
+
+        # Filter by player_id
+        response = client.get("/system/task-executions?player_id=42")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert all(e["player_id"] == 42 for e in data["executions"])
+
+        # Filter by schedule_id
+        response = client.get(
+            "/system/task-executions?schedule_id=schedule_123"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert all(
+            e["schedule_id"] == "schedule_123" for e in data["executions"]
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_task_executions_with_pagination(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test pagination of task executions."""
+        from datetime import UTC, datetime
+
+        from app.models.task_execution import (
+            TaskExecution,
+            TaskExecutionStatus,
+        )
+
+        # Create multiple executions
+        for i in range(10):
+            execution = TaskExecution(
+                task_name="test_task",
+                status=TaskExecutionStatus.SUCCESS,
+                started_at=datetime.now(UTC),
+                completed_at=datetime.now(UTC),
+            )
+            test_session.add(execution)
+
+        await test_session.commit()
+
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        # First page
+        response = client.get("/system/task-executions?limit=5&offset=0")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 10
+        assert data["limit"] == 5
+        assert data["offset"] == 0
+        assert len(data["executions"]) == 5
+
+        # Second page
+        response = client.get("/system/task-executions?limit=5&offset=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 10
+        assert data["limit"] == 5
+        assert data["offset"] == 5
+        assert len(data["executions"]) == 5
+
+    def test_get_task_executions_invalid_status(self, client):
+        """Test filtering with invalid status returns empty results."""
+        response = client.get("/system/task-executions?status=invalid_status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert len(data["executions"]) == 0
+
+    def test_get_task_executions_unauthorized(self, app, mock_db_session):
+        """Test task executions endpoint without authentication."""
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        # Don't override require_auth
+        client = TestClient(app)
+
+        response = client.get("/system/task-executions")
+        assert response.status_code == 401

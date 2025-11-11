@@ -1,4 +1,5 @@
 import logging
+import traceback
 from datetime import UTC, datetime
 from typing import Any, Dict, Optional
 
@@ -213,22 +214,34 @@ async def fetch_player_hiscores_task(
                     }
 
                 except RateLimitError as e:
+                    error_traceback = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     logger.error(
-                        f"OSRS API rate limit exceeded for {username}: {e} (schedule_id: {schedule_id})"
+                        f"OSRS API rate limit exceeded for {username}: {e} "
+                        f"(schedule_id: {schedule_id})\n{error_traceback}"
                     )
                     # Rate limit errors should trigger task retry
                     raise
 
                 except APIUnavailableError as e:
+                    error_traceback = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     logger.error(
-                        f"OSRS API unavailable for {username}: {e} (schedule_id: {schedule_id})"
+                        f"OSRS API unavailable for {username}: {e} "
+                        f"(schedule_id: {schedule_id})\n{error_traceback}"
                     )
                     # API unavailable errors should trigger task retry
                     raise
 
                 except OSRSAPIError as e:
+                    error_traceback = "".join(
+                        traceback.format_exception(type(e), e, e.__traceback__)
+                    )
                     logger.error(
-                        f"OSRS API error for {username}: {e} (schedule_id: {schedule_id})"
+                        f"OSRS API error for {username}: {e} "
+                        f"(schedule_id: {schedule_id})\n{error_traceback}"
                     )
                     # Other API errors are not retry-able
                     return {
@@ -239,6 +252,7 @@ async def fetch_player_hiscores_task(
                         "schedule_id": schedule_id,
                         "schedule_type": schedule_type,
                         "error": str(e),
+                        "error_traceback": error_traceback,
                         "timestamp": datetime.now(UTC).isoformat(),
                         "duration_seconds": (
                             datetime.now(UTC) - start_time
@@ -329,8 +343,12 @@ async def fetch_player_hiscores_task(
 
         except Exception as e:
             await db_session.rollback()
+            error_traceback = "".join(
+                traceback.format_exception(type(e), e, e.__traceback__)
+            )
             logger.error(
-                f"Unexpected error fetching hiscores for {username}: {e} (schedule_id: {schedule_id})"
+                f"Unexpected error fetching hiscores for {username}: {e} "
+                f"(schedule_id: {schedule_id})\n{error_traceback}"
             )
             # Unexpected errors should also trigger retry
             raise
