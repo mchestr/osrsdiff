@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/apiClient';
+import { Modal } from '../components/Modal';
 
 interface Player {
   id: number;
@@ -42,10 +43,58 @@ export const AdminDashboard: React.FC = () => {
   const [addingPlayer, setAddingPlayer] = useState(false);
   const [editingInterval, setEditingInterval] = useState<number | null>(null);
   const [intervalValue, setIntervalValue] = useState<string>('');
+  const [verifyingSchedules, setVerifyingSchedules] = useState(false);
+  const [fetchingAllPlayers, setFetchingAllPlayers] = useState(false);
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
+  const [modalType, setModalType] = useState<'info' | 'error' | 'success' | 'warning'>('info');
+  const [modalShowConfirm, setModalShowConfirm] = useState(false);
+  const [modalConfirmCallback, setModalConfirmCallback] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const showModal = (
+    title: string,
+    message: string | React.ReactNode,
+    type: 'info' | 'error' | 'success' | 'warning' = 'info'
+  ) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalType(type);
+    setModalShowConfirm(false);
+    setModalOpen(true);
+  };
+
+  const showConfirmModal = (
+    title: string,
+    message: string | React.ReactNode,
+    onConfirm: () => void,
+    type: 'info' | 'error' | 'success' | 'warning' = 'warning'
+  ) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalType(type);
+    setModalShowConfirm(true);
+    setModalConfirmCallback(() => onConfirm);
+    setModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setModalConfirmCallback(null);
+  };
+
+  const handleModalConfirm = () => {
+    if (modalConfirmCallback) {
+      modalConfirmCallback();
+    }
+    handleModalClose();
+  };
 
   const fetchData = async () => {
     try {
@@ -79,7 +128,7 @@ export const AdminDashboard: React.FC = () => {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to add player';
       const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      alert(errorDetail || errorMessage);
+      showModal('Error', errorDetail || errorMessage, 'error');
     } finally {
       setAddingPlayer(false);
     }
@@ -96,33 +145,37 @@ export const AdminDashboard: React.FC = () => {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update player';
       const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      alert(errorDetail || errorMessage);
+      showModal('Error', errorDetail || errorMessage, 'error');
     }
   };
 
   const handleDeletePlayer = async (username: string) => {
-    if (!confirm(`Are you sure you want to delete player "${username}"?`)) {
-      return;
-    }
-
-    try {
-      await api.PlayersService.removePlayerApiV1PlayersUsernameDelete(username);
-      await fetchData();
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete player';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      alert(errorDetail || errorMessage);
-    }
+    showConfirmModal(
+      'Delete Player',
+      `Are you sure you want to delete player "${username}"? This action cannot be undone.`,
+      async () => {
+        try {
+          await api.PlayersService.removePlayerApiV1PlayersUsernameDelete(username);
+          await fetchData();
+          showModal('Success', `Player "${username}" has been deleted.`, 'success');
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to delete player';
+          const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+          showModal('Error', errorDetail || errorMessage, 'error');
+        }
+      },
+      'warning'
+    );
   };
 
   const handleTriggerFetch = async (username: string) => {
     try {
       await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
-      alert('Fetch task enqueued successfully');
+      showModal('Success', 'Fetch task enqueued successfully', 'success');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetch';
       const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      alert(errorDetail || errorMessage);
+      showModal('Error', errorDetail || errorMessage, 'error');
     }
   };
 
@@ -139,7 +192,7 @@ export const AdminDashboard: React.FC = () => {
   const handleSaveInterval = async (username: string) => {
     const newInterval = parseInt(intervalValue, 10);
     if (isNaN(newInterval) || newInterval < 1 || newInterval > 10080) {
-      alert('Interval must be between 1 and 10080 minutes (1 week)');
+      showModal('Invalid Interval', 'Interval must be between 1 and 10080 minutes (1 week)', 'error');
       return;
     }
 
@@ -154,8 +207,82 @@ export const AdminDashboard: React.FC = () => {
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to update interval';
       const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      alert(errorDetail || errorMessage);
+      showModal('Error', errorDetail || errorMessage, 'error');
     }
+  };
+
+  const handleVerifySchedules = async () => {
+    setVerifyingSchedules(true);
+    try {
+      const response = await api.PlayersService.verifyAllSchedulesApiV1PlayersSchedulesVerifyPost();
+      const message = (
+        <div className="space-y-2">
+          <p>Schedule verification completed.</p>
+          <div className="space-y-1 text-sm">
+            <p>Total schedules: <span className="font-bold">{response.total_schedules}</span></p>
+            <p>Player fetch schedules: <span className="font-bold">{response.player_fetch_schedules}</span></p>
+            <p>Invalid schedules: <span className="font-bold" style={{ color: response.invalid_schedules.length > 0 ? '#d32f2f' : '#4caf50' }}>{response.invalid_schedules.length}</span></p>
+            <p>Orphaned schedules: <span className="font-bold" style={{ color: response.orphaned_schedules.length > 0 ? '#d32f2f' : '#4caf50' }}>{response.orphaned_schedules.length}</span></p>
+            <p>Duplicate schedules: <span className="font-bold" style={{ color: Object.keys(response.duplicate_schedules).length > 0 ? '#d32f2f' : '#4caf50' }}>{Object.keys(response.duplicate_schedules).length}</span></p>
+          </div>
+        </div>
+      );
+      showModal('Schedule Verification', message, response.invalid_schedules.length > 0 || response.orphaned_schedules.length > 0 ? 'warning' : 'success');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to verify schedules';
+      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+      showModal('Error', errorDetail || errorMessage, 'error');
+    } finally {
+      setVerifyingSchedules(false);
+    }
+  };
+
+  const handleFetchAllPlayers = async () => {
+    const activePlayers = players.filter((p) => p.is_active);
+    if (activePlayers.length === 0) {
+      showModal('No Active Players', 'No active players to fetch', 'info');
+      return;
+    }
+
+    showConfirmModal(
+      'Fetch All Active Players',
+      `Trigger fetch for all ${activePlayers.length} active players?`,
+      async () => {
+        setFetchingAllPlayers(true);
+        try {
+          let successCount = 0;
+          let errorCount = 0;
+
+          // Trigger fetch for each active player
+          for (const player of activePlayers) {
+            try {
+              await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(player.username);
+              successCount++;
+            } catch (error) {
+              errorCount++;
+              console.error(`Failed to trigger fetch for ${player.username}:`, error);
+            }
+          }
+
+          const message = (
+            <div className="space-y-2">
+              <p>Fetch tasks triggered:</p>
+              <div className="space-y-1 text-sm">
+                <p>Success: <span className="font-bold" style={{ color: '#4caf50' }}>{successCount}</span></p>
+                <p>Errors: <span className="font-bold" style={{ color: errorCount > 0 ? '#d32f2f' : '#4caf50' }}>{errorCount}</span></p>
+              </div>
+            </div>
+          );
+          showModal('Fetch Complete', message, errorCount > 0 ? 'warning' : 'success');
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetches';
+          showModal('Error', errorMessage, 'error');
+        } finally {
+          setFetchingAllPlayers(false);
+        }
+      },
+      'info'
+    );
   };
 
   if (loading) {
@@ -222,6 +349,29 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Admin Actions */}
+      <div className="osrs-card">
+        <h2 className="osrs-card-title mb-4">Admin Actions</h2>
+        <div className="flex gap-4 flex-wrap">
+          <button
+            onClick={handleVerifySchedules}
+            disabled={verifyingSchedules}
+            className="osrs-btn"
+            style={{ minWidth: '200px' }}
+          >
+            {verifyingSchedules ? 'Verifying...' : 'Verify Schedules'}
+          </button>
+          <button
+            onClick={handleFetchAllPlayers}
+            disabled={fetchingAllPlayers}
+            className="osrs-btn"
+            style={{ minWidth: '200px' }}
+          >
+            {fetchingAllPlayers ? 'Triggering...' : 'Fetch All Active Players'}
+          </button>
+        </div>
+      </div>
 
       {/* Add Player */}
       <div className="osrs-card">
@@ -371,6 +521,18 @@ export const AdminDashboard: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Modal */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={handleModalClose}
+        title={modalTitle}
+        type={modalType}
+        showConfirm={modalShowConfirm}
+        onConfirm={handleModalConfirm}
+      >
+        {modalMessage}
+      </Modal>
     </div>
   );
 };
