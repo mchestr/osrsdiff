@@ -201,12 +201,13 @@ async def get_player_history(
         current_user: Authenticated user information
 
     Returns:
-        ProgressAnalysisResponse: Progress analysis data
+        ProgressAnalysisResponse: Progress analysis data (returns whatever data is available,
+        even if less than requested)
 
     Raises:
         400 Bad Request: Invalid date parameters
         404 Not Found: Player not found
-        422 Unprocessable Entity: Insufficient data for analysis
+        422 Unprocessable Entity: No data available at all
         500 Internal Server Error: Service errors
     """
     try:
@@ -311,12 +312,12 @@ async def get_skill_progress(
         current_user: Authenticated user information
 
     Returns:
-        SkillProgressResponse: Skill progress analysis data
+        SkillProgressResponse: Skill progress analysis data (returns whatever data is available,
+        even if less than requested. period_days reflects actual data available)
 
     Raises:
         400 Bad Request: Invalid parameters
         404 Not Found: Player not found
-        422 Unprocessable Entity: Insufficient data for analysis
         500 Internal Server Error: Service errors
     """
     try:
@@ -395,12 +396,12 @@ async def get_boss_progress(
         current_user: Authenticated user information
 
     Returns:
-        BossProgressResponse: Boss progress analysis data
+        BossProgressResponse: Boss progress analysis data (returns whatever data is available,
+        even if less than requested. period_days reflects actual data available)
 
     Raises:
         400 Bad Request: Invalid parameters
         404 Not Found: Player not found
-        422 Unprocessable Entity: Insufficient data for analysis
         500 Internal Server Error: Service errors
     """
     try:

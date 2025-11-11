@@ -185,17 +185,17 @@ class TestHistoryService:
             )
 
     @pytest.mark.asyncio
-    async def test_get_progress_between_dates_insufficient_data(
+    async def test_get_progress_between_dates_no_data(
         self, history_service, test_player_with_history
     ):
-        """Test progress calculation with insufficient data."""
+        """Test progress calculation with no data at all."""
         # Date range before any records exist
         start_date = datetime.now(timezone.utc) - timedelta(days=30)
         end_date = datetime.now(timezone.utc) - timedelta(days=29)
 
         with pytest.raises(
             InsufficientDataError,
-            match="Insufficient data for progress analysis",
+            match="No data available",
         ):
             await history_service.get_progress_between_dates(
                 "progressPlayer", start_date, end_date
@@ -213,7 +213,9 @@ class TestHistoryService:
         assert isinstance(result, SkillProgress)
         assert result.username == "progressPlayer"
         assert result.skill_name == "attack"
-        assert result.days == 7
+        assert (
+            result.days == 4
+        )  # Actual period available (4 days between first and last record)
         assert len(result.records) == 5  # All records have attack data
 
         # Check progress calculations
@@ -221,7 +223,9 @@ class TestHistoryService:
             result.total_experience_gained == 400000
         )  # 4 days * 100k per day
         assert result.levels_gained == 0  # Already at 99
-        assert result.daily_experience_rate == 400000 / 7  # Total gain / days
+        assert (
+            result.daily_experience_rate == 400000 / 4
+        )  # Total gain / actual days
 
     @pytest.mark.asyncio
     async def test_get_skill_progress_with_level_gains(
@@ -235,7 +239,9 @@ class TestHistoryService:
         assert result.skill_name == "defence"
         assert result.total_experience_gained == 200000  # 4 days * 50k per day
         assert result.levels_gained == 2  # 90 -> 92
-        assert result.daily_experience_rate == 200000 / 7
+        assert (
+            result.daily_experience_rate == 200000 / 4
+        )  # Total gain / actual days
 
     @pytest.mark.asyncio
     async def test_get_skill_progress_player_not_found(self, history_service):
@@ -276,12 +282,14 @@ class TestHistoryService:
         assert isinstance(result, BossProgress)
         assert result.username == "progressPlayer"
         assert result.boss_name == "zulrah"
-        assert result.days == 7
+        assert (
+            result.days == 4
+        )  # Actual period available (4 days between first and last record)
         assert len(result.records) == 5  # All records have zulrah data
 
         # Check progress calculations
         assert result.total_kills_gained == 40  # 4 days * 10 per day
-        assert result.daily_kill_rate == 40 / 7  # Total kills / days
+        assert result.daily_kill_rate == 40 / 4  # Total kills / actual days
 
     @pytest.mark.asyncio
     async def test_get_boss_progress_player_not_found(self, history_service):
@@ -358,7 +366,7 @@ class TestHistoryService:
 
         assert data["username"] == "progressPlayer"
         assert data["skill"] == "attack"
-        assert data["period_days"] == 7
+        assert data["period_days"] == 4  # Actual period available
         assert data["total_records"] == 5
 
         # Check progress data
@@ -386,7 +394,7 @@ class TestHistoryService:
 
         assert data["username"] == "progressPlayer"
         assert data["boss"] == "vorkath"
-        assert data["period_days"] == 7
+        assert data["period_days"] == 4  # Actual period available
         assert data["total_records"] == 5
 
         # Check progress data
@@ -468,29 +476,33 @@ class TestHistoryService:
             await history_service.get_boss_progress("", "zulrah", 7)
 
     @pytest.mark.asyncio
-    async def test_progress_analysis_edge_cases(
+    async def test_progress_analysis_same_record(
         self, history_service, test_player_with_history
     ):
-        """Test edge cases in progress analysis calculations."""
-        # Test with same start and end record (should raise error)
+        """Test progress analysis with same start and end record (returns zero progress)."""
         base_date = datetime.now(timezone.utc) - timedelta(days=4)
         start_date = base_date + timedelta(
             hours=12
         )  # Exact time of first record
         end_date = base_date + timedelta(hours=12, seconds=1)  # 1 second later
 
-        with pytest.raises(
-            InsufficientDataError, match="Start and end records are the same"
-        ):
-            await history_service.get_progress_between_dates(
-                "progressPlayer", start_date, end_date
-            )
+        result = await history_service.get_progress_between_dates(
+            "progressPlayer", start_date, end_date
+        )
+
+        assert isinstance(result, ProgressAnalysis)
+        # All progress should be zero since records are the same
+        assert result.experience_gained["overall"] == 0
+        assert result.levels_gained["overall"] == 0
+        assert (
+            result.days_elapsed == 0 or result.days_elapsed == 1
+        )  # Should be 0 or 1 day
 
     @pytest.mark.asyncio
-    async def test_insufficient_skill_data(
+    async def test_skill_progress_no_skill_data(
         self, history_service, test_session
     ):
-        """Test skill progress with insufficient skill-specific data."""
+        """Test skill progress with no skill-specific data (returns empty result)."""
         # Create player with records that don't have the requested skill
         player = Player(username="limitedPlayer")
         test_session.add(player)
@@ -516,17 +528,23 @@ class TestHistoryService:
         test_session.add_all([record1, record2])
         await test_session.commit()
 
-        # Should raise error for skill not in data
-        with pytest.raises(
-            InsufficientDataError, match="Insufficient cooking data"
-        ):
-            await history_service.get_skill_progress(
-                "limitedPlayer", "cooking", 7
-            )
+        # Should return result with zero records and zero progress
+        result = await history_service.get_skill_progress(
+            "limitedPlayer", "cooking", 7
+        )
+
+        assert isinstance(result, SkillProgress)
+        assert result.username == "limitedPlayer"
+        assert result.skill_name == "cooking"
+        assert len(result.records) == 0
+        assert result.total_experience_gained == 0
+        assert result.levels_gained == 0
 
     @pytest.mark.asyncio
-    async def test_insufficient_boss_data(self, history_service, test_session):
-        """Test boss progress with insufficient boss-specific data."""
+    async def test_boss_progress_no_boss_data(
+        self, history_service, test_session
+    ):
+        """Test boss progress with no boss-specific data (returns empty result)."""
         # Create player with records that don't have the requested boss
         player = Player(username="limitedBossPlayer")
         test_session.add(player)
@@ -548,10 +566,204 @@ class TestHistoryService:
         test_session.add_all([record1, record2])
         await test_session.commit()
 
-        # Should raise error for boss not in data
-        with pytest.raises(
-            InsufficientDataError, match="Insufficient bandos data"
-        ):
-            await history_service.get_boss_progress(
-                "limitedBossPlayer", "bandos", 7
+        # Should return result with zero records and zero progress
+        result = await history_service.get_boss_progress(
+            "limitedBossPlayer", "bandos", 7
+        )
+
+        assert isinstance(result, BossProgress)
+        assert result.username == "limitedBossPlayer"
+        assert result.boss_name == "bandos"
+        assert len(result.records) == 0
+        assert result.total_kills_gained == 0
+
+    @pytest.mark.asyncio
+    async def test_get_progress_between_dates_partial_data(
+        self, history_service, test_player_with_history
+    ):
+        """Test progress calculation with partial data (only end record available)."""
+        base_date = datetime.now(timezone.utc) - timedelta(days=4)
+        # Request a range where start_date is before any records, but end_date has a record
+        start_date = datetime.now(timezone.utc) - timedelta(days=10)
+        end_date = base_date + timedelta(
+            days=2, hours=1
+        )  # After second record
+
+        result = await history_service.get_progress_between_dates(
+            "progressPlayer", start_date, end_date
+        )
+
+        assert isinstance(result, ProgressAnalysis)
+        # Should have both records (start will use first available, end will use closest to end_date)
+        assert result.start_record is not None
+        assert result.end_record is not None
+        # Progress should be calculated between the available records
+        assert result.experience_gained["overall"] >= 0
+
+    @pytest.mark.asyncio
+    async def test_get_progress_between_dates_only_one_record(
+        self, history_service, test_player_with_history
+    ):
+        """Test progress calculation when only end record is available (uses it for both)."""
+        base_date = datetime.now(timezone.utc) - timedelta(days=4)
+        # Request a range where start_date is before any records, so start_record will be None
+        # and we'll use end_record for both
+        start_date = datetime.now(timezone.utc) - timedelta(
+            days=20
+        )  # Before all records
+        end_date = base_date + timedelta(days=4, hours=1)  # After last record
+
+        result = await history_service.get_progress_between_dates(
+            "progressPlayer", start_date, end_date
+        )
+
+        assert isinstance(result, ProgressAnalysis)
+        # Should use the same record for both start and end (end_record used for both)
+        assert result.start_record is not None
+        assert result.end_record is not None
+        assert result.start_record.id == result.end_record.id
+        # Progress should be zero since it's the same record
+        assert result.experience_gained["overall"] == 0
+        assert result.levels_gained["overall"] == 0
+
+    @pytest.mark.asyncio
+    async def test_get_skill_progress_partial_data(
+        self, history_service, test_session
+    ):
+        """Test skill progress with partial data (requesting 7 days but only having 3)."""
+        player = Player(username="partialPlayer")
+        test_session.add(player)
+        await test_session.flush()
+
+        # Create only 3 days of records (recent dates)
+        base_date = datetime.now(timezone.utc) - timedelta(days=2)
+        for i in range(3):
+            record_date = base_date + timedelta(days=i)
+            record = HiscoreRecord(
+                player_id=player.id,
+                fetched_at=record_date,
+                skills_data={
+                    "attack": {
+                        "rank": 500 - i,
+                        "level": 99,
+                        "experience": 13034431 + (i * 100000),
+                    }
+                },
             )
+            test_session.add(record)
+
+        await test_session.commit()
+
+        # Request 7 days but only have 3
+        result = await history_service.get_skill_progress(
+            "partialPlayer", "attack", 7
+        )
+
+        assert isinstance(result, SkillProgress)
+        assert result.username == "partialPlayer"
+        assert result.skill_name == "attack"
+        assert len(result.records) == 3
+        # days should reflect actual data available (2 days between first and last)
+        assert result.days == 2
+        assert (
+            result.total_experience_gained == 200000
+        )  # 2 days * 100k per day
+
+    @pytest.mark.asyncio
+    async def test_get_boss_progress_partial_data(
+        self, history_service, test_session
+    ):
+        """Test boss progress with partial data (requesting 7 days but only having 3)."""
+        player = Player(username="partialBossPlayer")
+        test_session.add(player)
+        await test_session.flush()
+
+        # Create only 3 days of records (recent dates)
+        base_date = datetime.now(timezone.utc) - timedelta(days=2)
+        for i in range(3):
+            record_date = base_date + timedelta(days=i)
+            record = HiscoreRecord(
+                player_id=player.id,
+                fetched_at=record_date,
+                bosses_data={
+                    "zulrah": {
+                        "rank": 1000 - i,
+                        "kill_count": 500 + (i * 10),
+                    }
+                },
+            )
+            test_session.add(record)
+
+        await test_session.commit()
+
+        # Request 7 days but only have 3
+        result = await history_service.get_boss_progress(
+            "partialBossPlayer", "zulrah", 7
+        )
+
+        assert isinstance(result, BossProgress)
+        assert result.username == "partialBossPlayer"
+        assert result.boss_name == "zulrah"
+        assert len(result.records) == 3
+        # days should reflect actual data available (2 days between first and last)
+        assert result.days == 2
+        assert result.total_kills_gained == 20  # 2 days * 10 per day
+
+    @pytest.mark.asyncio
+    async def test_get_skill_progress_single_record(
+        self, history_service, test_session
+    ):
+        """Test skill progress with only one record available."""
+        player = Player(username="singleRecordPlayer")
+        test_session.add(player)
+        await test_session.flush()
+
+        # Create only one record
+        record = HiscoreRecord(
+            player_id=player.id,
+            fetched_at=datetime.now(timezone.utc) - timedelta(days=1),
+            skills_data={
+                "attack": {"rank": 500, "level": 99, "experience": 13034431}
+            },
+        )
+        test_session.add(record)
+        await test_session.commit()
+
+        result = await history_service.get_skill_progress(
+            "singleRecordPlayer", "attack", 7
+        )
+
+        assert isinstance(result, SkillProgress)
+        assert len(result.records) == 1
+        assert result.total_experience_gained == 0
+        assert result.levels_gained == 0
+        # days should be based on days from now
+        assert result.days >= 1
+
+    @pytest.mark.asyncio
+    async def test_get_boss_progress_single_record(
+        self, history_service, test_session
+    ):
+        """Test boss progress with only one record available."""
+        player = Player(username="singleBossRecordPlayer")
+        test_session.add(player)
+        await test_session.flush()
+
+        # Create only one record
+        record = HiscoreRecord(
+            player_id=player.id,
+            fetched_at=datetime.now(timezone.utc) - timedelta(days=1),
+            bosses_data={"zulrah": {"rank": 1000, "kill_count": 500}},
+        )
+        test_session.add(record)
+        await test_session.commit()
+
+        result = await history_service.get_boss_progress(
+            "singleBossRecordPlayer", "zulrah", 7
+        )
+
+        assert isinstance(result, BossProgress)
+        assert len(result.records) == 1
+        assert result.total_kills_gained == 0
+        # days should be based on days from now
+        assert result.days >= 1

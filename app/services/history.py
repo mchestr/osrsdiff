@@ -165,7 +165,15 @@ class SkillProgress:
     ):
         self.username = username
         self.skill_name = skill_name
-        self.records = sorted(records, key=lambda r: r.fetched_at)
+
+        # Ensure all fetched_at are timezone-aware for sorting
+        def get_fetched_at(record: HiscoreRecord) -> datetime:
+            dt = record.fetched_at
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        self.records = sorted(records, key=lambda r: get_fetched_at(r))
         self.days = days
 
     @property
@@ -228,7 +236,15 @@ class BossProgress:
     ):
         self.username = username
         self.boss_name = boss_name
-        self.records = sorted(records, key=lambda r: r.fetched_at)
+
+        # Ensure all fetched_at are timezone-aware for sorting
+        def get_fetched_at(record: HiscoreRecord) -> datetime:
+            dt = record.fetched_at
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        self.records = sorted(records, key=lambda r: get_fetched_at(r))
         self.days = days
 
     @property
@@ -285,17 +301,21 @@ class HistoryService:
         """
         Calculate progress between two specific dates.
 
+        Returns whatever data is available, even if it's less than requested.
+        If only one record is available, it will be used for both start and end.
+        If records are the same, progress will be zero but data will still be returned.
+
         Args:
             username: OSRS player username
             start_date: Start date for progress analysis
             end_date: End date for progress analysis
 
         Returns:
-            ProgressAnalysis: Calculated progress data
+            ProgressAnalysis: Calculated progress data (may be partial)
 
         Raises:
             PlayerNotFoundError: If player doesn't exist
-            InsufficientDataError: If insufficient data for analysis
+            InsufficientDataError: If no data available at all
             HistoryServiceError: For other service errors
         """
         if not username:
@@ -327,15 +347,32 @@ class HistoryService:
                 player.id, end_date, before=True
             )
 
-            if not start_record or not end_record:
+            # If we don't have both records, adjust dates to available data
+            if not start_record and not end_record:
                 raise InsufficientDataError(
-                    f"Insufficient data for progress analysis between {start_date} and {end_date}"
+                    f"No data available for progress analysis between {start_date} and {end_date}"
                 )
 
-            if start_record.id == end_record.id:
-                raise InsufficientDataError(
-                    "Start and end records are the same - no progress to calculate"
+            # If we only have one record, use it for both start and end
+            if not start_record:
+                start_record = end_record
+                start_date = (
+                    end_record.fetched_at if end_record else start_date
                 )
+            elif not end_record:
+                end_record = start_record
+                end_date = (
+                    start_record.fetched_at if start_record else end_date
+                )
+
+            # If records are the same, still return the data (just no progress)
+            # At this point, both start_record and end_record are guaranteed to be not None
+            assert start_record is not None and end_record is not None
+            if start_record.id == end_record.id:
+                # Use the actual fetched_at date for both
+                actual_date = start_record.fetched_at
+                start_date = actual_date
+                end_date = actual_date
 
             progress = ProgressAnalysis(
                 username=player.username,
@@ -364,17 +401,19 @@ class HistoryService:
         """
         Get progress for a specific skill over a number of days.
 
+        Returns whatever data is available, even if it's less than requested.
+        The period_days in the response will reflect the actual data available.
+
         Args:
             username: OSRS player username
             skill: Skill name (e.g., 'attack', 'defence')
-            days: Number of days to look back
+            days: Number of days to look back (requested)
 
         Returns:
-            SkillProgress: Skill-specific progress data
+            SkillProgress: Skill-specific progress data (may be partial)
 
         Raises:
             PlayerNotFoundError: If player doesn't exist
-            InsufficientDataError: If insufficient data for analysis
             HistoryServiceError: For other service errors
         """
         if not username:
@@ -408,11 +447,6 @@ class HistoryService:
                 player.id, cutoff_date
             )
 
-            if len(records) < 2:
-                raise InsufficientDataError(
-                    f"Insufficient data for {skill} progress analysis (need at least 2 records)"
-                )
-
             # Filter records that have data for this skill
             skill_records = [
                 record
@@ -420,10 +454,62 @@ class HistoryService:
                 if record.get_skill_data(skill) is not None
             ]
 
-            if len(skill_records) < 2:
-                raise InsufficientDataError(
-                    f"Insufficient {skill} data for progress analysis"
+            # If we have no records, try to get the most recent record regardless of date
+            if len(skill_records) == 0:
+                # Get the most recent record with this skill data
+                stmt = (
+                    select(HiscoreRecord)
+                    .where(HiscoreRecord.player_id == player.id)
+                    .order_by(HiscoreRecord.fetched_at.desc())
                 )
+                result = await self.db_session.execute(stmt)
+                all_records = list(result.scalars().all())
+                skill_records = [
+                    record
+                    for record in all_records
+                    if record.get_skill_data(skill) is not None
+                ]
+                # If we found records, calculate actual days based on oldest record
+                if skill_records:
+
+                    def get_fetched_at(record: HiscoreRecord) -> datetime:
+                        dt = record.fetched_at
+                        if dt.tzinfo is None:
+                            return dt.replace(tzinfo=timezone.utc)
+                        return dt
+
+                    oldest_record = min(
+                        skill_records, key=lambda r: get_fetched_at(r)
+                    )
+                    oldest_dt = get_fetched_at(oldest_record)
+                    actual_days = (datetime.now(timezone.utc) - oldest_dt).days
+                    days = max(1, actual_days)
+
+            # Calculate actual period based on available data
+            if len(skill_records) > 0:
+                # Ensure all fetched_at are timezone-aware for comparison
+                def get_fetched_at(record: HiscoreRecord) -> datetime:
+                    dt = record.fetched_at
+                    if dt.tzinfo is None:
+                        return dt.replace(tzinfo=timezone.utc)
+                    return dt
+
+                oldest_record = min(
+                    skill_records, key=lambda r: get_fetched_at(r)
+                )
+                newest_record = max(
+                    skill_records, key=lambda r: get_fetched_at(r)
+                )
+                oldest_dt = get_fetched_at(oldest_record)
+                newest_dt = get_fetched_at(newest_record)
+                actual_days = (newest_dt - oldest_dt).days
+                if actual_days > 0:
+                    days = actual_days
+                elif len(skill_records) == 1:
+                    # Single record, use days from now
+                    days = max(
+                        1, (datetime.now(timezone.utc) - oldest_dt).days
+                    )
 
             progress = SkillProgress(
                 username=player.username,
@@ -452,17 +538,19 @@ class HistoryService:
         """
         Get progress for a specific boss over a number of days.
 
+        Returns whatever data is available, even if it's less than requested.
+        The period_days in the response will reflect the actual data available.
+
         Args:
             username: OSRS player username
             boss: Boss name (e.g., 'zulrah', 'vorkath')
-            days: Number of days to look back
+            days: Number of days to look back (requested)
 
         Returns:
-            BossProgress: Boss-specific progress data
+            BossProgress: Boss-specific progress data (may be partial)
 
         Raises:
             PlayerNotFoundError: If player doesn't exist
-            InsufficientDataError: If insufficient data for analysis
             HistoryServiceError: For other service errors
         """
         if not username:
@@ -496,11 +584,6 @@ class HistoryService:
                 player.id, cutoff_date
             )
 
-            if len(records) < 2:
-                raise InsufficientDataError(
-                    f"Insufficient data for {boss} progress analysis (need at least 2 records)"
-                )
-
             # Filter records that have data for this boss
             boss_records = [
                 record
@@ -508,10 +591,62 @@ class HistoryService:
                 if record.get_boss_data(boss) is not None
             ]
 
-            if len(boss_records) < 2:
-                raise InsufficientDataError(
-                    f"Insufficient {boss} data for progress analysis"
+            # If we have no records, try to get the most recent record regardless of date
+            if len(boss_records) == 0:
+                # Get the most recent record with this boss data
+                stmt = (
+                    select(HiscoreRecord)
+                    .where(HiscoreRecord.player_id == player.id)
+                    .order_by(HiscoreRecord.fetched_at.desc())
                 )
+                result = await self.db_session.execute(stmt)
+                all_records = list(result.scalars().all())
+                boss_records = [
+                    record
+                    for record in all_records
+                    if record.get_boss_data(boss) is not None
+                ]
+                # If we found records, calculate actual days based on oldest record
+                if boss_records:
+
+                    def get_fetched_at(record: HiscoreRecord) -> datetime:
+                        dt = record.fetched_at
+                        if dt.tzinfo is None:
+                            return dt.replace(tzinfo=timezone.utc)
+                        return dt
+
+                    oldest_record = min(
+                        boss_records, key=lambda r: get_fetched_at(r)
+                    )
+                    oldest_dt = get_fetched_at(oldest_record)
+                    actual_days = (datetime.now(timezone.utc) - oldest_dt).days
+                    days = max(1, actual_days)
+
+            # Calculate actual period based on available data
+            if len(boss_records) > 0:
+                # Ensure all fetched_at are timezone-aware for comparison
+                def get_fetched_at(record: HiscoreRecord) -> datetime:
+                    dt = record.fetched_at
+                    if dt.tzinfo is None:
+                        return dt.replace(tzinfo=timezone.utc)
+                    return dt
+
+                oldest_record = min(
+                    boss_records, key=lambda r: get_fetched_at(r)
+                )
+                newest_record = max(
+                    boss_records, key=lambda r: get_fetched_at(r)
+                )
+                oldest_dt = get_fetched_at(oldest_record)
+                newest_dt = get_fetched_at(newest_record)
+                actual_days = (newest_dt - oldest_dt).days
+                if actual_days > 0:
+                    days = actual_days
+                elif len(boss_records) == 1:
+                    # Single record, use days from now
+                    days = max(
+                        1, (datetime.now(timezone.utc) - oldest_dt).days
+                    )
 
             progress = BossProgress(
                 username=player.username,

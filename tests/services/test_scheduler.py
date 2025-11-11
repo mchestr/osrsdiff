@@ -446,7 +446,9 @@ class TestPlayerScheduleManager:
         mock_schedule = MagicMock()
         mock_schedule.schedule_id = "player_fetch_123"
         mock_schedule.cron = "*/30 * * * *"
-        mock_schedule.task_name = "app.workers.fetch:fetch_player_hiscores_task"
+        mock_schedule.task_name = (
+            "app.workers.fetch:fetch_player_hiscores_task"
+        )
         mock_schedule.labels = {
             "player_id": "123",
             "schedule_type": "player_fetch",

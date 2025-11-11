@@ -294,12 +294,10 @@ class TestHistoryEndpoints:
         assert response.status_code == 404
         assert "not found in tracking system" in response.json()["detail"]
 
-    def test_get_player_history_insufficient_data(
-        self, client, mock_history_service
-    ):
-        """Test handling of insufficient data error."""
+    def test_get_player_history_no_data(self, client, mock_history_service):
+        """Test handling of no data available error."""
         mock_history_service.get_progress_between_dates.side_effect = (
-            InsufficientDataError("Insufficient data for progress analysis")
+            InsufficientDataError("No data available for progress analysis")
         )
 
         response = client.get(
@@ -308,7 +306,7 @@ class TestHistoryEndpoints:
         )
 
         assert response.status_code == 422
-        assert "Insufficient data" in response.json()["detail"]
+        assert "No data available" in response.json()["detail"]
 
     def test_get_player_history_service_error(
         self, client, mock_history_service
@@ -444,23 +442,40 @@ class TestHistoryEndpoints:
         assert response.status_code == 404
         assert "not found in tracking system" in response.json()["detail"]
 
-    def test_get_skill_progress_insufficient_data(
+    def test_get_skill_progress_partial_data(
         self, client, mock_history_service
     ):
-        """Test skill progress with insufficient data."""
-        mock_history_service.get_skill_progress.side_effect = (
-            InsufficientDataError(
-                "Insufficient attack data for progress analysis"
-            )
+        """Test skill progress with partial data (returns available data)."""
+        # Create mock skill progress with fewer records than requested
+        player = create_test_player(1, "test_player")
+        records = [
+            create_test_hiscore_record(
+                1, player, datetime.now(timezone.utc) - timedelta(days=2)
+            ),
+            create_test_hiscore_record(
+                2, player, datetime.now(timezone.utc) - timedelta(days=1)
+            ),
+        ]
+        # Request 7 days but only have 2 days of data
+        skill_progress = SkillProgress(
+            username="test_player",
+            skill_name="attack",
+            records=records,
+            days=2,  # Actual period available
         )
 
+        mock_history_service.get_skill_progress.return_value = skill_progress
+
         response = client.get(
-            "/players/test_player/history/skills/attack",
+            "/players/test_player/history/skills/attack?days=7",
             headers={"Authorization": "Bearer fake_token"},
         )
 
-        assert response.status_code == 422
-        assert "Insufficient attack data" in response.json()["detail"]
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "test_player"
+        assert data["period_days"] == 2  # Reflects actual data available
+        assert data["total_records"] == 2
 
     def test_get_boss_progress_success(self, client, mock_history_service):
         """Test successful retrieval of boss progress."""
@@ -558,23 +573,40 @@ class TestHistoryEndpoints:
         assert response.status_code == 404
         assert "not found in tracking system" in response.json()["detail"]
 
-    def test_get_boss_progress_insufficient_data(
+    def test_get_boss_progress_partial_data(
         self, client, mock_history_service
     ):
-        """Test boss progress with insufficient data."""
-        mock_history_service.get_boss_progress.side_effect = (
-            InsufficientDataError(
-                "Insufficient zulrah data for progress analysis"
-            )
+        """Test boss progress with partial data (returns available data)."""
+        # Create mock boss progress with fewer records than requested
+        player = create_test_player(1, "test_player")
+        records = [
+            create_test_hiscore_record(
+                1, player, datetime.now(timezone.utc) - timedelta(days=2)
+            ),
+            create_test_hiscore_record(
+                2, player, datetime.now(timezone.utc) - timedelta(days=1)
+            ),
+        ]
+        # Request 7 days but only have 2 days of data
+        boss_progress = BossProgress(
+            username="test_player",
+            boss_name="zulrah",
+            records=records,
+            days=2,  # Actual period available
         )
 
+        mock_history_service.get_boss_progress.return_value = boss_progress
+
         response = client.get(
-            "/players/test_player/history/bosses/zulrah",
+            "/players/test_player/history/bosses/zulrah?days=7",
             headers={"Authorization": "Bearer fake_token"},
         )
 
-        assert response.status_code == 422
-        assert "Insufficient zulrah data" in response.json()["detail"]
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "test_player"
+        assert data["period_days"] == 2  # Reflects actual data available
+        assert data["total_records"] == 2
 
     def test_authentication_required_history(
         self, client, mock_history_service
