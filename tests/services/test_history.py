@@ -604,10 +604,10 @@ class TestHistoryService:
     async def test_get_progress_between_dates_only_one_record(
         self, history_service, test_player_with_history
     ):
-        """Test progress calculation when only end record is available (uses it for both)."""
+        """Test progress calculation when start_date is before any records (uses oldest record)."""
         base_date = datetime.now(timezone.utc) - timedelta(days=4)
         # Request a range where start_date is before any records, so start_record will be None
-        # and we'll use end_record for both
+        # and we'll use the oldest available record as start_record
         start_date = datetime.now(timezone.utc) - timedelta(
             days=20
         )  # Before all records
@@ -618,13 +618,18 @@ class TestHistoryService:
         )
 
         assert isinstance(result, ProgressAnalysis)
-        # Should use the same record for both start and end (end_record used for both)
+        # Should use the oldest record as start and the closest record to end_date as end
         assert result.start_record is not None
         assert result.end_record is not None
-        assert result.start_record.id == result.end_record.id
-        # Progress should be zero since it's the same record
-        assert result.experience_gained["overall"] == 0
-        assert result.levels_gained["overall"] == 0
+        # Start record should be the oldest (first record)
+        assert result.start_record.id == 1
+        # End record should be the last record (closest to end_date)
+        assert result.end_record.id == 5
+        # Progress should show actual progress from oldest to newest record
+        assert (
+            result.experience_gained["overall"] == 600000
+        )  # 4 days * 150k per day
+        assert result.levels_gained["overall"] == 20  # 4 days * 5 per day
 
     @pytest.mark.asyncio
     async def test_get_skill_progress_partial_data(

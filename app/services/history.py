@@ -353,17 +353,32 @@ class HistoryService:
                     f"No data available for progress analysis between {start_date} and {end_date}"
                 )
 
-            # If we only have one record, use it for both start and end
+            # If we can't find a start record (requested date is before any data),
+            # use the oldest available record instead of the end record
             if not start_record:
-                start_record = end_record
-                start_date = (
-                    end_record.fetched_at if end_record else start_date
-                )
+                oldest_record = await self._get_oldest_record(player.id)
+                if oldest_record:
+                    start_record = oldest_record
+                    # Ensure timezone consistency
+                    oldest_dt = oldest_record.fetched_at
+                    if oldest_dt.tzinfo is None:
+                        oldest_dt = oldest_dt.replace(tzinfo=timezone.utc)
+                    start_date = oldest_dt
+                else:
+                    # Fallback to end_record if no oldest record found
+                    start_record = end_record
+                    if end_record:
+                        end_dt = end_record.fetched_at
+                        if end_dt.tzinfo is None:
+                            end_dt = end_dt.replace(tzinfo=timezone.utc)
+                        start_date = end_dt
             elif not end_record:
                 end_record = start_record
-                end_date = (
-                    start_record.fetched_at if start_record else end_date
-                )
+                if start_record:
+                    start_dt = start_record.fetched_at
+                    if start_dt.tzinfo is None:
+                        start_dt = start_dt.replace(tzinfo=timezone.utc)
+                    end_date = start_dt
 
             # If records are the same, still return the data (just no progress)
             # At this point, both start_record and end_record are guaranteed to be not None
@@ -371,6 +386,8 @@ class HistoryService:
             if start_record.id == end_record.id:
                 # Use the actual fetched_at date for both
                 actual_date = start_record.fetched_at
+                if actual_date.tzinfo is None:
+                    actual_date = actual_date.replace(tzinfo=timezone.utc)
                 start_date = actual_date
                 end_date = actual_date
 
@@ -738,6 +755,28 @@ class HistoryService:
 
         result = await self.db_session.execute(stmt)
         return list(result.scalars().all())
+
+    async def _get_oldest_record(
+        self, player_id: int
+    ) -> Optional[HiscoreRecord]:
+        """
+        Get the oldest hiscore record for a player.
+
+        Args:
+            player_id: Player ID
+
+        Returns:
+            Optional[HiscoreRecord]: Oldest record or None
+        """
+        stmt = (
+            select(HiscoreRecord)
+            .where(HiscoreRecord.player_id == player_id)
+            .order_by(HiscoreRecord.fetched_at.asc())
+            .limit(1)
+        )
+
+        result = await self.db_session.execute(stmt)
+        return result.scalar_one_or_none()
 
 
 async def get_history_service(db_session: AsyncSession) -> HistoryService:
