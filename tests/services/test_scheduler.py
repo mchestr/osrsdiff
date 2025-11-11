@@ -435,6 +435,110 @@ class TestPlayerScheduleManager:
         assert result is False
 
     @pytest.mark.asyncio
+    async def test_verify_schedule_exists_and_valid_task_name_full_path(
+        self, schedule_manager, mock_redis_source, sample_player
+    ):
+        """Test schedule verification with full task path format (module:function)."""
+        sample_player.schedule_id = "player_fetch_123"
+        sample_player.fetch_interval_minutes = 30
+
+        # Mock schedule with full task path format (as TaskIQ stores it)
+        mock_schedule = MagicMock()
+        mock_schedule.schedule_id = "player_fetch_123"
+        mock_schedule.cron = "*/30 * * * *"
+        mock_schedule.task_name = "app.workers.fetch:fetch_player_hiscores_task"
+        mock_schedule.labels = {
+            "player_id": "123",
+            "schedule_type": "player_fetch",
+        }
+
+        mock_redis_source.get_schedules.return_value = [mock_schedule]
+
+        result = await schedule_manager._verify_schedule_exists_and_valid(
+            sample_player
+        )
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_verify_schedule_exists_and_valid_task_name_simple(
+        self, schedule_manager, mock_redis_source, sample_player
+    ):
+        """Test schedule verification with simple task name format (backward compatibility)."""
+        sample_player.schedule_id = "player_fetch_123"
+        sample_player.fetch_interval_minutes = 30
+
+        # Mock schedule with simple task name format
+        mock_schedule = MagicMock()
+        mock_schedule.schedule_id = "player_fetch_123"
+        mock_schedule.cron = "*/30 * * * *"
+        mock_schedule.task_name = "fetch_player_hiscores_task"
+        mock_schedule.labels = {
+            "player_id": "123",
+            "schedule_type": "player_fetch",
+        }
+
+        mock_redis_source.get_schedules.return_value = [mock_schedule]
+
+        result = await schedule_manager._verify_schedule_exists_and_valid(
+            sample_player
+        )
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_verify_schedule_exists_and_valid_wrong_task_name(
+        self, schedule_manager, mock_redis_source, sample_player
+    ):
+        """Test schedule verification when task name is wrong."""
+        sample_player.schedule_id = "player_fetch_123"
+        sample_player.fetch_interval_minutes = 30
+
+        # Mock schedule with wrong task name (full path format)
+        mock_schedule = MagicMock()
+        mock_schedule.schedule_id = "player_fetch_123"
+        mock_schedule.cron = "*/30 * * * *"
+        mock_schedule.task_name = "app.workers.fetch:wrong_task_name"
+        mock_schedule.labels = {
+            "player_id": "123",
+            "schedule_type": "player_fetch",
+        }
+
+        mock_redis_source.get_schedules.return_value = [mock_schedule]
+
+        result = await schedule_manager._verify_schedule_exists_and_valid(
+            sample_player
+        )
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_verify_schedule_exists_and_valid_wrong_task_name_simple(
+        self, schedule_manager, mock_redis_source, sample_player
+    ):
+        """Test schedule verification when task name is wrong (simple format)."""
+        sample_player.schedule_id = "player_fetch_123"
+        sample_player.fetch_interval_minutes = 30
+
+        # Mock schedule with wrong task name (simple format)
+        mock_schedule = MagicMock()
+        mock_schedule.schedule_id = "player_fetch_123"
+        mock_schedule.cron = "*/30 * * * *"
+        mock_schedule.task_name = "wrong_task_name"
+        mock_schedule.labels = {
+            "player_id": "123",
+            "schedule_type": "player_fetch",
+        }
+
+        mock_redis_source.get_schedules.return_value = [mock_schedule]
+
+        result = await schedule_manager._verify_schedule_exists_and_valid(
+            sample_player
+        )
+
+        assert result is False
+
+    @pytest.mark.asyncio
     async def test_verify_all_schedules_success(
         self, schedule_manager, mock_redis_source
     ):

@@ -313,12 +313,21 @@ class PlayerScheduleManager:
                 return False
 
             # Check if task name matches
+            # TaskIQ stores task names as "module:function_name" format
             if hasattr(player_schedule, "task_name"):
                 expected_task_name = "fetch_player_hiscores_task"
-                if player_schedule.task_name != expected_task_name:
+                # Extract function name from stored task name (handles both formats)
+                stored_task_name = player_schedule.task_name
+                # If stored name contains ':', extract the function name part
+                if ":" in stored_task_name:
+                    stored_function_name = stored_task_name.split(":")[-1]
+                else:
+                    stored_function_name = stored_task_name
+
+                if stored_function_name != expected_task_name:
                     logger.warning(
                         f"Schedule {player.schedule_id} has wrong task name. "
-                        f"Expected: {expected_task_name}, Found: {player_schedule.task_name}"
+                        f"Expected: {expected_task_name}, Found: {stored_task_name} (extracted: {stored_function_name})"
                     )
                     return False
 
