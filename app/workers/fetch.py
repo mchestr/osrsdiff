@@ -18,7 +18,7 @@ from app.services.osrs_api import (
     HiscoreData,
     OSRSAPIClient,
 )
-from app.workers.main import broker, get_task_defaults
+from app.workers.main import broker
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +72,11 @@ def _hiscore_data_changed(
     return False
 
 
-@broker.task(  # type: ignore[misc]
-    **get_task_defaults(
-        retry_count=5,  # More retries for API calls
-        retry_delay=5.0,  # Longer delay between retries for rate limiting
-        task_timeout=120.0,  # 2 minutes timeout for individual fetch
-    )
+@broker.task(
+    retry_on_error=True,
+    max_retries=5,
+    delay=5.0,
+    task_timeout=30.0,
 )
 async def fetch_player_hiscores_task(
     username: str, context: Context = TaskiqDepends()
@@ -334,98 +333,4 @@ async def fetch_player_hiscores_task(
                 f"Unexpected error fetching hiscores for {username}: {e} (schedule_id: {schedule_id})"
             )
             # Unexpected errors should also trigger retry
-            raise
-
-
-@broker.task(  # type: ignore[misc]
-    **get_task_defaults(
-        retry_count=2,
-        retry_delay=15.0,
-        task_timeout=600.0,  # 10 minutes for fetching all players
-    )
-)
-async def fetch_all_players_task() -> Dict[str, Any]:
-    """
-    Fetch hiscore data for all active players immediately.
-
-    This is a utility task for manual triggering of fetches for all players,
-    regardless of their last fetch time or interval settings. Useful for
-    administrative purposes or initial data population.
-
-    Returns:
-        Dict containing processing results and statistics
-    """
-    logger.info("Starting fetch for all active players")
-    start_time = datetime.now(UTC)
-
-    async with AsyncSessionLocal() as db_session:
-        try:
-            # Get all active players
-            stmt = (
-                select(Player)
-                .where(Player.is_active.is_(True))
-                .order_by(Player.username)
-            )
-            result = await db_session.execute(stmt)
-            active_players = result.scalars().all()
-
-            if not active_players:
-                logger.info("No active players found")
-                return {
-                    "status": "success",
-                    "message": "No active players to fetch",
-                    "players_processed": 0,
-                    "tasks_enqueued": 0,
-                    "failed_enqueues": 0,
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "duration_seconds": (
-                        datetime.now(UTC) - start_time
-                    ).total_seconds(),
-                }
-
-            logger.info(
-                f"Enqueuing fetch tasks for {len(active_players)} active players"
-            )
-
-            # Enqueue fetch tasks for all active players
-            tasks_enqueued = 0
-            failed_enqueues = 0
-            enqueue_errors = []
-
-            for player in active_players:
-                try:
-                    await fetch_player_hiscores_task.kiq(player.username)
-                    tasks_enqueued += 1
-                    logger.debug(f"Enqueued fetch task for {player.username}")
-
-                except Exception as e:
-                    failed_enqueues += 1
-                    error_msg = f"Failed to enqueue fetch task for {player.username}: {e}"
-                    enqueue_errors.append(error_msg)
-                    logger.error(error_msg)
-
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-
-            logger.info(
-                f"Fetch all players complete: {tasks_enqueued} tasks enqueued, "
-                f"{failed_enqueues} failed (duration: {duration:.2f}s)"
-            )
-
-            response_data = {
-                "status": "success",
-                "players_processed": len(active_players),
-                "tasks_enqueued": tasks_enqueued,
-                "failed_enqueues": failed_enqueues,
-                "timestamp": datetime.now(UTC).isoformat(),
-                "duration_seconds": duration,
-            }
-
-            if enqueue_errors:
-                response_data["enqueue_errors"] = enqueue_errors
-
-            return response_data
-
-        except Exception as e:
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            logger.error(f"Error in fetch all players: {e}")
             raise

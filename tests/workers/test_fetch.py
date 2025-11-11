@@ -1,14 +1,13 @@
 """Tests for hiscore fetch worker tasks."""
 
-from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import OSRSPlayerNotFoundError
-from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.osrs_api import (
     APIUnavailableError,
@@ -16,7 +15,6 @@ from app.services.osrs_api import (
     RateLimitError,
 )
 from app.workers.fetch import (
-    fetch_all_players_task,
     fetch_player_hiscores_task,
 )
 
@@ -210,54 +208,3 @@ class TestFetchPlayerHiscores:
                     await fetch_player_hiscores_task.original_func(
                         sample_player.username
                     )
-
-
-class TestFetchAllPlayers:
-    """Test fetch all players functionality."""
-
-    @pytest.mark.asyncio
-    async def test_fetch_all_no_players(self, test_session):
-        """Test fetch all when no active players exist."""
-        with patch(
-            "app.workers.fetch.AsyncSessionLocal"
-        ) as mock_session_local:
-            mock_session_local.return_value.__aenter__.return_value = (
-                test_session
-            )
-            result = await fetch_all_players_task.original_func()
-
-        assert result["status"] == "success"
-        assert result["players_processed"] == 0
-        assert result["tasks_enqueued"] == 0
-        assert "No active players" in result["message"]
-
-    @pytest.mark.asyncio
-    async def test_fetch_all_success(self, test_session):
-        """Test successful fetch all players."""
-        # Create active and inactive players
-        active_player1 = Player(username="active1", is_active=True)
-        active_player2 = Player(username="active2", is_active=True)
-        inactive_player = Player(username="inactive", is_active=False)
-
-        test_session.add_all([active_player1, active_player2, inactive_player])
-        await test_session.commit()
-
-        # Mock the task import to avoid circular import issues
-        with patch(
-            "app.workers.fetch.fetch_player_hiscores_task"
-        ) as mock_task:
-            mock_task.kiq = AsyncMock()
-
-            with patch(
-                "app.workers.fetch.AsyncSessionLocal"
-            ) as mock_session_local:
-                mock_session_local.return_value.__aenter__.return_value = (
-                    test_session
-                )
-                result = await fetch_all_players_task.original_func()
-
-            assert result["status"] == "success"
-            assert result["players_processed"] == 2  # Only active players
-            # Note: Due to mocking complexity, we just verify the basic result structure
-            assert "tasks_enqueued" in result
-            assert "failed_enqueues" in result

@@ -153,6 +153,19 @@ class TaskIQSettings(BaseModel):
         default="app:schedules",
         description="Redis prefix for TaskIQ schedules",
     )
+    # SmartRetryMiddleware settings
+    use_jitter: bool = Field(
+        default=True,
+        description="Enable jitter to distribute retries evenly and prevent simultaneous task execution",
+    )
+    use_delay_exponent: bool = Field(
+        default=True,
+        description="Enable exponential backoff to gradually increase delay for each retry",
+    )
+    max_delay_exponent: float = Field(
+        default=1800.0,
+        description="Maximum delay exponent in seconds for exponential backoff",
+    )
 
 
 class AdminSettings(BaseModel):

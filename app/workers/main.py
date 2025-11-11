@@ -2,10 +2,9 @@
 
 import logging
 from logging.config import dictConfig
-from typing import Any, Dict
 
 from taskiq import TaskiqEvents
-from taskiq.middlewares import SimpleRetryMiddleware
+from taskiq.middlewares import SmartRetryMiddleware
 from taskiq.state import TaskiqState
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
@@ -27,10 +26,14 @@ broker = RedisStreamBroker(
     max_connection_pool_size=settings.redis.max_connections,
 ).with_result_backend(result_backend)
 
-# Add retry middleware
+# Add smart retry middleware
 broker.add_middlewares(
-    SimpleRetryMiddleware(
+    SmartRetryMiddleware(
         default_retry_count=settings.taskiq.default_retry_count,
+        default_delay=settings.taskiq.default_retry_delay,
+        use_jitter=settings.taskiq.use_jitter,
+        use_delay_exponent=settings.taskiq.use_delay_exponent,
+        max_delay_exponent=settings.taskiq.max_delay_exponent,
     )
 )
 
@@ -86,18 +89,6 @@ async def client_startup_event(context: TaskiqState) -> None:
 async def client_shutdown_event(context: TaskiqState) -> None:
     """Clean up client resources on shutdown."""
     logger.info("TaskIQ client shutting down...")
-
-
-def get_task_defaults(**kwargs: Any) -> Dict[str, Any]:
-    """Get task configuration with default settings."""
-    defaults = {
-        "retry_count": settings.taskiq.default_retry_count,
-        "retry_delay": settings.taskiq.default_retry_delay,
-        "task_timeout": settings.taskiq.task_timeout,
-        "result_ttl": settings.taskiq.result_ttl,
-    }
-    defaults.update(kwargs)
-    return defaults
 
 
 # Import all task modules to ensure tasks are registered with the broker

@@ -12,19 +12,18 @@ from typing import Any, Dict
 from app.models.base import AsyncSessionLocal
 from app.services.schedule_maintenance import ScheduleMaintenanceService
 from app.services.scheduler import get_player_schedule_manager
-from app.workers.main import broker, get_task_defaults
+from app.workers.main import broker
 
 logger = logging.getLogger(__name__)
 
 
 # Daily schedule verification job - runs at 3 AM UTC
-@broker.task(  # type: ignore[misc]
-    schedule=[{"cron": "0 3 * * *"}],  # Daily at 3 AM UTC
-    **get_task_defaults(
-        retry_count=2,
-        retry_delay=30.0,
-        task_timeout=1800.0,  # 30 minutes for verification job
-    ),
+@broker.task(
+    schedule=[{"cron": "0 3 * * *"}],
+    retry_on_error=True,
+    max_retries=2,
+    delay=30.0,
+    task_timeout=1800.0,
 )
 async def schedule_verification_job() -> Dict[str, Any]:
     """
@@ -248,12 +247,11 @@ async def schedule_verification_job() -> Dict[str, Any]:
 
 
 # Manual cleanup job (no schedule - triggered manually)
-@broker.task(  # type: ignore[misc]
-    **get_task_defaults(
-        retry_count=2,
-        retry_delay=15.0,
-        task_timeout=600.0,  # 10 minutes for cleanup
-    )
+@broker.task(
+    retry_on_error=True,
+    max_retries=2,
+    delay=15.0,
+    task_timeout=600.0,
 )
 async def cleanup_orphaned_schedules_job() -> Dict[str, Any]:
     """
