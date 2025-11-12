@@ -27,6 +27,7 @@ import miningIcon from '../assets/images/skill-icons/mining-icon.png';
 import prayerIcon from '../assets/images/skill-icons/prayer-icon.png';
 import rangedIcon from '../assets/images/skill-icons/ranged-icon.png';
 import runecraftIcon from '../assets/images/skill-icons/runecraft-icon.png';
+import sailingIcon from '../assets/images/skill-icons/sailing-icon.png';
 import slayerIcon from '../assets/images/skill-icons/slayer-icon.png';
 import smithingIcon from '../assets/images/skill-icons/smithing-icon.png';
 import strengthIcon from '../assets/images/skill-icons/strength-icon.png';
@@ -70,7 +71,7 @@ const SKILL_ICONS: Record<string, string> = {
   farming: farmingIcon,
   construction: constructionIcon,
   hunter: hunterIcon,
-  sailing: '⚓', // Sailing is newer, may not have an icon on the wiki yet
+  sailing: sailingIcon,
 };
 
 // Type definitions for skill and boss data
@@ -276,20 +277,19 @@ export const PlayerStats: React.FC = () => {
 
   const bossNames = Object.keys(stats.bosses || {});
 
-  // Get skills in OSRS order, filtering to only include skills that exist
+  // Get skills in OSRS order, always including all skills (even if data is missing)
   const orderedSkills = OSRS_SKILL_ORDER
     .map((skillName) => {
       const skillData = stats.skills?.[skillName] as SkillData | undefined;
-      if (!skillData || typeof skillData !== 'object') return null;
+      // Always include the skill, even if data is missing (defaults to level 1, experience 0)
       return {
         name: skillName,
         displayName: skillName.charAt(0).toUpperCase() + skillName.slice(1),
-        level: skillData.level ?? 0,
-        experience: skillData.experience ?? 0,
-        maxLevel: 99, // OSRS max level is 99 for most skills, but some have different maxes
+        level: skillData?.level ?? 1,
+        experience: skillData?.experience ?? 0,
+        maxLevel: 99, // All OSRS skills have max level 99
       };
-    })
-    .filter((skill): skill is { name: string; displayName: string; level: number; experience: number; maxLevel: number } => skill !== null);
+    });
 
   // Prepare data for charts
   const topBosses = bossNames
@@ -346,7 +346,7 @@ export const PlayerStats: React.FC = () => {
             <div className="osrs-skills-grid">
               {orderedSkills.map((skill) => {
                 const iconUrl = SKILL_ICONS[skill.name];
-                const maxLevel = skill.name === 'sailing' ? 1 : 99; // Sailing has max level 1
+                const maxLevel = skill.maxLevel;
                 return (
                   <div
                     key={skill.name}
@@ -850,9 +850,9 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
   skillIcon,
   onClose,
 }) => {
-  const currentLevel = skillData?.level ?? 0;
+  const currentLevel = skillData?.level ?? 1;
   const currentExp = skillData?.experience ?? 0;
-  const maxLevel = skill === 'sailing' ? 1 : 99;
+  const maxLevel = 99; // All OSRS skills have max level 99
   const isMaxLevel = currentLevel >= maxLevel;
 
   // Calculate time estimates
