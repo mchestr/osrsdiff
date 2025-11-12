@@ -4,6 +4,7 @@ from logging.config import dictConfig
 from pathlib import Path
 from typing import AsyncGenerator
 
+from aiohttp import ClientSession, ClientTimeout, DummyCookieJar
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -26,15 +27,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Application lifespan manager.
 
     Handles startup and shutdown events for the FastAPI application.
+    Creates and manages a shared aiohttp session for reuse across requests.
     """
     # Startup
     await init_db()
     await startup_service.startup()
 
+    # Create shared aiohttp session with DummyCookieJar to prevent cookie persistence
+    # This avoids redirect issues caused by cookies being saved across requests
+    timeout = ClientTimeout(total=30.0)
+    session = ClientSession(
+        timeout=timeout,
+        headers={
+            "User-Agent": "OSRSDiff/1.0.0 (https://github.com/mchestr/osrsdiff)"
+        },
+        cookie_jar=DummyCookieJar(),  # Don't save cookies across requests
+    )
+    app.state.osrs_http_session = session
+    logger.info("Created shared aiohttp session for OSRS API")
+
     yield
 
     # Shutdown
-    # Add any cleanup code here if needed
+    # Close the shared aiohttp session
+    if hasattr(app.state, "osrs_http_session"):
+        await app.state.osrs_http_session.close()
+        logger.info("Closed shared aiohttp session")
 
 
 def create_app() -> FastAPI:

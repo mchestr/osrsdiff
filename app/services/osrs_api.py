@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from urllib.parse import quote
 
-from aiohttp import ClientError, ClientSession, ClientTimeout
+from aiohttp import ClientError, ClientSession, ClientTimeout, DummyCookieJar
+from fastapi import Request
 from pydantic import BaseModel, Field
 
 from app.exceptions import (
@@ -48,9 +49,16 @@ class OSRSAPIClient:
     # Timeout configuration (seconds)
     TIMEOUT = 30.0
 
-    def __init__(self) -> None:
-        """Initialize the OSRS API client."""
-        self._session: Optional[ClientSession] = None
+    def __init__(self, session: Optional[ClientSession] = None) -> None:
+        """
+        Initialize the OSRS API client.
+
+        Args:
+            session: Optional shared aiohttp session. If not provided, a new session
+                    will be created lazily (not recommended for production).
+        """
+        self._session: Optional[ClientSession] = session
+        self._owns_session = session is None
 
     async def __aenter__(self) -> "OSRSAPIClient":
         """Async context manager entry."""
@@ -66,6 +74,10 @@ class OSRSAPIClient:
     async def _ensure_session(self) -> None:
         """Ensure HTTP session is created."""
         if self._session is None or self._session.closed:
+            if not self._owns_session:
+                raise RuntimeError(
+                    "Shared session was closed. This should not happen."
+                )
             timeout = ClientTimeout(total=self.TIMEOUT)
 
             self._session = ClientSession(
@@ -73,11 +85,17 @@ class OSRSAPIClient:
                 headers={
                     "User-Agent": "OSRSDiff/1.0.0 (https://github.com/mchestr/osrsdiff)"
                 },
+                cookie_jar=DummyCookieJar(),  # Don't save cookies across requests
             )
 
     async def close(self) -> None:
-        """Close the HTTP session."""
-        if self._session and not self._session.closed:
+        """
+        Close the HTTP session.
+
+        Only closes the session if this client owns it (i.e., it was created
+        by this client, not passed in from outside).
+        """
+        if self._owns_session and self._session and not self._session.closed:
             await self._session.close()
             self._session = None
 
@@ -352,10 +370,18 @@ class OSRSAPIClient:
             raise
 
 
-# Global client instance for dependency injection
-osrs_api_client = OSRSAPIClient()
+async def get_osrs_api_client(request: Request) -> OSRSAPIClient:
+    """
+    Dependency injection function for FastAPI.
 
+    Retrieves the shared aiohttp session from app.state and creates
+    an OSRSAPIClient instance that uses it.
 
-async def get_osrs_api_client() -> OSRSAPIClient:
-    """Dependency injection function for FastAPI."""
-    return osrs_api_client
+    Args:
+        request: FastAPI request object to access app.state
+
+    Returns:
+        OSRSAPIClient: Client instance using the shared session
+    """
+    session = request.app.state.osrs_http_session
+    return OSRSAPIClient(session=session)
