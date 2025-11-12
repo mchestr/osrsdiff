@@ -76,7 +76,8 @@ def _hiscore_data_changed(
 @broker.task(
     retry_on_error=True,
     max_retries=5,
-    delay=5.0,
+    # Remove fixed delay to allow SmartRetryMiddleware exponential backoff
+    # This will spread retries over 5+ minutes using exponential backoff
     task_timeout=30.0,
 )
 async def fetch_player_hiscores_task(

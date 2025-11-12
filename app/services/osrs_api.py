@@ -42,7 +42,7 @@ class OSRSAPIClient:
     # Retry configuration
     MAX_RETRIES = 3
     INITIAL_BACKOFF = 1.0
-    MAX_BACKOFF = 30.0
+    MAX_BACKOFF = 60.0  # Increased to 60 seconds for client-level retries
     BACKOFF_MULTIPLIER = 2.0
 
     # Timeout configuration (seconds)
@@ -115,9 +115,29 @@ class OSRSAPIClient:
                         raise RateLimitError("Rate limit exceeded")
 
                     elif response.status >= 500:
-                        raise APIUnavailableError(
-                            f"OSRS API unavailable (status: {response.status})"
+                        # Retry on 5xx errors (especially 504 Gateway Timeout)
+                        # with exponential backoff
+                        if attempt == self.MAX_RETRIES:
+                            raise APIUnavailableError(
+                                f"OSRS API unavailable after {self.MAX_RETRIES + 1} attempts "
+                                f"(status: {response.status})"
+                            )
+
+                        # Calculate exponential backoff delay
+                        backoff_delay = min(
+                            self.INITIAL_BACKOFF
+                            * (self.BACKOFF_MULTIPLIER**attempt),
+                            self.MAX_BACKOFF,
                         )
+
+                        logger.warning(
+                            f"OSRS API returned {response.status} for {username} "
+                            f"(attempt {attempt + 1}/{self.MAX_RETRIES + 1}). "
+                            f"Retrying in {backoff_delay:.2f} seconds"
+                        )
+
+                        await asyncio.sleep(backoff_delay)
+                        continue  # Retry the request
 
                     else:
                         raise OSRSAPIError(

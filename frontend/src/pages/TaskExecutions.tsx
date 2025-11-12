@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
 import { Modal } from '../components/Modal';
@@ -21,6 +21,7 @@ const STATUS_OPTIONS = ['success', 'failure', 'retry', 'pending', 'cancelled', '
 
 export const TaskExecutions: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Initialize filters from URL params
   const [executions, setExecutions] = useState<TaskExecutionResponse[]>([]);
@@ -35,7 +36,7 @@ export const TaskExecutions: React.FC = () => {
   const [scheduleIdFilter, setScheduleIdFilter] = useState<string>(searchParams.get('schedule_id') || '');
   const [playerIdFilter, setPlayerIdFilter] = useState<string>(searchParams.get('player_id') || '');
 
-  // Modal state
+  // Modal state (for errors only)
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
@@ -93,78 +94,7 @@ export const TaskExecutions: React.FC = () => {
   };
 
   const handleViewDetails = (execution: TaskExecutionResponse) => {
-    const details = (
-      <div className="space-y-4 text-left">
-        <div>
-          <h4 className="font-semibold mb-2">Task Information</h4>
-          <div className="space-y-1 text-sm">
-            <p><span className="font-medium">Task Name:</span> {execution.task_name}</p>
-            <p><span className="font-medium">Status:</span> <span style={{ color: STATUS_COLORS[execution.status] || '#fff' }}>{execution.status}</span></p>
-            <p><span className="font-medium">Retry Count:</span> {execution.retry_count}</p>
-            {execution.schedule_id && <p><span className="font-medium">Schedule ID:</span> {execution.schedule_id}</p>}
-            {execution.schedule_type && <p><span className="font-medium">Schedule Type:</span> {execution.schedule_type}</p>}
-            {execution.player_id && <p><span className="font-medium">Player ID:</span> {execution.player_id}</p>}
-          </div>
-        </div>
-        {execution.task_args && (
-          <div>
-            <h4 className="font-semibold mb-2">Task Arguments</h4>
-            <pre className="text-xs bg-black p-2 rounded overflow-auto max-h-40">
-              {JSON.stringify(execution.task_args, null, 2)}
-            </pre>
-          </div>
-        )}
-        <div>
-          <h4 className="font-semibold mb-2">Timing</h4>
-          <div className="space-y-1 text-sm">
-            <p><span className="font-medium">Started:</span> {format(new Date(execution.started_at), 'MMM d, yyyy HH:mm:ss')}</p>
-            {execution.completed_at && (
-              <p><span className="font-medium">Completed:</span> {format(new Date(execution.completed_at), 'MMM d, yyyy HH:mm:ss')}</p>
-            )}
-            {execution.duration_seconds !== null && execution.duration_seconds !== undefined && (
-              <p><span className="font-medium">Duration:</span> {execution.duration_seconds.toFixed(3)}s</p>
-            )}
-            <p><span className="font-medium">Created:</span> {format(new Date(execution.created_at), 'MMM d, yyyy HH:mm:ss')}</p>
-          </div>
-        </div>
-        {execution.error_type && (
-          <div>
-            <h4 className="font-semibold mb-2" style={{ color: '#d32f2f' }}>Error Information</h4>
-            <div className="space-y-1 text-sm">
-              <p><span className="font-medium">Error Type:</span> {execution.error_type}</p>
-              {execution.error_message && (
-                <p><span className="font-medium">Error Message:</span> {execution.error_message}</p>
-              )}
-              {execution.error_traceback && (
-                <div>
-                  <p className="font-medium mb-1">Traceback:</p>
-                  <pre className="text-xs bg-black p-2 rounded overflow-auto max-h-60">
-                    {execution.error_traceback}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        {execution.result_data && (
-          <div>
-            <h4 className="font-semibold mb-2">Result Data</h4>
-            <pre className="text-xs bg-black p-2 rounded overflow-auto max-h-60">
-              {JSON.stringify(execution.result_data, null, 2)}
-            </pre>
-          </div>
-        )}
-        {execution.execution_metadata && (
-          <div>
-            <h4 className="font-semibold mb-2">Execution Metadata</h4>
-            <pre className="text-xs bg-black p-2 rounded overflow-auto max-h-40">
-              {JSON.stringify(execution.execution_metadata, null, 2)}
-            </pre>
-          </div>
-        )}
-      </div>
-    );
-    showModal('Task Execution Details', details, 'info');
+    navigate(`/task-executions/${execution.id}`);
   };
 
   const handleResetFilters = () => {

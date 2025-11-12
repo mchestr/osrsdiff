@@ -7,6 +7,7 @@ import { Home } from './pages/Home';
 import { PlayerStats } from './pages/PlayerStats';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { TaskExecutions } from './pages/TaskExecutions';
+import { TaskExecutionDetail } from './pages/TaskExecutionDetail';
 
 const AppRoutes = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -63,6 +64,16 @@ const AppRoutes = () => {
           <ProtectedRoute requireAdmin>
             <Layout>
               <TaskExecutions />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/task-executions/:id"
+        element={
+          <ProtectedRoute requireAdmin>
+            <Layout>
+              <TaskExecutionDetail />
             </Layout>
           </ProtectedRoute>
         }

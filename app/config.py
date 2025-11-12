@@ -135,7 +135,8 @@ class TaskIQSettings(BaseModel):
         default=3, description="Default number of task retries"
     )
     default_retry_delay: float = Field(
-        default=2.0, description="Default retry delay in seconds"
+        default=10.0,
+        description="Default retry delay in seconds (base for exponential backoff)",
     )
     max_retry_delay: float = Field(
         default=60.0, description="Maximum retry delay in seconds"
