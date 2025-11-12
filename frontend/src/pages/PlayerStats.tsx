@@ -419,6 +419,7 @@ export const PlayerStats: React.FC = () => {
         progressMonth={progressMonth}
         skillIcons={SKILL_ICONS}
         orderedSkills={orderedSkills}
+        onSkillClick={handleSkillClick}
       />
 
       {/* Boss Progress Summary */}
@@ -909,6 +910,7 @@ interface SkillsSummaryTableProps {
   progressMonth: ProgressAnalysisResponse | null;
   skillIcons: Record<string, string>;
   orderedSkills: Array<{ name: string; displayName: string; level: number; experience: number; maxLevel: number }>;
+  onSkillClick: (skillName: string) => void;
 }
 
 const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
@@ -917,6 +919,7 @@ const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
   progressMonth,
   skillIcons,
   orderedSkills,
+  onSkillClick,
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<number>(7);
 
@@ -982,7 +985,11 @@ const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
                     style={{ borderBottom: '1px solid #8b7355', backgroundColor: progress.experience > 0 ? 'rgba(255, 215, 0, 0.05)' : 'transparent' }}
                   >
                     <td className="py-2 px-3">
-                      <div className="flex items-center gap-2">
+                      <div
+                        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => onSkillClick(skill.name)}
+                        title={`Click to view ${skill.displayName} details`}
+                      >
                         {iconUrl && iconUrl !== '⚓' ? (
                           <img
                             src={iconUrl}
@@ -1071,6 +1078,19 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
     level: entry.level ?? 0,
     experience: entry.experience ?? 0,
   }));
+
+  // Calculate y-axis domain for experience based on first record to avoid flat line appearance
+  const experienceValues = timelineData.map((d) => d.experience).filter((v) => v > 0);
+  const minExperience = experienceValues.length > 0 ? Math.min(...experienceValues) : 0;
+  const maxExperience = experienceValues.length > 0 ? Math.max(...experienceValues) : 0;
+  const range = maxExperience - minExperience;
+  // Add 5% padding below min and above max, but ensure min doesn't go below 0
+  // If range is 0 or very small, use a minimum padding of 1% of the value
+  const padding = range > 0 ? range * 0.05 : Math.max(minExperience * 0.01, 1000);
+  const experienceYAxisDomain = [
+    Math.max(0, minExperience - padding),
+    maxExperience + padding,
+  ];
 
   return (
     <div className="p-6">
@@ -1191,6 +1211,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
                 />
                 <YAxis
                   yAxisId="exp"
+                  domain={experienceYAxisDomain}
                   tick={{ fontSize: 14, fill: '#ffd700', fontWeight: 500 }}
                   stroke="#8b7355"
                   label={{
