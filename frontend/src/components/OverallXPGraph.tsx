@@ -68,6 +68,19 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
   const currentXP = progress.timeline[progress.timeline.length - 1]?.experience ?? 0;
   const xpGained = progress.progress.experience_gained ?? 0;
 
+  // Calculate y-axis domain based on first record to avoid flat line appearance
+  const experienceValues = timelineData.map((d) => d.experience).filter((v) => v > 0);
+  const minExperience = experienceValues.length > 0 ? Math.min(...experienceValues) : 0;
+  const maxExperience = experienceValues.length > 0 ? Math.max(...experienceValues) : 0;
+  const range = maxExperience - minExperience;
+  // Add 5% padding below min and above max, but ensure min doesn't go below 0
+  // If range is 0 or very small, use a minimum padding of 1% of the value
+  const padding = range > 0 ? range * 0.05 : Math.max(minExperience * 0.01, 1000);
+  const yAxisDomain = [
+    Math.max(0, minExperience - padding),
+    maxExperience + padding,
+  ];
+
   return (
     <div className="osrs-card" style={{ padding: '16px' }}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
@@ -107,6 +120,7 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
               stroke="#8b7355"
             />
             <YAxis
+              domain={yAxisDomain}
               tick={{ fontSize: 11, fill: '#ffd700', fontWeight: 500 }}
               stroke="#8b7355"
               tickFormatter={(value) => {
