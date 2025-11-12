@@ -54,8 +54,8 @@ def create_test_hiscore_record(
             "magic": {"rank": 100, "level": 99, "experience": 13034431},
         },
         bosses_data={
-            "zulrah": {"rank": 1000, "kill_count": 500},
-            "vorkath": {"rank": 2000, "kill_count": 200},
+            "zulrah": {"rank": 1000, "kc": 500},
+            "vorkath": {"rank": 2000, "kc": 200},
         },
     )
     record.player = player
@@ -128,8 +128,8 @@ class TestStatisticsEndpoints:
                 "defence": {"rank": 600, "level": 90, "experience": 5346332},
             },
             "bosses": {
-                "zulrah": {"rank": 1000, "kill_count": 500},
-                "vorkath": {"rank": 2000, "kill_count": 200},
+                "zulrah": {"rank": 1000, "kc": 500},
+                "vorkath": {"rank": 2000, "kc": 200},
             },
             "metadata": {
                 "total_skills": 7,

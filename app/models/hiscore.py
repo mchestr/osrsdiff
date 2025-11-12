@@ -70,7 +70,7 @@ class HiscoreRecord(Base):
         JSON,
         nullable=False,
         default=dict,
-        doc="Boss kill counts data: {boss_name: {rank: int, kill_count: int}}",
+        doc="Boss kill counts data: {boss_name: {rank: int, kc: int}}",
     )
 
     # Relationships
@@ -126,7 +126,7 @@ class HiscoreRecord(Base):
             boss_name: Name of the boss (e.g., 'abyssal_sire', 'zulrah')
 
         Returns:
-            Dict with rank and kill_count, or None if boss not found
+            Dict with rank and kc, or None if boss not found
         """
         return self.bosses_data.get(boss_name.lower())
 
@@ -149,7 +149,9 @@ class HiscoreRecord(Base):
     def get_boss_kills(self, boss_name: str) -> Optional[int]:
         """Get the kill count for a specific boss."""
         boss_data = self.get_boss_data(boss_name)
-        return boss_data.get("kill_count") if boss_data else None
+        if not boss_data:
+            return None
+        return boss_data.get("kc")
 
     @property
     def total_skills(self) -> int:

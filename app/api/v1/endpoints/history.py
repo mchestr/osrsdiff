@@ -131,9 +131,7 @@ class BossTimelineEntry(BaseModel):
     """Response model for boss timeline entry."""
 
     date: str = Field(description="Date of the record (ISO format)")
-    kill_count: Optional[int] = Field(
-        None, description="Boss kill count at this date"
-    )
+    kc: Optional[int] = Field(None, description="Boss kill count at this date")
 
 
 class BossProgressDataResponse(BaseModel):

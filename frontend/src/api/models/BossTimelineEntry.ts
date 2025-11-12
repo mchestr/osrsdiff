@@ -1,7 +1,7 @@
 /* generated using openapi-typescript-codegen -- do no edit */
 /* istanbul ignore file */
 /* tslint:disable */
- 
+
 
 /**
  * Response model for boss timeline entry.
@@ -14,6 +14,6 @@ export type BossTimelineEntry = {
     /**
      * Boss kill count at this date
      */
-    kill_count?: (number | null);
+    kc?: (number | null);
 };
 

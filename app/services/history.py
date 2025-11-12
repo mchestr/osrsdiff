@@ -91,8 +91,10 @@ class ProgressAnalysis:
         end_bosses = self.end_record.bosses_data or {}
 
         for boss_name in end_bosses.keys():
-            start_kc = start_bosses.get(boss_name, {}).get("kill_count", 0)
-            end_kc = end_bosses.get(boss_name, {}).get("kill_count", 0)
+            start_boss_data = start_bosses.get(boss_name, {})
+            end_boss_data = end_bosses.get(boss_name, {})
+            start_kc = start_boss_data.get("kc") or 0
+            end_kc = end_boss_data.get("kc") or 0
             gains[boss_name] = max(0, end_kc - start_kc)
 
         return gains
@@ -276,7 +278,7 @@ class BossProgress:
             "timeline": [
                 {
                     "date": record.fetched_at.isoformat(),
-                    "kill_count": record.get_boss_kills(self.boss_name),
+                    "kc": record.get_boss_kills(self.boss_name),
                 }
                 for record in self.records
             ],

@@ -60,8 +60,8 @@ class TestStatisticsService:
                 "magic": {"rank": 100, "level": 99, "experience": 13034431},
             },
             bosses_data={
-                "zulrah": {"rank": 1000, "kill_count": 500},
-                "vorkath": {"rank": 2000, "kill_count": 200},
+                "zulrah": {"rank": 1000, "kc": 500},
+                "vorkath": {"rank": 2000, "kc": 200},
             },
         )
 
@@ -85,8 +85,8 @@ class TestStatisticsService:
                 "magic": {"rank": 100, "level": 99, "experience": 13034431},
             },
             bosses_data={
-                "zulrah": {"rank": 980, "kill_count": 520},
-                "vorkath": {"rank": 1950, "kill_count": 210},
+                "zulrah": {"rank": 980, "kc": 520},
+                "vorkath": {"rank": 1950, "kc": 210},
             },
         )
 
@@ -228,7 +228,7 @@ class TestStatisticsService:
 
         # Check bosses data
         assert "zulrah" in result["bosses"]
-        assert result["bosses"]["zulrah"]["kill_count"] == 520
+        assert result["bosses"]["zulrah"]["kc"] == 520
 
         # Check metadata
         metadata = result["metadata"]

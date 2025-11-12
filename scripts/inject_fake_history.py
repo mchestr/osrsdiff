@@ -161,13 +161,13 @@ def generate_initial_bosses() -> Dict[str, Dict[str, int]]:
     for boss in selected_bosses:
         # Some bosses have more kills than others
         if boss in ["zulrah", "vorkath", "barrows_chests"]:
-            kill_count = random.randint(50, 500)
+            kc = random.randint(50, 500)
         else:
-            kill_count = random.randint(0, 100)
+            kc = random.randint(0, 100)
 
         bosses[boss] = {
             "rank": base_rank + random.randint(-5000, 5000),
-            "kill_count": kill_count,
+            "kc": kc,
         }
 
     return bosses
@@ -217,7 +217,7 @@ def progress_bosses(bosses: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, in
     base_rank = random.randint(10000, 100000)
 
     for boss, data in bosses.items():
-        current_kc = data["kill_count"]
+        current_kc = data["kc"]
 
         # Some bosses get more kills per day
         if boss in ["zulrah", "vorkath"]:
@@ -232,7 +232,7 @@ def progress_bosses(bosses: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, in
 
         new_bosses[boss] = {
             "rank": base_rank + random.randint(-5000, 5000),
-            "kill_count": new_kc,
+            "kc": new_kc,
         }
 
     return new_bosses

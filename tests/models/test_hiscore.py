@@ -38,8 +38,8 @@ class TestHiscoreRecordModel:
         }
 
         bosses_data = {
-            "zulrah": {"rank": 1000, "kill_count": 500},
-            "vorkath": {"rank": 2000, "kill_count": 200},
+            "zulrah": {"rank": 1000, "kc": 500},
+            "vorkath": {"rank": 2000, "kc": 200},
         }
 
         record = HiscoreRecord(
@@ -90,19 +90,19 @@ class TestHiscoreRecordModel:
     def test_get_boss_data(self):
         """Test getting boss data by name."""
         bosses_data = {
-            "zulrah": {"rank": 1000, "kill_count": 500},
-            "vorkath": {"rank": 2000, "kill_count": 200},
+            "zulrah": {"rank": 1000, "kc": 500},
+            "vorkath": {"rank": 2000, "kc": 200},
         }
 
         record = HiscoreRecord(player_id=1, bosses_data=bosses_data)
 
         # Test existing boss
         zulrah_data = record.get_boss_data("zulrah")
-        assert zulrah_data == {"rank": 1000, "kill_count": 500}
+        assert zulrah_data == {"rank": 1000, "kc": 500}
 
         # Test case insensitive
         zulrah_data_upper = record.get_boss_data("ZULRAH")
-        assert zulrah_data_upper == {"rank": 1000, "kill_count": 500}
+        assert zulrah_data_upper == {"rank": 1000, "kc": 500}
 
         # Test non-existing boss
         missing_data = record.get_boss_data("bandos")
@@ -137,8 +137,8 @@ class TestHiscoreRecordModel:
     def test_get_boss_kills(self):
         """Test getting boss kill count by name."""
         bosses_data = {
-            "zulrah": {"rank": 1000, "kill_count": 500},
-            "vorkath": {"rank": 2000, "kill_count": 200},
+            "zulrah": {"rank": 1000, "kc": 500},
+            "vorkath": {"rank": 2000, "kc": 200},
         }
 
         record = HiscoreRecord(player_id=1, bosses_data=bosses_data)
@@ -146,6 +146,30 @@ class TestHiscoreRecordModel:
         assert record.get_boss_kills("zulrah") == 500
         assert record.get_boss_kills("vorkath") == 200
         assert record.get_boss_kills("bandos") is None
+
+    def test_get_boss_kills_with_kc_field(self):
+        """Test getting boss kill count using 'kc' field (OSRS API format)."""
+        bosses_data = {
+            "zulrah": {"rank": 1000, "kc": 500},
+            "vorkath": {"rank": 2000, "kc": 200},
+        }
+
+        record = HiscoreRecord(player_id=1, bosses_data=bosses_data)
+
+        assert record.get_boss_kills("zulrah") == 500
+        assert record.get_boss_kills("vorkath") == 200
+        assert record.get_boss_kills("bandos") is None
+
+    def test_get_boss_kills_handles_zero_kc(self):
+        """Test that kc of 0 is handled correctly."""
+        bosses_data = {
+            "zulrah": {"rank": 1000, "kc": 0},
+        }
+
+        record = HiscoreRecord(player_id=1, bosses_data=bosses_data)
+
+        # Should return 0
+        assert record.get_boss_kills("zulrah") == 0
 
     def test_total_skills_property(self):
         """Test total_skills property."""
@@ -161,8 +185,8 @@ class TestHiscoreRecordModel:
     def test_total_bosses_property(self):
         """Test total_bosses property."""
         bosses_data = {
-            "zulrah": {"rank": 1000, "kill_count": 500},
-            "vorkath": {"rank": 2000, "kill_count": 200},
+            "zulrah": {"rank": 1000, "kc": 500},
+            "vorkath": {"rank": 2000, "kc": 200},
         }
 
         record = HiscoreRecord(player_id=1, bosses_data=bosses_data)
@@ -284,8 +308,8 @@ class TestHiscoreRecordDatabaseOperations:
                 "defence": {"rank": 600, "level": 90, "experience": 5346332},
             },
             bosses_data={
-                "zulrah": {"rank": 1000, "kill_count": 500},
-                "vorkath": {"rank": 2000, "kill_count": 200},
+                "zulrah": {"rank": 1000, "kc": 500},
+                "vorkath": {"rank": 2000, "kc": 200},
             },
         )
         test_session.add(record)
@@ -397,10 +421,10 @@ class TestHiscoreRecordDatabaseOperations:
         }
 
         complex_bosses_data = {
-            "zulrah": {"rank": 1000, "kill_count": 500},
-            "vorkath": {"rank": 2000, "kill_count": 200},
-            "bandos": {"rank": 3000, "kill_count": 100},
-            "armadyl": {"rank": 4000, "kill_count": 50},
+            "zulrah": {"rank": 1000, "kc": 500},
+            "vorkath": {"rank": 2000, "kc": 200},
+            "bandos": {"rank": 3000, "kc": 100},
+            "armadyl": {"rank": 4000, "kc": 50},
         }
 
         record = HiscoreRecord(

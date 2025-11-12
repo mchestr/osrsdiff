@@ -93,11 +93,11 @@ class TestHistoryService:
                 bosses_data={
                     "zulrah": {
                         "rank": 1000 - (i * 5),
-                        "kill_count": zulrah_kc,
+                        "kc": zulrah_kc,
                     },
                     "vorkath": {
                         "rank": 2000 - (i * 3),
-                        "kill_count": vorkath_kc,
+                        "kc": vorkath_kc,
                     },
                 },
             )
@@ -152,6 +152,48 @@ class TestHistoryService:
         daily_boss = result.daily_boss_rates
         assert daily_boss["zulrah"] == 10.0
         assert daily_boss["vorkath"] == 5.0
+
+    @pytest.mark.asyncio
+    async def test_get_progress_between_dates_with_kc_field(
+        self, history_service, test_session: AsyncSession
+    ):
+        """Test boss kills gained calculation with 'kc' field (OSRS API format)."""
+        # Create a test player
+        player = Player(username="kcTestPlayer")
+        test_session.add(player)
+        await test_session.commit()
+        await test_session.refresh(player)
+
+        # Create records with 'kc' field
+        base_date = datetime.now(timezone.utc) - timedelta(days=2)
+        records = []
+        for i in range(3):
+            record = HiscoreRecord(
+                player_id=player.id,
+                fetched_at=base_date + timedelta(days=i),
+                bosses_data={
+                    "zulrah": {
+                        "rank": 1000 - (i * 5),
+                        "kc": 500 + (i * 10),  # Using 'kc' field
+                    },
+                },
+            )
+            records.append(record)
+
+        test_session.add_all(records)
+        await test_session.commit()
+
+        # Calculate progress
+        start_date = base_date
+        end_date = base_date + timedelta(days=2, hours=1)
+
+        result = await history_service.get_progress_between_dates(
+            "kcTestPlayer", start_date, end_date
+        )
+
+        # Verify boss kills gained works with 'kc' field
+        boss_gains = result.boss_kills_gained
+        assert boss_gains["zulrah"] == 20  # 520 - 500 = 20
 
     @pytest.mark.asyncio
     async def test_get_progress_between_dates_player_not_found(
@@ -406,7 +448,7 @@ class TestHistoryService:
         timeline = data["timeline"]
         assert len(timeline) == 5
         assert all("date" in entry for entry in timeline)
-        assert all("kill_count" in entry for entry in timeline)
+        assert all("kc" in entry for entry in timeline)
 
     @pytest.mark.asyncio
     async def test_username_normalization(
@@ -555,12 +597,12 @@ class TestHistoryService:
         record1 = HiscoreRecord(
             player_id=player.id,
             fetched_at=base_date,
-            bosses_data={"zulrah": {"rank": 1000, "kill_count": 500}},
+            bosses_data={"zulrah": {"rank": 1000, "kc": 500}},
         )
         record2 = HiscoreRecord(
             player_id=player.id,
             fetched_at=base_date + timedelta(days=1),
-            bosses_data={"zulrah": {"rank": 1000, "kill_count": 500}},
+            bosses_data={"zulrah": {"rank": 1000, "kc": 500}},
         )
 
         test_session.add_all([record1, record2])
@@ -693,7 +735,7 @@ class TestHistoryService:
                 bosses_data={
                     "zulrah": {
                         "rank": 1000 - i,
-                        "kill_count": 500 + (i * 10),
+                        "kc": 500 + (i * 10),
                     }
                 },
             )
@@ -758,7 +800,7 @@ class TestHistoryService:
         record = HiscoreRecord(
             player_id=player.id,
             fetched_at=datetime.now(timezone.utc) - timedelta(days=1),
-            bosses_data={"zulrah": {"rank": 1000, "kill_count": 500}},
+            bosses_data={"zulrah": {"rank": 1000, "kc": 500}},
         )
         test_session.add(record)
         await test_session.commit()

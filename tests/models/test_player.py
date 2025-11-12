@@ -171,7 +171,7 @@ class TestPlayerDatabaseOperations:
             skills_data={
                 "attack": {"rank": 500, "level": 99, "experience": 13034431}
             },
-            bosses_data={"zulrah": {"rank": 1000, "kill_count": 500}},
+            bosses_data={"zulrah": {"rank": 1000, "kc": 500}},
         )
         record2 = HiscoreRecord(
             player_id=player.id,
@@ -180,7 +180,7 @@ class TestPlayerDatabaseOperations:
             skills_data={
                 "attack": {"rank": 400, "level": 99, "experience": 13034431}
             },
-            bosses_data={"zulrah": {"rank": 900, "kill_count": 550}},
+            bosses_data={"zulrah": {"rank": 900, "kc": 550}},
         )
 
         test_session.add_all([record1, record2])

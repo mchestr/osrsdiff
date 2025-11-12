@@ -87,8 +87,6 @@ interface SkillData {
 
 interface BossData {
   kc?: number | null;
-  kill_count?: number | null;
-  kills?: number | null;
   rank?: number | null;
 }
 
@@ -330,7 +328,7 @@ export const PlayerStats: React.FC = () => {
     .map((name) => {
       const bossData = stats.bosses?.[name] as BossData | undefined;
       if (!bossData || typeof bossData !== 'object') return null;
-      const kills = bossData.kc ?? bossData.kill_count ?? bossData.kills ?? 0;
+      const kills = bossData.kc ?? 0;
       return {
         name,
         displayName: name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
@@ -1310,13 +1308,13 @@ const BossDetailModal: React.FC<BossDetailModalProps> = ({
   bossProgress,
   onClose,
 }) => {
-  const currentKills = bossData?.kc ?? bossData?.kill_count ?? bossData?.kills ?? 0;
+  const currentKills = bossData?.kc ?? 0;
   const dailyRate = bossProgress.progress.daily_kill_rate;
 
   // Prepare timeline data for chart
   const timelineData = bossProgress.timeline.map((entry) => ({
     date: format(new Date(entry.date), 'MMM d'),
-    kill_count: entry.kill_count ?? 0,
+    kc: entry.kc ?? 0,
   }));
 
   return (
@@ -1448,7 +1446,7 @@ const BossDetailModal: React.FC<BossDetailModalProps> = ({
                 />
                 <Line
                   type="monotone"
-                  dataKey="kill_count"
+                  dataKey="kc"
                   stroke="#ffd700"
                   strokeWidth={2.5}
                   name="Kill Count"
