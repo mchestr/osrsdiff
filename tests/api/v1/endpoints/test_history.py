@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from starlette import status
 
-from app.api.auth import require_auth
 from app.api.v1.endpoints.history import get_history_service, router
 from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
@@ -93,13 +92,13 @@ def app():
 
 
 @pytest.fixture
-def client(app, mock_history_service, mock_auth_user):
+def client(app, mock_history_service):
     """Create test client with dependency overrides."""
     # Override dependencies
     app.dependency_overrides[get_history_service] = (
         lambda: mock_history_service
     )
-    app.dependency_overrides[require_auth] = lambda: mock_auth_user
+    # Note: require_auth is no longer needed for history endpoints
 
     return TestClient(app)
 
@@ -134,7 +133,6 @@ class TestHistoryEndpoints:
             "/players/test_player/history"
             "?start_date=2024-01-01T00:00:00Z"
             "&end_date=2024-01-31T23:59:59Z",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -182,7 +180,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history?days=7",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -223,7 +220,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -242,7 +238,6 @@ class TestHistoryEndpoints:
         """Test handling of invalid date format."""
         response = client.get(
             "/players/test_player/history?start_date=invalid-date",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 400
@@ -256,7 +251,6 @@ class TestHistoryEndpoints:
             "/players/test_player/history"
             "?start_date=2024-01-31T00:00:00Z"
             "&end_date=2024-01-01T00:00:00Z",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 400
@@ -272,7 +266,6 @@ class TestHistoryEndpoints:
             "/players/test_player/history"
             "?start_date=2023-01-01T00:00:00Z"
             "&end_date=2024-01-02T00:00:00Z",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 400
@@ -288,7 +281,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/nonexistent/history",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 404
@@ -302,7 +294,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 422
@@ -318,7 +309,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 500
@@ -347,7 +337,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history/skills/attack?days=7",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -382,7 +371,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history/skills/defence",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -398,7 +386,6 @@ class TestHistoryEndpoints:
         """Test skill progress with invalid days parameter."""
         response = client.get(
             "/players/test_player/history/skills/attack?days=0",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 422  # Validation error
@@ -409,7 +396,6 @@ class TestHistoryEndpoints:
         """Test skill progress with days parameter exceeding limit."""
         response = client.get(
             "/players/test_player/history/skills/attack?days=400",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 422  # Validation error
@@ -420,7 +406,6 @@ class TestHistoryEndpoints:
         """Test skill progress with empty skill name."""
         response = client.get(
             "/players/test_player/history/skills/ ",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 400
@@ -436,7 +421,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/nonexistent/history/skills/attack",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 404
@@ -468,7 +452,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history/skills/attack?days=7",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -500,7 +483,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history/bosses/zulrah?days=14",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -535,7 +517,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history/bosses/vorkath",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -551,7 +532,6 @@ class TestHistoryEndpoints:
         """Test boss progress with empty boss name."""
         response = client.get(
             "/players/test_player/history/bosses/ ",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 400
@@ -567,7 +547,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/nonexistent/history/bosses/zulrah",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 404
@@ -599,7 +578,6 @@ class TestHistoryEndpoints:
 
         response = client.get(
             "/players/test_player/history/bosses/zulrah?days=7",
-            headers={"Authorization": "Bearer fake_token"},
         )
 
         assert response.status_code == 200
@@ -608,41 +586,69 @@ class TestHistoryEndpoints:
         assert data["period_days"] == 2  # Reflects actual data available
         assert data["total_records"] == 2
 
-    def test_authentication_required_history(
+    def test_get_player_history_no_auth_required(
         self, client, mock_history_service
     ):
-        """Test that authentication is required for history endpoint."""
-        # Remove auth override to test without authentication
-        app = client.app
-        del app.dependency_overrides[require_auth]
+        """Test that authentication is not required for history endpoint."""
+        # Create test data
+        player = create_test_player(1, "test_player")
+        now = datetime.now(timezone.utc)
+        start_date = now - timedelta(days=30)
+        start_record = create_test_hiscore_record(1, player, start_date)
+        end_record = create_test_hiscore_record(2, player, now)
+        progress = ProgressAnalysis(
+            username="test_player",
+            start_date=start_date,
+            end_date=now,
+            start_record=start_record,
+            end_record=end_record,
+        )
+        mock_history_service.get_progress_between_dates.return_value = progress
 
+        # Should work without auth headers
         response = client.get("/players/test_player/history")
 
-        # Without auth, FastAPI should return 401 for missing dependency
-        assert response.status_code == 401
+        # Should succeed without authentication
+        assert response.status_code == 200
 
-    def test_authentication_required_skill_progress(
+    def test_get_skill_progress_no_auth_required(
         self, client, mock_history_service
     ):
-        """Test that authentication is required for skill progress endpoint."""
-        # Remove auth override to test without authentication
-        app = client.app
-        del app.dependency_overrides[require_auth]
+        """Test that authentication is not required for skill progress endpoint."""
+        # Create test data
+        player = create_test_player(1, "test_player")
+        records = [create_test_hiscore_record(1, player)]
+        skill_progress = SkillProgress(
+            username="test_player",
+            skill_name="attack",
+            records=records,
+            days=30,
+        )
+        mock_history_service.get_skill_progress.return_value = skill_progress
 
+        # Should work without auth headers
         response = client.get("/players/test_player/history/skills/attack")
 
-        # Without auth, FastAPI should return 401 for missing dependency
-        assert response.status_code == 401
+        # Should succeed without authentication
+        assert response.status_code == 200
 
-    def test_authentication_required_boss_progress(
+    def test_get_boss_progress_no_auth_required(
         self, client, mock_history_service
     ):
-        """Test that authentication is required for boss progress endpoint."""
-        # Remove auth override to test without authentication
-        app = client.app
-        del app.dependency_overrides[require_auth]
+        """Test that authentication is not required for boss progress endpoint."""
+        # Create test data
+        player = create_test_player(1, "test_player")
+        records = [create_test_hiscore_record(1, player)]
+        boss_progress = BossProgress(
+            username="test_player",
+            boss_name="zulrah",
+            records=records,
+            days=30,
+        )
+        mock_history_service.get_boss_progress.return_value = boss_progress
 
+        # Should work without auth headers
         response = client.get("/players/test_player/history/bosses/zulrah")
 
-        # Without auth, FastAPI should return 401 for missing dependency
-        assert response.status_code == 401
+        # Should succeed without authentication
+        assert response.status_code == 200

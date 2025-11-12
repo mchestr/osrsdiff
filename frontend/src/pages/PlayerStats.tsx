@@ -8,7 +8,9 @@ import type { PlayerMetadataResponse } from '../api/models/PlayerMetadataRespons
 import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
+import { OverallXPGraph } from '../components/OverallXPGraph';
 import { SkillsGrid } from '../components/SkillsGrid';
+import { useAuth } from '../contexts/AuthContext';
 
 // Import local skill icons
 import agilityIcon from '../assets/images/skill-icons/agility-icon.png';
@@ -155,6 +157,7 @@ const formatDuration = (days: number): string => {
 
 export const PlayerStats: React.FC = () => {
   const { username } = useParams<{ username: string }>();
+  const { isAuthenticated } = useAuth();
   const [stats, setStats] = useState<PlayerStatsResponse | null>(null);
   const [progressDay, setProgressDay] = useState<ProgressAnalysisResponse | null>(null);
   const [progressWeek, setProgressWeek] = useState<ProgressAnalysisResponse | null>(null);
@@ -360,15 +363,24 @@ export const PlayerStats: React.FC = () => {
           >
             OSRS
           </a>
-          <button
-            onClick={handleTriggerFetch}
-            disabled={fetching}
-            className="osrs-btn text-xs px-2 py-1"
-          >
-            {fetching ? '...' : 'Fetch'}
-          </button>
+          {isAuthenticated && (
+            <button
+              onClick={handleTriggerFetch}
+              disabled={fetching}
+              className="osrs-btn text-xs px-2 py-1"
+            >
+              {fetching ? '...' : 'Fetch'}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Overall XP Graph - Full Width */}
+      {username && (
+        <div className="mb-1.5">
+          <OverallXPGraph username={username} />
+        </div>
+      )}
 
       {/* Main Stats Grid - Compact */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-1.5">
@@ -382,45 +394,8 @@ export const PlayerStats: React.FC = () => {
           />
         </div>
 
-        {/* Overview Stats - Compact */}
-        <div className="lg:col-span-2">
-          <div className="osrs-card h-full" style={{ padding: '12px' }}>
-            <h3 className="osrs-card-title text-sm mb-1.5" style={{ marginBottom: '8px' }}>Overview</h3>
-            <div className="space-y-1.5">
-              {stats.overall && (
-                <div className="flex justify-between items-center">
-                  <span className="osrs-stat-label text-xs">Total Level</span>
-                  <span className="osrs-stat-value text-lg">{stats.overall.level ?? 'N/A'}</span>
-                </div>
-              )}
-              {stats.overall && (
-                <div className="flex justify-between items-center">
-                  <span className="osrs-stat-label text-xs">Total XP</span>
-                  <span className="osrs-text text-sm font-semibold">
-                    {stats.overall.experience ? (stats.overall.experience / 1000000).toFixed(2) + 'M' : 'N/A'}
-                  </span>
-                </div>
-              )}
-              {stats.combat_level && (
-                <div className="flex justify-between items-center">
-                  <span className="osrs-stat-label text-xs">Combat</span>
-                  <span className="osrs-stat-value text-lg">{stats.combat_level}</span>
-                </div>
-              )}
-              {stats.overall?.rank && (
-                <div className="flex justify-between items-center">
-                  <span className="osrs-stat-label text-xs">Rank</span>
-                  <span className="osrs-text text-sm font-semibold">
-                    {stats.overall.rank.toLocaleString()}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Top 10 Skills Progress */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-4">
           <TopProgressHighlights
             progressWeek={progressWeek}
             skillIcons={SKILL_ICONS}
@@ -428,7 +403,7 @@ export const PlayerStats: React.FC = () => {
         </div>
 
         {/* Top 10 Bosses Progress */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-4">
           <TopBossProgressHighlights
             progressWeek={progressWeek}
             orderedBosses={orderedBosses}

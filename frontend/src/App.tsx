@@ -31,21 +31,17 @@ const AppRoutes = () => {
       <Route
         path="/"
         element={
-          <ProtectedRoute>
-            <Layout>
-              <Home />
-            </Layout>
-          </ProtectedRoute>
+          <Layout>
+            <Home />
+          </Layout>
         }
       />
       <Route
         path="/players/:username"
         element={
-          <ProtectedRoute>
-            <Layout>
-              <PlayerStats />
-            </Layout>
-          </ProtectedRoute>
+          <Layout>
+            <PlayerStats />
+          </Layout>
         }
       />
       <Route

@@ -8,7 +8,6 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
-from app.api.auth import require_auth
 from app.api.v1.endpoints.statistics import get_statistics_service, router
 from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
@@ -93,13 +92,13 @@ def app():
 
 
 @pytest.fixture
-def client(app, mock_statistics_service, mock_auth_user):
+def client(app, mock_statistics_service):
     """Create test client with dependency overrides."""
     # Override dependencies
     app.dependency_overrides[get_statistics_service] = (
         lambda: mock_statistics_service
     )
-    app.dependency_overrides[require_auth] = lambda: mock_auth_user
+    # Note: require_auth is no longer needed for stats endpoint
 
     return TestClient(app)
 
@@ -139,10 +138,7 @@ class TestStatisticsEndpoints:
             },
         }
 
-        response = client.get(
-            "/players/test_player/stats",
-            headers={"Authorization": "Bearer fake_token"},
-        )
+        response = client.get("/players/test_player/stats")
 
         assert response.status_code == 200
         data = response.json()
@@ -172,10 +168,7 @@ class TestStatisticsEndpoints:
         # Mock service to return None (no data)
         mock_statistics_service.get_current_stats.return_value = None
 
-        response = client.get(
-            "/players/test_player/stats",
-            headers={"Authorization": "Bearer fake_token"},
-        )
+        response = client.get("/players/test_player/stats")
 
         assert response.status_code == 200
         data = response.json()
@@ -215,23 +208,31 @@ class TestStatisticsEndpoints:
             StatisticsServiceError("Database connection failed")
         )
 
-        response = client.get(
-            "/players/test_player/stats",
-            headers={"Authorization": "Bearer fake_token"},
-        )
+        response = client.get("/players/test_player/stats")
 
         assert response.status_code == 500
         assert "Statistics service error" in response.json()["detail"]
 
-    def test_authentication_required_single_player(
+    def test_get_player_stats_no_auth_required(
         self, client, mock_statistics_service
     ):
-        """Test that authentication is required for single player stats endpoint."""
-        # Remove auth override to test without authentication
-        app = client.app
-        del app.dependency_overrides[require_auth]
+        """Test that authentication is not required for single player stats endpoint."""
+        # Mock service responses
+        player = create_test_player(1, "test_player")
+        record = create_test_hiscore_record(1, player)
+        mock_statistics_service.get_current_stats.return_value = record
+        mock_statistics_service.format_stats_response.return_value = {
+            "username": "test_player",
+            "fetched_at": record.fetched_at.isoformat(),
+            "overall": {"rank": 1000, "level": 1500, "experience": 50000000},
+            "combat_level": 133,
+            "skills": {},
+            "bosses": {},
+            "metadata": {"total_skills": 0, "total_bosses": 0, "record_id": 1},
+        }
 
+        # Should work without auth headers
         response = client.get("/players/test_player/stats")
 
-        # Without auth, FastAPI should return 401 for missing dependency
-        assert response.status_code == 401
+        # Should succeed without authentication
+        assert response.status_code == 200

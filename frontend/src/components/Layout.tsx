@@ -6,7 +6,7 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { logout, isAdmin } = useAuth();
+  const { logout, isAdmin, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -63,15 +63,26 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
             {/* User Section */}
             <div className="flex items-center space-x-3">
-              {isAdmin && (
-                <span className="osrs-nav-badge">Admin</span>
+              {isAuthenticated ? (
+                <>
+                  {isAdmin && (
+                    <span className="osrs-nav-badge">Admin</span>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="osrs-nav-logout"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  className="osrs-nav-link"
+                >
+                  Login
+                </Link>
               )}
-              <button
-                onClick={handleLogout}
-                className="osrs-nav-logout"
-              >
-                Logout
-              </button>
             </div>
           </div>
         </div>

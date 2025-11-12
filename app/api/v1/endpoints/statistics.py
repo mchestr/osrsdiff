@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_utils import require_auth
 from app.exceptions import (
     PlayerNotFoundError,
     StatisticsServiceError,
@@ -78,7 +77,6 @@ router = APIRouter(prefix="/players", tags=["statistics"])
 async def get_player_stats(
     username: str,
     statistics_service: StatisticsService = Depends(get_statistics_service),
-    current_user: Dict[str, Any] = Depends(require_auth),
 ) -> PlayerStatsResponse:
     """
     Get current statistics for a specific player.
@@ -90,7 +88,6 @@ async def get_player_stats(
     Args:
         username: OSRS player username
         statistics_service: Statistics service dependency
-        current_user: Authenticated user information
 
     Returns:
         PlayerStatsResponse: Current player statistics
@@ -100,9 +97,7 @@ async def get_player_stats(
         500 Internal Server Error: Service errors
     """
     try:
-        logger.debug(
-            f"User {current_user.get('username')} requesting stats for player: {username}"
-        )
+        logger.debug(f"Requesting stats for player: {username}")
 
         # Get current stats for the player
         record = await statistics_service.get_current_stats(username)

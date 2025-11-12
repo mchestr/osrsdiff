@@ -460,7 +460,6 @@ async def trigger_manual_fetch(
 async def get_player_metadata(
     username: str,
     db_session: AsyncSession = Depends(get_db_session),
-    current_user: Dict[str, Any] = Depends(require_auth),
 ) -> PlayerMetadataResponse:
     """
     Get detailed metadata and statistics for a specific player.
@@ -472,7 +471,6 @@ async def get_player_metadata(
     Args:
         username: OSRS player username
         db_session: Database session dependency
-        current_user: Authenticated user information
 
     Returns:
         PlayerMetadataResponse: Detailed player metadata and statistics
@@ -482,9 +480,7 @@ async def get_player_metadata(
         500 Internal Server Error: Database or calculation errors
     """
     try:
-        logger.info(
-            f"User {current_user.get('username')} requesting metadata for player: {username}"
-        )
+        logger.info(f"Requesting metadata for player: {username}")
 
         # Get player
         player_result = await db_session.execute(

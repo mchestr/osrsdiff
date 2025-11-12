@@ -504,10 +504,7 @@ class TestPlayerMetadata:
             lambda: mock_db_session
         )
 
-        response = client.get(
-            "/players/testuser/metadata",
-            headers={"Authorization": "Bearer fake_token"},
-        )
+        response = client.get("/players/testuser/metadata")
 
         assert response.status_code == 200
         data = response.json()
@@ -535,13 +532,73 @@ class TestPlayerMetadata:
             lambda: mock_db_session
         )
 
-        response = client.get(
-            "/players/nonexistent/metadata",
-            headers={"Authorization": "Bearer fake_token"},
-        )
+        response = client.get("/players/nonexistent/metadata")
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
+
+    def test_get_player_metadata_no_auth_required(
+        self, app, mock_player_service
+    ):
+        """Test that authentication is not required for metadata endpoint."""
+        from datetime import datetime
+
+        from app.models.base import get_db_session
+
+        # Create client without auth override
+        app.dependency_overrides[get_player_service] = (
+            lambda: mock_player_service
+        )
+        # Don't override require_auth for this test
+        client = TestClient(app)
+
+        # Create mock database session
+        mock_db_session = AsyncMock()
+
+        # Create test player
+        test_player = create_test_player(1, "testuser")
+
+        # Mock database queries in order
+        player_result = AsyncMock()
+        player_result.scalar_one_or_none = lambda: test_player
+
+        count_result = AsyncMock()
+        count_result.scalar = lambda: 50
+
+        first_result = AsyncMock()
+        first_result.scalar = lambda: datetime(2024, 1, 1, tzinfo=timezone.utc)
+
+        latest_result = AsyncMock()
+        latest_result.scalar = lambda: datetime(
+            2024, 11, 2, tzinfo=timezone.utc
+        )
+
+        records_24h_result = AsyncMock()
+        records_24h_result.scalar = lambda: 5
+
+        records_7d_result = AsyncMock()
+        records_7d_result.scalar = lambda: 25
+
+        mock_db_session.execute.side_effect = [
+            player_result,
+            count_result,
+            first_result,
+            latest_result,
+            records_24h_result,
+            records_7d_result,
+        ]
+
+        # Override the database dependency
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+
+        # Should work without auth headers
+        response = client.get("/players/testuser/metadata")
+
+        # Should succeed without authentication
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "testuser"
+        assert data["total_records"] == 50
 
 
 class TestPlayerActivation:

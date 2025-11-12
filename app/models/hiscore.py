@@ -96,17 +96,27 @@ class HiscoreRecord(Base):
             f"fetched_at={self.fetched_at}, overall_level={self.overall_level})>"
         )
 
-    def get_skill_data(self, skill_name: str) -> Optional[Dict[str, int]]:
+    def get_skill_data(
+        self, skill_name: str
+    ) -> Optional[Dict[str, Optional[int]]]:
         """
         Get data for a specific skill.
 
         Args:
-            skill_name: Name of the skill (e.g., 'attack', 'defence')
+            skill_name: Name of the skill (e.g., 'attack', 'defence', 'overall')
 
         Returns:
             Dict with rank, level, and experience, or None if skill not found
         """
-        return self.skills_data.get(skill_name.lower())
+        skill_name_lower = skill_name.lower()
+        # Handle "overall" as a special case since it's stored in separate columns
+        if skill_name_lower == "overall":
+            return {
+                "rank": self.overall_rank,
+                "level": self.overall_level,
+                "experience": self.overall_experience,
+            }
+        return self.skills_data.get(skill_name_lower)
 
     def get_boss_data(self, boss_name: str) -> Optional[Dict[str, int]]:
         """
@@ -122,11 +132,17 @@ class HiscoreRecord(Base):
 
     def get_skill_level(self, skill_name: str) -> Optional[int]:
         """Get the level for a specific skill."""
+        # Handle "overall" as a special case for performance
+        if skill_name.lower() == "overall":
+            return self.overall_level
         skill_data = self.get_skill_data(skill_name)
         return skill_data.get("level") if skill_data else None
 
     def get_skill_experience(self, skill_name: str) -> Optional[int]:
         """Get the experience for a specific skill."""
+        # Handle "overall" as a special case for performance
+        if skill_name.lower() == "overall":
+            return self.overall_experience
         skill_data = self.get_skill_data(skill_name)
         return skill_data.get("experience") if skill_data else None
 

@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_utils import require_auth
 from app.exceptions import (
     BadRequestError,
     HistoryServiceError,
@@ -184,7 +183,6 @@ async def get_player_history(
         le=365,
     ),
     history_service: HistoryService = Depends(get_history_service),
-    current_user: Dict[str, Any] = Depends(require_auth),
 ) -> ProgressAnalysisResponse:
     """
     Get historical progress analysis for a player.
@@ -198,7 +196,6 @@ async def get_player_history(
         end_date: End date for analysis (ISO format)
         days: Alternative to start_date - number of days to look back
         history_service: History service dependency
-        current_user: Authenticated user information
 
     Returns:
         ProgressAnalysisResponse: Progress analysis data (returns whatever data is available,
@@ -211,9 +208,7 @@ async def get_player_history(
         500 Internal Server Error: Service errors
     """
     try:
-        logger.debug(
-            f"User {current_user.get('username')} requesting history for player: {username}"
-        )
+        logger.debug(f"Requesting history for player: {username}")
 
         # Parse and validate dates
         now = datetime.now(timezone.utc)
@@ -295,7 +290,6 @@ async def get_skill_progress(
         30, description="Number of days to analyze", ge=1, le=365
     ),
     history_service: HistoryService = Depends(get_history_service),
-    current_user: Dict[str, Any] = Depends(require_auth),
 ) -> SkillProgressResponse:
     """
     Get progress analysis for a specific skill.
@@ -309,7 +303,6 @@ async def get_skill_progress(
         skill: Skill name (e.g., 'attack', 'defence', 'magic')
         days: Number of days to analyze (1-365)
         history_service: History service dependency
-        current_user: Authenticated user information
 
     Returns:
         SkillProgressResponse: Skill progress analysis data (returns whatever data is available,
@@ -322,8 +315,7 @@ async def get_skill_progress(
     """
     try:
         logger.debug(
-            f"User {current_user.get('username')} requesting {skill} progress "
-            f"for player: {username} over {days} days"
+            f"Requesting {skill} progress for player: {username} over {days} days"
         )
 
         # Validate skill name
@@ -380,7 +372,6 @@ async def get_boss_progress(
         30, description="Number of days to analyze", ge=1, le=365
     ),
     history_service: HistoryService = Depends(get_history_service),
-    current_user: Dict[str, Any] = Depends(require_auth),
 ) -> BossProgressResponse:
     """
     Get progress analysis for a specific boss.
@@ -393,7 +384,6 @@ async def get_boss_progress(
         boss: Boss name (e.g., 'zulrah', 'vorkath', 'chambers_of_xeric')
         days: Number of days to analyze (1-365)
         history_service: History service dependency
-        current_user: Authenticated user information
 
     Returns:
         BossProgressResponse: Boss progress analysis data (returns whatever data is available,
@@ -406,8 +396,7 @@ async def get_boss_progress(
     """
     try:
         logger.debug(
-            f"User {current_user.get('username')} requesting {boss} progress "
-            f"for player: {username} over {days} days"
+            f"Requesting {boss} progress for player: {username} over {days} days"
         )
 
         # Validate boss name
