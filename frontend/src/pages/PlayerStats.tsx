@@ -1,12 +1,14 @@
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api/apiClient';
+import type { BossProgressResponse } from '../api/models/BossProgressResponse';
 import type { PlayerMetadataResponse } from '../api/models/PlayerMetadataResponse';
 import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
+import { SkillsGrid } from '../components/SkillsGrid';
 
 // Import local skill icons
 import agilityIcon from '../assets/images/skill-icons/agility-icon.png';
@@ -163,6 +165,9 @@ export const PlayerStats: React.FC = () => {
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [skillProgress, setSkillProgress] = useState<SkillProgressResponse | null>(null);
   const [skillProgressLoading, setSkillProgressLoading] = useState(false);
+  const [selectedBoss, setSelectedBoss] = useState<string | null>(null);
+  const [bossProgress, setBossProgress] = useState<BossProgressResponse | null>(null);
+  const [bossProgressLoading, setBossProgressLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
 
@@ -259,6 +264,32 @@ export const PlayerStats: React.FC = () => {
     setSkillProgress(null);
   };
 
+  const handleBossClick = async (bossName: string) => {
+    if (!username) return;
+
+    setSelectedBoss(bossName);
+    setBossProgressLoading(true);
+
+    try {
+      const bossData = await api.HistoryService.getBossProgressApiV1PlayersUsernameHistoryBossesBossGet(
+        username,
+        bossName,
+        90 // Get 90 days of history
+      );
+      setBossProgress(bossData);
+    } catch (err: unknown) {
+      console.error('Failed to load boss progress:', err);
+      setBossProgress(null);
+    } finally {
+      setBossProgressLoading(false);
+    }
+  };
+
+  const closeBossModal = () => {
+    setSelectedBoss(null);
+    setBossProgress(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -291,137 +322,117 @@ export const PlayerStats: React.FC = () => {
       };
     });
 
-  // Prepare data for charts
-  const topBosses = bossNames
+  // Prepare boss data for grid display
+  const orderedBosses = bossNames
     .map((name) => {
       const bossData = stats.bosses?.[name] as BossData | undefined;
       if (!bossData || typeof bossData !== 'object') return null;
-      // Boss data structure: {rank: number | null, kc: number | null}
-      // The API uses "kc" for kill count
       const kills = bossData.kc ?? bossData.kill_count ?? bossData.kills ?? 0;
       return {
-        name: name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+        name,
+        displayName: name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
         kills: typeof kills === 'number' && kills !== null ? kills : 0,
+        rank: bossData.rank ?? null,
       };
     })
-    .filter((boss): boss is { name: string; kills: number } => boss !== null && boss.kills > 0)
-    .sort((a, b) => b.kills - a.kills)
-    .slice(0, 10);
+    .filter((boss): boss is { name: string; displayName: string; kills: number; rank: number | null } => boss !== null && boss.kills > 0)
+    .sort((a, b) => b.kills - a.kills);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="osrs-card-title text-2xl sm:text-3xl">
+    <div className="space-y-1">
+      {/* Compact Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 mb-1">
+        <h1 className="osrs-card-title text-xl sm:text-2xl" style={{ marginBottom: 0 }}>
           {stats.username}
         </h1>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
           {stats.fetched_at && (
             <p className="osrs-text-secondary text-xs">
-              Last updated: {format(new Date(stats.fetched_at), 'PPpp')}
+              {format(new Date(stats.fetched_at), 'MMM d, HH:mm')}
             </p>
           )}
           <a
             href={`https://secure.runescape.com/m=hiscore_oldschool/hiscorepersonal.ws?user1=${encodeURIComponent(stats.username)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="osrs-btn text-sm px-3 py-1.5"
+            className="osrs-btn text-xs px-2 py-1"
             title="View on official OSRS hiscore"
           >
-            View on OSRS
+            OSRS
           </a>
           <button
             onClick={handleTriggerFetch}
             disabled={fetching}
-            className="osrs-btn text-sm px-3 py-1.5"
+            className="osrs-btn text-xs px-2 py-1"
           >
-            {fetching ? 'Fetching...' : 'Fetch Now'}
+            {fetching ? '...' : 'Fetch'}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-x-1 gap-y-3">
-        {/* OSRS Skills Grid - Main Feature */}
-        <div className="lg:col-span-2">
-          <div className="osrs-skills-panel">
-            <div className="osrs-skills-grid">
-              {orderedSkills.map((skill) => {
-                const iconUrl = SKILL_ICONS[skill.name];
-                const maxLevel = skill.maxLevel;
-                return (
-                  <div
-                    key={skill.name}
-                    className="osrs-skill-cell cursor-pointer hover:opacity-80 transition-opacity"
-                    onClick={() => handleSkillClick(skill.name)}
-                    title={`Click to view ${skill.displayName} details`}
-                  >
-                    <div className="osrs-skill-icon">
-                      {iconUrl && iconUrl !== '⚓' ? (
-                        <img
-                          src={iconUrl}
-                          alt={skill.displayName}
-                          className="osrs-skill-icon-img"
-                          onError={(e) => {
-                            // Fallback to emoji if image fails to load
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            if (!target.parentElement?.querySelector('.osrs-skill-icon-fallback')) {
-                              const fallback = document.createElement('span');
-                              fallback.textContent = '❓';
-                              fallback.className = 'osrs-skill-icon-fallback';
-                              target.parentElement?.appendChild(fallback);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className="osrs-skill-icon-fallback">{iconUrl || '❓'}</span>
-                      )}
-                    </div>
-                    <div className="osrs-skill-level">
-                      {skill.level}/{maxLevel}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="osrs-total-level">
-              Total level: {stats.overall?.level ?? 0}
-            </div>
-          </div>
+      {/* Main Stats Grid - Compact */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-1.5">
+        {/* Skills Grid */}
+        <div className="lg:col-span-4">
+          <SkillsGrid
+            skills={orderedSkills}
+            skillIcons={SKILL_ICONS}
+            totalLevel={stats.overall?.level ?? 0}
+            onSkillClick={handleSkillClick}
+          />
         </div>
 
-        {/* Overall Stats - Compact */}
-        <div className="lg:col-span-1">
-          <div className="osrs-card h-full">
-            <div className="space-y-4">
+        {/* Overview Stats - Compact */}
+        <div className="lg:col-span-2">
+          <div className="osrs-card h-full" style={{ padding: '12px' }}>
+            <h3 className="osrs-card-title text-sm mb-1.5" style={{ marginBottom: '8px' }}>Overview</h3>
+            <div className="space-y-1.5">
               {stats.overall && (
-                <div>
-                  <h3 className="osrs-stat-label mb-1">Total Level</h3>
-                  <p className="osrs-stat-value">{stats.overall.level ?? 'N/A'}</p>
+                <div className="flex justify-between items-center">
+                  <span className="osrs-stat-label text-xs">Total Level</span>
+                  <span className="osrs-stat-value text-lg">{stats.overall.level ?? 'N/A'}</span>
                 </div>
               )}
               {stats.overall && (
-                <div>
-                  <h3 className="osrs-stat-label mb-1">Total Experience</h3>
-                  <p className="osrs-stat-value">
-                    {stats.overall.experience?.toLocaleString() ?? 'N/A'}
-                  </p>
+                <div className="flex justify-between items-center">
+                  <span className="osrs-stat-label text-xs">Total XP</span>
+                  <span className="osrs-text text-sm font-semibold">
+                    {stats.overall.experience ? (stats.overall.experience / 1000000).toFixed(2) + 'M' : 'N/A'}
+                  </span>
                 </div>
               )}
               {stats.combat_level && (
-                <div>
-                  <h3 className="osrs-stat-label mb-1">Combat Level</h3>
-                  <p className="osrs-stat-value">{stats.combat_level}</p>
+                <div className="flex justify-between items-center">
+                  <span className="osrs-stat-label text-xs">Combat</span>
+                  <span className="osrs-stat-value text-lg">{stats.combat_level}</span>
+                </div>
+              )}
+              {stats.overall?.rank && (
+                <div className="flex justify-between items-center">
+                  <span className="osrs-stat-label text-xs">Rank</span>
+                  <span className="osrs-text text-sm font-semibold">
+                    {stats.overall.rank.toLocaleString()}
+                  </span>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Top 5 Progress Highlights - Last 7 Days */}
-        <div className="lg:col-span-1">
+        {/* Top 10 Skills Progress */}
+        <div className="lg:col-span-3">
           <TopProgressHighlights
             progressWeek={progressWeek}
             skillIcons={SKILL_ICONS}
+          />
+        </div>
+
+        {/* Top 10 Bosses Progress */}
+        <div className="lg:col-span-3">
+          <TopBossProgressHighlights
+            progressWeek={progressWeek}
+            orderedBosses={orderedBosses}
+            onBossClick={handleBossClick}
           />
         </div>
       </div>
@@ -435,44 +446,17 @@ export const PlayerStats: React.FC = () => {
         orderedSkills={orderedSkills}
       />
 
-      {/* Top Bosses Chart */}
-      {topBosses.length > 0 && (
-        <div className="osrs-card">
-          <h2 className="osrs-card-title mb-3">Top Bosses by Kill Count</h2>
-          <div className="h-80" style={{ backgroundColor: '#1d1611' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topBosses} layout="vertical" margin={{ top: 5, right: 30, left: 120, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 12, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
-                  stroke="#8b7355"
-                  label={{ value: 'Kill Count', position: 'insideBottom', offset: -5, style: { textAnchor: 'middle', fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' } }}
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  width={110}
-                  tick={{ fontSize: 12, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
-                  stroke="#8b7355"
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#2d2418',
-                    border: '2px solid #8b7355',
-                    borderRadius: '0',
-                    color: '#ffd700',
-                    fontFamily: 'Courier New, Courier, monospace'
-                  }}
-                  labelStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '20px', color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }} />
-                <Bar dataKey="kills" fill="#ffd700" stroke="#8b7355" strokeWidth={1} name="Kills" radius={[0, 0, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+      {/* Boss Progress Summary */}
+      {orderedBosses.length > 0 && (
+        <BossProgressSummary
+          progressDay={progressDay}
+          progressWeek={progressWeek}
+          progressMonth={progressMonth}
+          orderedBosses={orderedBosses}
+          onBossClick={handleBossClick}
+        />
       )}
+
 
       {/* Skill Detail Modal */}
       {selectedSkill && (
@@ -510,6 +494,47 @@ export const PlayerStats: React.FC = () => {
                   </button>
                 </div>
                 <div className="osrs-text">Failed to load skill progress data.</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Boss Detail Modal */}
+      {selectedBoss && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+          onClick={closeBossModal}
+        >
+          <div
+            className="osrs-card max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {bossProgressLoading ? (
+              <div className="p-8 text-center">
+                <div className="osrs-text text-xl">Loading boss details...</div>
+              </div>
+            ) : bossProgress && stats ? (
+              <BossDetailModal
+                boss={selectedBoss}
+                bossData={stats.bosses?.[selectedBoss] as BossData | undefined}
+                bossProgress={bossProgress}
+                onClose={closeBossModal}
+              />
+            ) : (
+              <div className="p-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="osrs-card-title text-2xl">
+                    {selectedBoss.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                  </h2>
+                  <button
+                    onClick={closeBossModal}
+                    className="osrs-text hover:opacity-70 text-3xl leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="osrs-text">Failed to load boss progress data.</div>
               </div>
             )}
           </div>
@@ -633,7 +658,8 @@ export const PlayerStats: React.FC = () => {
   );
 };
 
-// Top Progress Highlights Component - Top 5 stats from last 7 days
+
+// Top Progress Highlights Component - Top 10 skills from last 7 days
 interface TopProgressHighlightsProps {
   progressWeek: ProgressAnalysisResponse | null;
   skillIcons: Record<string, string>;
@@ -643,7 +669,7 @@ const TopProgressHighlights: React.FC<TopProgressHighlightsProps> = ({
   progressWeek,
   skillIcons,
 }) => {
-  const getTopSkills = (progress: ProgressAnalysisResponse | null, count: number = 5) => {
+  const getTopSkills = (progress: ProgressAnalysisResponse | null, count: number = 10) => {
     if (!progress) return [];
     return Object.entries(progress.progress.experience_gained)
       .filter(([skill]) => skill !== 'overall')
@@ -657,40 +683,40 @@ const TopProgressHighlights: React.FC<TopProgressHighlightsProps> = ({
       .slice(0, count);
   };
 
-  const topSkills = getTopSkills(progressWeek, 5);
+  const topSkills = getTopSkills(progressWeek, 10);
 
   return (
-    <div className="osrs-card h-full">
-      <h3 className="osrs-card-title text-sm mb-3">Top 5 Progress</h3>
+    <div className="osrs-card h-full" style={{ padding: '12px' }}>
+      <h3 className="osrs-card-title text-sm mb-1.5" style={{ marginBottom: '8px' }}>Top 10 Skills (7d)</h3>
       {topSkills.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
           {topSkills.map((skillData, index) => (
-            <div key={skillData.skill} className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center osrs-text text-xs font-bold">
+            <div key={skillData.skill} className="flex items-center gap-2">
+              <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center osrs-text text-xs font-bold">
                 #{index + 1}
               </div>
               {skillIcons[skillData.skill] && skillIcons[skillData.skill] !== '⚓' ? (
                 <img
                   src={skillIcons[skillData.skill]}
                   alt={skillData.skill}
-                  className="w-6 h-6 flex-shrink-0"
+                  className="w-5 h-5 flex-shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                   }}
                 />
               ) : (
-                <span className="w-6 h-6 flex items-center justify-center text-xs">{skillIcons[skillData.skill] || '❓'}</span>
+                <span className="w-5 h-5 flex items-center justify-center text-xs">{skillIcons[skillData.skill] || '❓'}</span>
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="osrs-text text-sm font-semibold capitalize truncate">{skillData.skill}</span>
+                  <span className="osrs-text text-xs font-semibold capitalize truncate">{skillData.skill}</span>
                   <span className="osrs-text text-xs font-medium whitespace-nowrap">
-                    {skillData.experience.toLocaleString()} XP
+                    {skillData.experience.toLocaleString()}
                   </span>
                 </div>
                 {skillData.levels > 0 && (
-                  <div className="osrs-text-secondary text-xs mt-0.5">
+                  <div className="osrs-text-secondary text-xs">
                     +{skillData.levels} level{skillData.levels !== 1 ? 's' : ''}
                   </div>
                 )}
@@ -699,7 +725,203 @@ const TopProgressHighlights: React.FC<TopProgressHighlightsProps> = ({
           ))}
         </div>
       ) : (
-        <div className="osrs-text-secondary text-sm text-center py-4">No progress</div>
+        <div className="osrs-text-secondary text-xs text-center py-4">No progress</div>
+      )}
+    </div>
+  );
+};
+
+// Top Boss Progress Highlights Component - Top 10 bosses from last 7 days
+interface TopBossProgressHighlightsProps {
+  progressWeek: ProgressAnalysisResponse | null;
+  orderedBosses: Array<{ name: string; displayName: string; kills: number; rank: number | null }>;
+  onBossClick: (bossName: string) => void;
+}
+
+const TopBossProgressHighlights: React.FC<TopBossProgressHighlightsProps> = ({
+  progressWeek,
+  orderedBosses,
+  onBossClick,
+}) => {
+  const getTopBosses = (progress: ProgressAnalysisResponse | null, count: number = 10) => {
+    if (!progress) return [];
+    return Object.entries(progress.progress.boss_kills_gained || {})
+      .map(([boss, kills]) => ({
+        boss,
+        kills: typeof kills === 'number' ? kills : 0,
+      }))
+      .filter((item) => item.kills > 0)
+      .sort((a, b) => b.kills - a.kills)
+      .slice(0, count)
+      .map((item) => {
+        const bossData = orderedBosses.find((b) => b.name === item.boss);
+        return {
+          ...item,
+          displayName: bossData?.displayName || item.boss.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+        };
+      });
+  };
+
+  const topBosses = getTopBosses(progressWeek, 10);
+
+  return (
+    <div className="osrs-card h-full" style={{ padding: '12px' }}>
+      <h3 className="osrs-card-title text-sm mb-1.5" style={{ marginBottom: '8px' }}>Top 10 Bosses (7d)</h3>
+      {topBosses.length > 0 ? (
+        <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+          {topBosses.map((bossData, index) => (
+            <div
+              key={bossData.boss}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => onBossClick(bossData.boss)}
+              title={`Click to view ${bossData.displayName} details`}
+            >
+              <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center osrs-text text-xs font-bold">
+                #{index + 1}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="osrs-text text-xs font-semibold capitalize truncate">{bossData.displayName}</span>
+                  <span className="font-semibold text-green-400 text-xs whitespace-nowrap">
+                    +{bossData.kills.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="osrs-text-secondary text-xs text-center py-4">No progress</div>
+      )}
+    </div>
+  );
+};
+
+// Boss Progress Summary Component
+interface BossProgressSummaryProps {
+  progressDay: ProgressAnalysisResponse | null;
+  progressWeek: ProgressAnalysisResponse | null;
+  progressMonth: ProgressAnalysisResponse | null;
+  orderedBosses: Array<{ name: string; displayName: string; kills: number; rank: number | null }>;
+  onBossClick: (bossName: string) => void;
+}
+
+const BossProgressSummary: React.FC<BossProgressSummaryProps> = ({
+  progressDay,
+  progressWeek,
+  progressMonth,
+  orderedBosses,
+  onBossClick,
+}) => {
+  const [selectedPeriod, setSelectedPeriod] = useState<number>(7);
+
+  const getProgressForPeriod = (period: number): ProgressAnalysisResponse | null => {
+    switch (period) {
+      case 1:
+        return progressDay;
+      case 7:
+        return progressWeek;
+      case 30:
+        return progressMonth;
+      default:
+        return progressWeek;
+    }
+  };
+
+  const currentProgress = getProgressForPeriod(selectedPeriod);
+
+  const getBossProgress = (bossName: string) => {
+    if (!currentProgress) {
+      return { kills: 0 };
+    }
+    return {
+      kills: currentProgress.progress.boss_kills_gained?.[bossName] || 0,
+    };
+  };
+
+  const getPeriodLabel = (period: number) => {
+    switch (period) {
+      case 1:
+        return '1d';
+      case 7:
+        return '7d';
+      case 30:
+        return '30d';
+      default:
+        return '7d';
+    }
+  };
+
+  return (
+    <div className="osrs-card">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="osrs-card-title">Boss Progress Summary</h2>
+        <select
+          value={selectedPeriod}
+          onChange={(e) => setSelectedPeriod(Number(e.target.value))}
+          className="osrs-btn px-3 py-1.5 text-sm"
+        >
+          <option value={1}>Last 1 Day</option>
+          <option value={7}>Last 7 Days</option>
+          <option value={30}>Last 30 Days</option>
+        </select>
+      </div>
+
+      {currentProgress ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+          {orderedBosses.map((boss) => {
+            const progress = getBossProgress(boss.name);
+            return (
+              <div
+                key={boss.name}
+                className="cursor-pointer hover:opacity-80 transition-opacity"
+                style={{
+                  backgroundColor: progress.kills > 0 ? 'rgba(255, 215, 0, 0.05)' : '#3a3a3a',
+                  border: '2px solid #8b7355',
+                  borderRadius: '2px',
+                  minHeight: '48px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '8px 4px',
+                  gap: '4px',
+                }}
+                onClick={() => onBossClick(boss.name)}
+                title={`Click to view ${boss.displayName} details`}
+              >
+                <div className="osrs-text text-xs font-semibold text-center w-full px-1 leading-tight truncate">
+                  {boss.displayName}
+                </div>
+                <div
+                  className="font-bold text-base"
+                  style={{
+                    color: '#ffd700',
+                    fontFamily: 'Courier New, Courier, monospace',
+                    textShadow: '2px 2px 0px rgba(0, 0, 0, 1), -1px -1px 0px rgba(0, 0, 0, 1), 1px -1px 0px rgba(0, 0, 0, 1), -1px 1px 0px rgba(0, 0, 0, 1)',
+                    textAlign: 'center',
+                    margin: '0',
+                  }}
+                >
+                  {boss.kills.toLocaleString()}
+                </div>
+                {progress.kills > 0 ? (
+                  <div className="font-semibold text-green-400 text-xs text-center w-full">
+                    +{progress.kills.toLocaleString()} ({getPeriodLabel(selectedPeriod)})
+                  </div>
+                ) : (
+                  <div className="osrs-text-secondary text-xs text-center w-full">
+                    0 ({getPeriodLabel(selectedPeriod)})
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="osrs-text-secondary text-center py-8">
+          No progress data available for the selected period
+        </div>
       )}
     </div>
   );
@@ -1067,6 +1289,174 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
                   name="Level"
                   yAxisId="level"
                   dot={{ r: 4, fill: '#d4af37' }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Boss Detail Modal Component
+interface BossDetailModalProps {
+  boss: string;
+  bossData: BossData | undefined;
+  bossProgress: BossProgressResponse;
+  onClose: () => void;
+}
+
+const BossDetailModal: React.FC<BossDetailModalProps> = ({
+  boss,
+  bossData,
+  bossProgress,
+  onClose,
+}) => {
+  const currentKills = bossData?.kc ?? bossData?.kill_count ?? bossData?.kills ?? 0;
+  const dailyRate = bossProgress.progress.daily_kill_rate;
+
+  // Prepare timeline data for chart
+  const timelineData = bossProgress.timeline.map((entry) => ({
+    date: format(new Date(entry.date), 'MMM d'),
+    kill_count: entry.kill_count ?? 0,
+  }));
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h2 className="osrs-card-title text-3xl">
+            {boss.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+          </h2>
+          <p className="osrs-text-secondary">
+            {bossProgress.period_days} days of history • {bossProgress.total_records} records
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          className="osrs-text hover:opacity-70 text-3xl leading-none"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Current Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-1">Current Kills</h3>
+          <p className="osrs-stat-value text-2xl">
+            {currentKills.toLocaleString()}
+          </p>
+        </div>
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-1">Daily Kill Rate</h3>
+          <p className="osrs-stat-value text-2xl">
+            {dailyRate > 0 ? Math.round(dailyRate).toLocaleString() : 'N/A'}
+          </p>
+        </div>
+        <div className="osrs-card">
+          <h3 className="osrs-stat-label mb-1">Kills Gained</h3>
+          <p className="osrs-stat-value text-2xl">
+            {bossProgress.progress.kills_gained.toLocaleString()}
+          </p>
+        </div>
+        {bossData?.rank && (
+          <div className="osrs-card">
+            <h3 className="osrs-stat-label mb-1">Rank</h3>
+            <p className="osrs-stat-value text-2xl">
+              {bossData.rank.toLocaleString()}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Progress Summary */}
+      <div className="osrs-card mb-6">
+        <h3 className="osrs-card-title mb-4">Progress Summary ({bossProgress.period_days} days)</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="osrs-stat-label mb-1">Kills Gained</p>
+            <p className="osrs-stat-value text-2xl">
+              {bossProgress.progress.kills_gained.toLocaleString()}
+            </p>
+          </div>
+          <div>
+            <p className="osrs-stat-label mb-1">Average Daily Kills</p>
+            <p className="osrs-stat-value text-2xl">
+              {Math.round(bossProgress.progress.daily_kill_rate).toLocaleString()}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* History Chart */}
+      {timelineData.length > 0 && (
+        <div className="osrs-card">
+          <h3 className="osrs-card-title mb-4">Kill Count History</h3>
+          <div className="h-80" style={{ backgroundColor: '#1d1611' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={timelineData} margin={{ top: 20, right: 60, left: 100 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
+                <XAxis
+                  dataKey="date"
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  tick={{ fontSize: 14, fill: '#ffd700', fontWeight: 500 }}
+                  interval="preserveStartEnd"
+                  stroke="#8b7355"
+                />
+                <YAxis
+                  tick={{ fontSize: 14, fill: '#ffd700', fontWeight: 500 }}
+                  stroke="#8b7355"
+                  label={{
+                    value: 'Kill Count',
+                    angle: -90,
+                    position: 'insideLeft',
+                    offset: -10,
+                    style: { textAnchor: 'middle', fill: '#ffd700', fontSize: 16, fontWeight: 600 }
+                  }}
+                  tickFormatter={(value) => {
+                    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                    return value.toString();
+                  }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#2d2418',
+                    border: '2px solid #8b7355',
+                    borderRadius: '0',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    padding: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    color: '#ffd700'
+                  }}
+                  labelStyle={{
+                    marginBottom: '8px',
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#ffd700'
+                  }}
+                  formatter={(value: number) => {
+                    return [value.toLocaleString(), 'Kill Count'];
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ paddingTop: '0px', marginTop: '0px', fontSize: '14px', fontWeight: 500, color: '#ffd700' }}
+                  iconType="line"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="kill_count"
+                  stroke="#ffd700"
+                  strokeWidth={2.5}
+                  name="Kill Count"
+                  dot={{ r: 4, fill: '#ffd700' }}
                   activeDot={{ r: 6 }}
                 />
               </LineChart>
