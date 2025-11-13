@@ -42,7 +42,7 @@ class OSRSAPIClient:
 
     # Retry configuration
     MAX_RETRIES = 3
-    INITIAL_BACKOFF = 1.0
+    INITIAL_BACKOFF = 2.0
     MAX_BACKOFF = 60.0  # Increased to 60 seconds for client-level retries
     BACKOFF_MULTIPLIER = 2.0
 
