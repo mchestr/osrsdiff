@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
