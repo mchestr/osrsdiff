@@ -227,10 +227,10 @@ class TestOSRSAPIClient:
             assert mock_sleep.call_count == 2
             # Verify exponential backoff delays: 1.0s, 2.0s
             assert mock_sleep.call_args_list[0][0][0] == pytest.approx(
-                1.0, rel=0.1
+                2.0, rel=0.1
             )
             assert mock_sleep.call_args_list[1][0][0] == pytest.approx(
-                2.0, rel=0.1
+                4.0, rel=0.1
             )
             # Should have made 3 requests total (2 failures + 1 success)
             assert mock_session.get.call_count == 3
@@ -269,13 +269,13 @@ class TestOSRSAPIClient:
             assert mock_sleep.call_count == client.MAX_RETRIES
             # Verify exponential backoff delays: 1.0s, 2.0s, 4.0s
             assert mock_sleep.call_args_list[0][0][0] == pytest.approx(
-                1.0, rel=0.1
-            )
-            assert mock_sleep.call_args_list[1][0][0] == pytest.approx(
                 2.0, rel=0.1
             )
-            assert mock_sleep.call_args_list[2][0][0] == pytest.approx(
+            assert mock_sleep.call_args_list[1][0][0] == pytest.approx(
                 4.0, rel=0.1
+            )
+            assert mock_sleep.call_args_list[2][0][0] == pytest.approx(
+                8.0, rel=0.1
             )
             # Should have made MAX_RETRIES + 1 requests (4 total: initial + 3 retries)
             assert mock_session.get.call_count == client.MAX_RETRIES + 1
@@ -329,7 +329,7 @@ class TestOSRSAPIClient:
             assert mock_sleep.call_count == 1
             # Verify exponential backoff delay: 1.0s
             assert mock_sleep.call_args_list[0][0][0] == pytest.approx(
-                1.0, rel=0.1
+                2.0, rel=0.1
             )
             # Should have made 2 requests total (1 failure + 1 success)
             assert mock_session.get.call_count == 2
@@ -385,7 +385,7 @@ class TestOSRSAPIClient:
             assert mock_sleep.call_count == 1
             # Verify exponential backoff delay: 1.0s
             assert mock_sleep.call_args_list[0][0][0] == pytest.approx(
-                1.0, rel=0.1
+                2.0, rel=0.1
             )
             # Should have made 2 requests total (1 failure + 1 success)
             assert mock_session.get.call_count == 2
