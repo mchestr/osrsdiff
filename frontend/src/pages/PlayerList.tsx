@@ -49,8 +49,7 @@ export const PlayerList: React.FC = () => {
           placeholder="Search players..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="osrs-btn max-w-xs"
-          style={{ backgroundColor: '#3a3024', color: '#ffd700' }}
+          className="input max-w-xs"
         />
       </div>
 

@@ -71,14 +71,14 @@ export const Home: React.FC = () => {
   return (
     <div>
       {/* Hero Section - TailAdmin Marketing Style */}
-      <section className="relative pt-20 pb-16 sm:pt-24 sm:pb-20 lg:pt-32 lg:pb-28 bg-gradient-to-b from-gray-50 to-white">
+      <section className="relative pt-20 pb-16 sm:pt-24 sm:pb-20 lg:pt-32 lg:pb-28 bg-gradient-to-b from-secondary-50 to-white dark:from-secondary-900 dark:to-secondary-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-secondary-900 dark:text-secondary-100 tracking-tight">
               Track Your OSRS
-              <span className="text-primary-600"> Progress</span>
+              <span className="text-primary-600 dark:text-primary-400"> Progress</span>
             </h1>
-            <p className="mt-6 text-lg sm:text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">
+            <p className="mt-6 text-lg sm:text-xl md:text-2xl text-secondary-600 dark:text-secondary-200 max-w-3xl mx-auto">
               The open source Old School RuneScape player progress tracker. Monitor your skills, track boss kills, and visualize your journey.
             </p>
 
@@ -90,11 +90,11 @@ export const Home: React.FC = () => {
                   placeholder="Search for a player by username..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-1 px-6 py-4 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
+                  className="flex-1 px-6 py-4 text-base border border-secondary-300 dark:border-secondary-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm bg-white dark:bg-secondary-800 text-secondary-900 dark:text-secondary-100 placeholder:text-secondary-400 dark:placeholder:text-secondary-500"
                 />
                 <button
                   type="submit"
-                  className="px-8 py-4 text-base font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl"
+                  className="px-8 py-4 text-base font-semibold text-white bg-primary-600 dark:bg-primary-500 rounded-lg hover:bg-primary-700 dark:hover:bg-primary-600 transition-colors shadow-lg hover:shadow-xl"
                 >
                   Search
                 </button>
@@ -105,7 +105,7 @@ export const Home: React.FC = () => {
       </section>
 
       {/* Statistics Section */}
-      <section className="py-16 sm:py-20 bg-white dark:bg-gray-900">
+      <section className="py-16 sm:py-20 bg-white dark:bg-secondary-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <StatsGrid
             loading={loading}
@@ -144,41 +144,41 @@ export const Home: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-gray-50">
+      <section className="py-16 sm:py-20 lg:py-24 bg-secondary-50 dark:bg-secondary-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-secondary-900 dark:text-secondary-100 mb-4">
               Track your hiscores over time
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-secondary-600 dark:text-secondary-200 max-w-2xl mx-auto">
               By periodically checking your hiscores, OSRS Diff can create a historical record, this allows you to:
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 lg:gap-10">
-            <div className="bg-white p-8 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
+            <div className="bg-white dark:bg-secondary-900 p-8 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-secondary-200 dark:border-secondary-700">
               <div className="text-5xl mb-6 text-center">📊</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">
+              <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3 text-center">
                 Check your gains, all-time records and collect achievements
               </h3>
-              <p className="text-gray-600 text-center">
+              <p className="text-secondary-600 dark:text-secondary-200 text-center">
                 Monitor skill levels and experience gains over time with detailed progress charts and statistics.
               </p>
             </div>
-            <div className="bg-white p-8 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
+            <div className="bg-white dark:bg-secondary-900 p-8 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-secondary-200 dark:border-secondary-700">
               <div className="text-5xl mb-6 text-center">📈</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">
+              <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3 text-center">
                 Visualise your in-game activity
               </h3>
-              <p className="text-gray-600 text-center">
+              <p className="text-secondary-600 dark:text-secondary-200 text-center">
                 Get insights into your gameplay with daily rates, progress summaries, and time estimates.
               </p>
             </div>
-            <div className="bg-white p-8 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
+            <div className="bg-white dark:bg-secondary-900 p-8 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-secondary-200 dark:border-secondary-700">
               <div className="text-5xl mb-6 text-center">⚔️</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">
+              <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3 text-center">
                 Track boss progress
               </h3>
-              <p className="text-gray-600 text-center">
+              <p className="text-secondary-600 dark:text-secondary-200 text-center">
                 Track boss kill counts and analyze your PvM progress with historical data and trends.
               </p>
             </div>
@@ -187,41 +187,41 @@ export const Home: React.FC = () => {
       </section>
 
       {/* How it Works Section */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-white">
+      <section className="py-16 sm:py-20 lg:py-24 bg-white dark:bg-secondary-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-secondary-900 dark:text-secondary-100 mb-4">
               How does it work?
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-secondary-600 dark:text-secondary-200 max-w-2xl mx-auto">
               Getting started is simple and takes just a few steps
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 lg:gap-12 max-w-5xl mx-auto">
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-bold bg-primary-100 text-primary-600 border-4 border-primary-200 shadow-lg">
+              <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-bold bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-4 border-primary-200 dark:border-primary-700 shadow-lg">
                 1
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">You update your profile</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">You update your profile</h3>
+              <p className="text-secondary-600 dark:text-secondary-200">
                 Request an update to your profile via the website or search for any player to track.
               </p>
             </div>
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-bold bg-primary-100 text-primary-600 border-4 border-primary-200 shadow-lg">
+              <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-bold bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-4 border-primary-200 dark:border-primary-700 shadow-lg">
                 2
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">We save your current stats</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">We save your current stats</h3>
+              <p className="text-secondary-600 dark:text-secondary-200">
                 We'll check your hiscores page and store your current stats on our end.
               </p>
             </div>
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-bold bg-primary-100 text-primary-600 border-4 border-primary-200 shadow-lg">
+              <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-3xl font-bold bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border-4 border-primary-200 dark:border-primary-700 shadow-lg">
                 3
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">We calculate your progress</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-semibold text-secondary-900 dark:text-secondary-100 mb-3">We calculate your progress</h3>
+              <p className="text-secondary-600 dark:text-secondary-200">
                 Using this historical data, we can now calculate your gains, records, achievements, etc.
               </p>
             </div>
@@ -230,24 +230,24 @@ export const Home: React.FC = () => {
       </section>
 
       {/* Features Grid */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-gray-50">
+      <section className="py-16 sm:py-20 lg:py-24 bg-secondary-50 dark:bg-secondary-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">📊 Skill Tracking</h3>
-              <p className="text-gray-600 text-sm">
+            <div className="bg-white dark:bg-secondary-900 p-6 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-secondary-200 dark:border-secondary-700">
+              <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-3">📊 Skill Tracking</h3>
+              <p className="text-secondary-600 dark:text-secondary-200 text-sm">
                 Monitor skill levels and experience gains over time with detailed progress charts and statistics.
               </p>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">⚔️ Boss Progress</h3>
-              <p className="text-gray-600 text-sm">
+            <div className="bg-white dark:bg-secondary-900 p-6 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-secondary-200 dark:border-secondary-700">
+              <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-3">⚔️ Boss Progress</h3>
+              <p className="text-secondary-600 dark:text-secondary-200 text-sm">
                 Track boss kill counts and analyze your PvM progress with historical data and trends.
               </p>
             </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">📈 Analytics</h3>
-              <p className="text-gray-600 text-sm">
+            <div className="bg-white dark:bg-secondary-900 p-6 rounded-xl shadow-sm hover:shadow-lg transition-shadow border border-secondary-200 dark:border-secondary-700">
+              <h3 className="text-lg font-semibold text-secondary-900 dark:text-secondary-100 mb-3">📈 Analytics</h3>
+              <p className="text-secondary-600 dark:text-secondary-200 text-sm">
                 Get insights into your gameplay with daily rates, progress summaries, and time estimates.
               </p>
             </div>
@@ -268,7 +268,7 @@ export const Home: React.FC = () => {
             href="https://github.com/mchestr/osrsdiff"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center px-8 py-4 text-base font-semibold text-primary-600 bg-white rounded-lg hover:bg-gray-50 transition-colors shadow-lg hover:shadow-xl"
+            className="inline-flex items-center px-8 py-4 text-base font-semibold text-primary-600 dark:text-primary-400 bg-white dark:bg-secondary-100 rounded-lg hover:bg-secondary-50 dark:hover:bg-secondary-200 transition-colors shadow-lg hover:shadow-xl"
           >
             Contribute on GitHub
           </a>

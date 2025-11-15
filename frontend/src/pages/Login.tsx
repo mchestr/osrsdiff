@@ -27,26 +27,26 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-secondary-50">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-secondary-50 dark:bg-secondary-900">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-secondary-900 mb-2">
+          <h2 className="text-3xl font-bold text-secondary-900 dark:text-secondary-100 mb-2">
             OSRS Diff
           </h2>
-          <p className="text-sm text-secondary-600">
+          <p className="text-sm text-secondary-600 dark:text-secondary-200">
             Sign in to your account
           </p>
         </div>
         <div className="osrs-card">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="p-4 rounded-md bg-danger-50 border border-danger-200">
-                <p className="text-sm text-danger-700">{error}</p>
+              <div className="p-4 rounded-md bg-danger-50 dark:bg-danger-900/30 border border-danger-200 dark:border-danger-700">
+                <p className="text-sm text-danger-700 dark:text-danger-300">{error}</p>
               </div>
             )}
             <div className="space-y-4">
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-secondary-700 mb-2">
+                <label htmlFor="username" className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
                   Username
                 </label>
                 <input
@@ -61,7 +61,7 @@ export const Login: React.FC = () => {
                 />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-secondary-700 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-secondary-700 dark:text-secondary-300 mb-2">
                   Password
                 </label>
                 <input

@@ -51,7 +51,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
         }`}
       >
-        {children}
+        <div className="lg:pl-4 lg:pt-4 lg:pr-4 lg:pb-4">
+          {children}
+        </div>
       </main>
 
       <Footer sidebarCollapsed={sidebarCollapsed} />

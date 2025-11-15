@@ -1,56 +1,19 @@
-import { format } from 'date-fns';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useEffect, useState } from 'react';
 import { api } from '../api/apiClient';
 import type { CostStatsResponse } from '../api/models/OpenAICostStatsResponse';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
 import { Modal } from '../components/Modal';
-
-interface DatabaseStats {
-  total_players: number;
-  active_players: number;
-  inactive_players: number;
-  total_hiscore_records: number;
-  oldest_record: string | null;
-  newest_record: string | null;
-  records_last_24h: number;
-  records_last_7d: number;
-  avg_records_per_player: number;
-}
-
-interface SystemHealth {
-  status: string;
-  database_connected: boolean;
-  total_storage_mb: number | null;
-  uptime_info: Record<string, unknown>;
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  success: '#4caf50',
-  failure: '#d32f2f',
-  retry: '#ff9800',
-  pending: '#2196f3',
-  running: '#9c27b0',
-  cancelled: '#9e9e9e',
-  skipped: '#9e9e9e',
-  warning: '#ff9800',
-  timeout: '#f44336',
-};
-
-// Helper function to format large numbers
-const formatNumber = (num: number): string => {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toString();
-};
+import {
+  SystemHealthStats,
+  CostStatistics,
+  TaskExecutionHealth,
+  QuickActions,
+  useExecutionSummary,
+  type DatabaseStats,
+  type SystemHealth,
+} from '../components/admin';
 
 export const AdminDashboard: React.FC = () => {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<DatabaseStats | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,21 +22,12 @@ export const AdminDashboard: React.FC = () => {
 
 
   // Task execution summary state
-  const [executionSummary, setExecutionSummary] = useState<{
-    total: number;
-    successCount: number;
-    failureCount: number;
-    retryCount: number;
-    pendingCount: number;
-    successRate: number;
-    failureRate: number;
-    avgDuration: number;
-    recentFailures24h: number;
-    recentFailures7d: number;
-    statusBreakdown: Record<string, number>;
-  } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [executionsForGraph, setExecutionsForGraph] = useState<TaskExecutionResponse[]>([]);
+  const [executionTotal, setExecutionTotal] = useState(0);
+
+  // Calculate execution summary using hook
+  const executionSummary = useExecutionSummary(executionsForGraph, executionTotal);
 
   // Cost stats state
   const [costs, setCosts] = useState<CostStatsResponse | null>(null);
@@ -115,57 +69,8 @@ export const AdminDashboard: React.FC = () => {
         0
       );
 
-      const allExecutions = response.executions;
-      setExecutionsForGraph(allExecutions);
-      const now = new Date();
-      const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-      // Calculate statistics
-      const total = response.total;
-      const successCount = allExecutions.filter(e => e.status === 'success').length;
-      const failureCount = allExecutions.filter(e => e.status === 'failure').length;
-      const retryCount = allExecutions.filter(e => e.status === 'retry').length;
-      const pendingCount = allExecutions.filter(e => e.status === 'pending').length;
-
-      const successRate = total > 0 ? (successCount / total) * 100 : 0;
-      const failureRate = total > 0 ? (failureCount / total) * 100 : 0;
-
-      // Calculate average duration from completed executions
-      const completedExecutions = allExecutions.filter(
-        e => e.duration_seconds !== null && e.duration_seconds !== undefined
-      );
-      const avgDuration = completedExecutions.length > 0
-        ? completedExecutions.reduce((sum, e) => sum + (e.duration_seconds || 0), 0) / completedExecutions.length
-        : 0;
-
-      // Count recent failures
-      const recentFailures24h = allExecutions.filter(
-        e => e.status === 'failure' && new Date(e.started_at) >= last24h
-      ).length;
-      const recentFailures7d = allExecutions.filter(
-        e => e.status === 'failure' && new Date(e.started_at) >= last7d
-      ).length;
-
-      // Status breakdown
-      const statusBreakdown: Record<string, number> = {};
-      allExecutions.forEach(e => {
-        statusBreakdown[e.status] = (statusBreakdown[e.status] || 0) + 1;
-      });
-
-      setExecutionSummary({
-        total,
-        successCount,
-        failureCount,
-        retryCount,
-        pendingCount,
-        successRate,
-        failureRate,
-        avgDuration,
-        recentFailures24h,
-        recentFailures7d,
-        statusBreakdown,
-      });
+      setExecutionsForGraph(response.executions);
+      setExecutionTotal(response.total);
     } catch (error: unknown) {
       console.error('Failed to fetch execution summary:', error);
     } finally {
@@ -173,65 +78,6 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Calculate time-series data for executions over time
-  const timeSeriesData = useMemo(() => {
-    if (executionsForGraph.length === 0) return [];
-
-    // Sort executions by started_at
-    const sorted = [...executionsForGraph].sort((a, b) =>
-      new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
-    );
-
-    // Determine time grouping based on data range
-    const firstTime = new Date(sorted[0].started_at).getTime();
-    const lastTime = new Date(sorted[sorted.length - 1].started_at).getTime();
-    const timeRange = lastTime - firstTime;
-    const daysRange = timeRange / (1000 * 60 * 60 * 24);
-
-    // Group by hour if less than 7 days, otherwise by day
-    const groupByHour = daysRange < 7;
-
-    // Create time buckets
-    const timeBuckets: Record<string, { time: string; total: number; success: number; failure: number; retry: number; other: number }> = {};
-
-    sorted.forEach((execution) => {
-      const date = new Date(execution.started_at);
-      let bucketKey: string;
-
-      if (groupByHour) {
-        // Group by hour - use more compact format
-        bucketKey = format(date, 'MMM d HH:mm');
-      } else {
-        // Group by day - use more compact format
-        bucketKey = format(date, 'MMM d');
-      }
-
-      if (!timeBuckets[bucketKey]) {
-        timeBuckets[bucketKey] = {
-          time: bucketKey,
-          total: 0,
-          success: 0,
-          failure: 0,
-          retry: 0,
-          other: 0,
-        };
-      }
-
-      timeBuckets[bucketKey].total++;
-      const status = execution.status || 'unknown';
-      if (status === 'success') {
-        timeBuckets[bucketKey].success++;
-      } else if (status === 'failure') {
-        timeBuckets[bucketKey].failure++;
-      } else if (status === 'retry') {
-        timeBuckets[bucketKey].retry++;
-      } else {
-        timeBuckets[bucketKey].other++;
-      }
-    });
-
-    return Object.values(timeBuckets);
-  }, [executionsForGraph]);
 
   const showModal = (
     title: string,
@@ -361,480 +207,25 @@ export const AdminDashboard: React.FC = () => {
       <h1 className="osrs-card-title text-3xl sm:text-4xl mb-0">Admin Dashboard</h1>
 
       {/* System Health & Database Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-4 md:gap-6">
-        {health && (
-          <>
-            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
-              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>System Status</h3>
-              <div className="flex items-center justify-center flex-1">
-                <span
-                  className="text-4xl"
-                  style={{ color: health.status === 'healthy' ? '#22c55e' : '#ef4444' }}
-                  title={health.status.toUpperCase()}
-                >
-                  {health.status === 'healthy' ? '✓' : '✗'}
-                </span>
-              </div>
-            </div>
-            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
-              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Database</h3>
-              <div className="flex items-center justify-center flex-1">
-                <span
-                  className="text-4xl"
-                  style={{ color: health.database_connected ? '#22c55e' : '#ef4444' }}
-                  title={health.database_connected ? 'Connected' : 'Disconnected'}
-                >
-                  {health.database_connected ? '✓' : '✗'}
-                </span>
-              </div>
-            </div>
-            {health.total_storage_mb && (
-              <div className="osrs-card flex flex-col">
-                <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Storage</h3>
-                <p className="osrs-stat-value flex-1 flex items-center" title={`${health.total_storage_mb.toFixed(2)} MB`}>
-                  {formatNumber(Math.round(health.total_storage_mb))} MB
-                </p>
-              </div>
-            )}
-          </>
-        )}
-        {stats && (
-          <>
-            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
-              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Total Players</h3>
-              <p className="osrs-stat-value flex-1 flex items-center" title={stats.total_players.toString()}>
-                {formatNumber(stats.total_players)}
-              </p>
-            </div>
-            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
-              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Active Players</h3>
-              <p className="osrs-stat-value flex-1 flex items-center text-success-600" title={stats.active_players.toString()}>
-                {formatNumber(stats.active_players)}
-              </p>
-            </div>
-            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
-              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Total Records</h3>
-              <p className="osrs-stat-value flex-1 flex items-center" title={stats.total_hiscore_records.toLocaleString()}>
-                {formatNumber(stats.total_hiscore_records)}
-              </p>
-            </div>
-            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
-              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Records (24h)</h3>
-              <p className="osrs-stat-value flex-1 flex items-center" title={stats.records_last_24h.toString()}>
-                {formatNumber(stats.records_last_24h)}
-              </p>
-            </div>
-          </>
-        )}
-      </div>
+      <SystemHealthStats health={health} stats={stats} />
 
       {/* Cost Statistics */}
-      <div className="osrs-card">
-        <h2 className="osrs-card-title mb-3 sm:mb-4 text-lg sm:text-xl">Cost Statistics</h2>
-        {costsLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <div className="osrs-text-secondary">Loading cost statistics...</div>
-          </div>
-        ) : costs ? (
-          <div className="space-y-4">
-            {/* Cost Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="osrs-card hover:shadow-card-hover transition-shadow">
-                <h3 className="osrs-stat-label mb-2">Total Cost</h3>
-                <p className="osrs-stat-value text-2xl">
-                  ${costs.total_cost_usd.toFixed(4)}
-                </p>
-              </div>
-              <div className="osrs-card hover:shadow-card-hover transition-shadow">
-                <h3 className="osrs-stat-label mb-2">Last 24 Hours</h3>
-                <p className="osrs-stat-value text-2xl text-success-600">
-                  ${costs.cost_last_24h_usd.toFixed(4)}
-                </p>
-              </div>
-              <div className="osrs-card hover:shadow-card-hover transition-shadow">
-                <h3 className="osrs-stat-label mb-2">Last 7 Days</h3>
-                <p className="osrs-stat-value text-2xl text-success-600">
-                  ${costs.cost_last_7d_usd.toFixed(4)}
-                </p>
-              </div>
-              <div className="osrs-card hover:shadow-card-hover transition-shadow">
-                <h3 className="osrs-stat-label mb-2">Last 30 Days</h3>
-                <p className="osrs-stat-value text-2xl text-success-600">
-                  ${costs.cost_last_30d_usd.toFixed(4)}
-                </p>
-              </div>
-            </div>
-
-            {/* Token Usage Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-secondary-200">
-              <div>
-                <h3 className="osrs-stat-label mb-1">Total Summaries</h3>
-                <p className="osrs-stat-value">{costs.total_summaries.toLocaleString()}</p>
-              </div>
-              <div>
-                <h3 className="osrs-stat-label mb-1">Total Tokens</h3>
-                <p className="osrs-stat-value">{formatNumber(costs.total_tokens)}</p>
-                <p className="text-xs osrs-text-secondary mt-1">
-                  {formatNumber(costs.total_prompt_tokens)} prompt + {formatNumber(costs.total_completion_tokens)} completion
-                </p>
-              </div>
-              <div>
-                <h3 className="osrs-stat-label mb-1">Avg Cost per Summary</h3>
-                <p className="osrs-stat-value">
-                  {costs.total_summaries > 0
-                    ? `$${(costs.total_cost_usd / costs.total_summaries).toFixed(6)}`
-                    : '$0.000000'}
-                </p>
-              </div>
-            </div>
-
-            {/* Model Breakdown */}
-            {Object.keys(costs.by_model).length > 0 && (
-              <div className="pt-2 border-t" style={{ borderColor: '#8b7355' }}>
-                <h3 className="osrs-stat-label mb-3">Cost Breakdown by Model</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(costs.by_model).map(([model, stats]) => (
-                    <div
-                      key={model}
-                      className="p-3 rounded"
-                      style={{
-                        backgroundColor: '#1a1510',
-                        border: '1px solid #8b7355',
-                      }}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold osrs-text" style={{ color: '#ffd700' }}>
-                          {model}
-                        </span>
-                        <span className="text-sm osrs-text-secondary">
-                          {stats.count} summaries
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="osrs-text-secondary">Cost:</span>
-                          <span className="osrs-text" style={{ color: '#4caf50' }}>
-                            ${stats.cost_usd.toFixed(4)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="osrs-text-secondary">Tokens:</span>
-                          <span className="osrs-text">{formatNumber(stats.total_tokens)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="osrs-text-secondary">Avg per summary:</span>
-                          <span className="osrs-text-secondary">
-                            ${stats.count > 0 ? (stats.cost_usd / stats.count).toFixed(6) : '0.000000'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center justify-center py-4">
-            <div className="osrs-text-secondary">No cost data available</div>
-          </div>
-        )}
-      </div>
+      <CostStatistics costs={costs} loading={costsLoading} />
 
       {/* Task Execution Health Summary */}
-      <div className="osrs-card">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
-          <h2 className="osrs-card-title mb-0 text-lg sm:text-xl">Task Execution Health</h2>
-          <Link
-            to="/task-executions"
-            className="osrs-btn text-sm"
-            style={{ minWidth: 'auto', padding: '0.5rem 1rem' }}
-          >
-            View All →
-          </Link>
-        </div>
-        {summaryLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <div className="osrs-text-secondary">Loading summary...</div>
-          </div>
-        ) : executionSummary ? (
-          <div className="space-y-4">
-            {/* Task Executions Over Time Graph */}
-            {executionsForGraph.length > 0 && timeSeriesData.length > 0 && (
-              <div className="pb-4 border-b" style={{ borderColor: '#8b7355' }}>
-                <h3 className="osrs-stat-label mb-4">Task Executions Over Time</h3>
-                <div className="h-96 rounded p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={timeSeriesData} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
-                      <XAxis
-                        dataKey="time"
-                        angle={-45}
-                        textAnchor="end"
-                        height={60}
-                        tick={{ fontSize: 9, fill: '#ffd700' }}
-                        stroke="#8b7355"
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12, fill: '#ffd700' }}
-                        stroke="#8b7355"
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#2d2418',
-                          border: '2px solid #a68b5b',
-                          borderRadius: '8px',
-                          color: '#ffd700'
-                        }}
-                        labelStyle={{ color: '#ffd700' }}
-                      />
-                      <Legend
-                        wrapperStyle={{
-                          paddingTop: '5px',
-                          paddingBottom: '5px',
-                          color: '#ffd700',
-                          fontSize: '11px'
-                        }}
-                        iconSize={12}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke="#ffd700"
-                        strokeWidth={2}
-                        name="Total"
-                        dot={{ fill: '#ffd700', r: 3 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="success"
-                        stroke={STATUS_COLORS.success}
-                        strokeWidth={2}
-                        name="Success"
-                        dot={{ fill: STATUS_COLORS.success, r: 3 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="failure"
-                        stroke={STATUS_COLORS.failure}
-                        strokeWidth={2}
-                        name="Failure"
-                        dot={{ fill: STATUS_COLORS.failure, r: 3 }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="retry"
-                        stroke={STATUS_COLORS.retry}
-                        strokeWidth={2}
-                        name="Retry"
-                        dot={{ fill: STATUS_COLORS.retry, r: 3 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Total Executions</h3>
-                <Link
-                  to="/task-executions"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{ textDecoration: 'none' }}
-                >
-                  {executionSummary.total.toLocaleString()}
-                </Link>
-              </div>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Success Rate</h3>
-                <Link
-                  to="/task-executions?status=success"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{
-                    color: executionSummary.successRate >= 95 ? '#4caf50' : executionSummary.successRate >= 80 ? '#ff9800' : '#d32f2f',
-                    textDecoration: 'none'
-                  }}
-                >
-                  {executionSummary.successRate.toFixed(1)}%
-                </Link>
-              </div>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failure Rate</h3>
-                <Link
-                  to="/task-executions?status=failure"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{
-                    color: executionSummary.failureRate <= 5 ? '#4caf50' : executionSummary.failureRate <= 20 ? '#ff9800' : '#d32f2f',
-                    textDecoration: 'none'
-                  }}
-                >
-                  {executionSummary.failureRate.toFixed(1)}%
-                </Link>
-              </div>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Avg Duration</h3>
-                <p className="osrs-stat-value block">
-                  {executionSummary.avgDuration > 0
-                    ? `${executionSummary.avgDuration.toFixed(2)}s`
-                    : '-'}
-                </p>
-              </div>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failures (24h)</h3>
-                <Link
-                  to="/task-executions?status=failure"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{
-                    color: executionSummary.recentFailures24h === 0 ? '#4caf50' : executionSummary.recentFailures24h <= 5 ? '#ff9800' : '#d32f2f',
-                    textDecoration: 'none'
-                  }}
-                >
-                  {executionSummary.recentFailures24h}
-                </Link>
-              </div>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failures (7d)</h3>
-                <Link
-                  to="/task-executions?status=failure"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{
-                    color: executionSummary.recentFailures7d === 0 ? '#4caf50' : executionSummary.recentFailures7d <= 20 ? '#ff9800' : '#d32f2f',
-                    textDecoration: 'none'
-                  }}
-                >
-                  {executionSummary.recentFailures7d}
-                </Link>
-              </div>
-            </div>
-
-            {/* Status Breakdown */}
-            <div>
-              <h3 className="osrs-stat-label mb-3">Status Breakdown</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                {Object.entries(executionSummary.statusBreakdown).map(([status, count]) => {
-                  const percentage = executionSummary.total > 0
-                    ? ((count / executionSummary.total) * 100).toFixed(1)
-                    : '0.0';
-                  return (
-                    <Link
-                      key={status}
-                      to={`/task-executions?status=${status}`}
-                      className="p-3 rounded hover:opacity-90 transition-opacity cursor-pointer block"
-                      style={{
-                        backgroundColor: `${STATUS_COLORS[status] || '#fff'}15`,
-                        border: `1px solid ${STATUS_COLORS[status] || '#fff'}40`,
-                        textDecoration: 'none'
-                      }}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span
-                          className="text-sm font-semibold capitalize"
-                          style={{ color: STATUS_COLORS[status] || '#fff' }}
-                        >
-                          {status}
-                        </span>
-                        <span className="text-xs osrs-text-secondary">{percentage}%</span>
-                      </div>
-                      <p className="text-lg font-bold" style={{ color: STATUS_COLORS[status] || '#fff' }}>
-                        {count.toLocaleString()}
-                      </p>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t" style={{ borderColor: '#8b7355' }}>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Successes</h3>
-                <Link
-                  to="/task-executions?status=success"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{ color: '#4caf50', textDecoration: 'none' }}
-                >
-                  {executionSummary.successCount.toLocaleString()}
-                </Link>
-              </div>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failures</h3>
-                <Link
-                  to="/task-executions?status=failure"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{ color: '#d32f2f', textDecoration: 'none' }}
-                >
-                  {executionSummary.failureCount.toLocaleString()}
-                </Link>
-              </div>
-              <div className="flex flex-col">
-                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Retries</h3>
-                <Link
-                  to="/task-executions?status=retry"
-                  className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
-                  style={{ color: '#ff9800', textDecoration: 'none' }}
-                >
-                  {executionSummary.retryCount.toLocaleString()}
-                </Link>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center py-4">
-            <div className="osrs-text-secondary">No execution data available</div>
-          </div>
-        )}
-      </div>
+      <TaskExecutionHealth
+        executionSummary={executionSummary}
+        executionsForGraph={executionsForGraph}
+        loading={summaryLoading}
+      />
 
       {/* Quick Actions */}
-      <div className="osrs-card">
-        <h2 className="osrs-card-title mb-6">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button
-            onClick={handleVerifySchedules}
-            disabled={verifyingSchedules}
-            className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
-            style={{
-              backgroundColor: '#3a3024',
-              border: '1px solid #8b7355',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-              minHeight: '80px'
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold osrs-text">Verify Schedules</span>
-              <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>🔍</span>
-            </div>
-            <span className="text-xs osrs-text-secondary">
-              {verifyingSchedules ? 'Checking schedule integrity...' : 'Validate all player fetch schedules'}
-            </span>
-          </button>
-          <button
-            onClick={handleGenerateSummaries}
-            disabled={generatingSummaries}
-            className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
-            style={{
-              backgroundColor: '#3a3024',
-              border: '1px solid #8b7355',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-              minHeight: '80px'
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold osrs-text">Generate Summaries</span>
-              <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>✨</span>
-            </div>
-            <span className="text-xs osrs-text-secondary">
-              {generatingSummaries ? 'Generating summaries...' : 'Generate AI summaries for all active players'}
-            </span>
-          </button>
-        </div>
-      </div>
+      <QuickActions
+        onVerifySchedules={handleVerifySchedules}
+        onGenerateSummaries={handleGenerateSummaries}
+        verifyingSchedules={verifyingSchedules}
+        generatingSummaries={generatingSummaries}
+      />
 
       {/* Modal */}
       <Modal

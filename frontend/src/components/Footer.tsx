@@ -10,7 +10,7 @@ export const Footer: React.FC<FooterProps> = ({ sidebarCollapsed = false }) => {
 
   return (
     <footer
-      className={`bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 transition-all duration-300 ${
+      className={`bg-gray-50 dark:bg-gray-800 border-t border-secondary-200 dark:border-secondary-700 transition-all duration-300 ${
         sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
       }`}
     >
@@ -18,7 +18,7 @@ export const Footer: React.FC<FooterProps> = ({ sidebarCollapsed = false }) => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">OSRS Diff</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-secondary-600 dark:text-secondary-200 mb-4">
               The open source Old School RuneScape player progress tracker.
             </p>
           </div>
@@ -29,7 +29,7 @@ export const Footer: React.FC<FooterProps> = ({ sidebarCollapsed = false }) => {
                 <li>
                   <Link
                     to="/login"
-                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    className="text-sm text-secondary-600 dark:text-secondary-200 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                   >
                     Login
                   </Link>
@@ -40,7 +40,7 @@ export const Footer: React.FC<FooterProps> = ({ sidebarCollapsed = false }) => {
                   href="https://github.com/mchestr/osrsdiff"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  className="text-sm text-secondary-600 dark:text-secondary-200 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                 >
                   GitHub
                 </a>
@@ -55,7 +55,7 @@ export const Footer: React.FC<FooterProps> = ({ sidebarCollapsed = false }) => {
                   href="https://github.com/mchestr/osrsdiff/issues"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  className="text-sm text-secondary-600 dark:text-secondary-200 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                 >
                   Report Bug
                 </a>
@@ -65,7 +65,7 @@ export const Footer: React.FC<FooterProps> = ({ sidebarCollapsed = false }) => {
                   href="https://github.com/mchestr/osrsdiff/issues"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  className="text-sm text-secondary-600 dark:text-secondary-200 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                 >
                   Request Feature
                 </a>
@@ -73,7 +73,7 @@ export const Footer: React.FC<FooterProps> = ({ sidebarCollapsed = false }) => {
             </ul>
           </div>
         </div>
-        <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-600 dark:text-gray-400">
+        <div className="mt-8 pt-8 border-t border-secondary-200 dark:border-secondary-700 text-center text-sm text-secondary-600 dark:text-secondary-200">
           <p>© {new Date().getFullYear()} OSRS Diff. Open source project.</p>
         </div>
       </div>

@@ -116,7 +116,7 @@ export const Sidebar = ({ isOpen, onClose, collapsed }: SidebarProps) => {
             ) : (
               <button
                 onClick={onClose}
-                className="lg:hidden p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                className="lg:hidden p-2 text-secondary-500 dark:text-secondary-300 hover:text-secondary-700 dark:hover:text-secondary-100"
                 aria-label="Close sidebar"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +137,7 @@ export const Sidebar = ({ isOpen, onClose, collapsed }: SidebarProps) => {
               <>
                 <div className="mb-6">
                   {!collapsed && (
-                    <h3 className="px-4 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <h3 className="px-4 mb-2 text-xs font-semibold text-secondary-500 dark:text-secondary-300 uppercase tracking-wider">
                       Admin
                     </h3>
                   )}
@@ -152,7 +152,7 @@ export const Sidebar = ({ isOpen, onClose, collapsed }: SidebarProps) => {
             )}
             <div>
               {!collapsed && (
-                <h3 className="px-4 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <h3 className="px-4 mb-2 text-xs font-semibold text-secondary-500 dark:text-secondary-300 uppercase tracking-wider">
                   General
                 </h3>
               )}

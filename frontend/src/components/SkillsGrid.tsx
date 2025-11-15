@@ -48,7 +48,8 @@ export const SkillsGrid: React.FC<SkillsGridProps> = ({
                 )}
               </div>
               <div className="osrs-skill-level">
-                {skill.level}/{maxLevel}
+                <span className="osrs-skill-numerator">{skill.level}</span>
+                <span className="osrs-skill-denominator">/{maxLevel}</span>
               </div>
             </div>
           );

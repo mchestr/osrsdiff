@@ -1,14 +1,19 @@
+import { ApexOptions } from 'apexcharts';
 import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import Chart from 'react-apexcharts';
 import { api } from '../api/apiClient';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
+import { useTheme } from '../contexts/ThemeContext';
+import { getChartColors, getXAxisLabelColors } from '../utils/chartColors';
 
 interface OverallXPGraphProps {
   username: string;
 }
 
 export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
+  const { theme } = useTheme();
+  const colors = getChartColors(theme);
   const [progress, setProgress] = useState<SkillProgressResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,18 +45,18 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
 
   if (loading) {
     return (
-      <div className="osrs-card" style={{ padding: '16px' }}>
-        <h3 className="osrs-card-title text-base mb-4">Overall XP</h3>
-        <div className="osrs-text-secondary text-sm text-center py-8">Loading...</div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Overall XP</h3>
+        <div className="text-secondary-500 dark:text-secondary-300 text-sm text-center py-8">Loading...</div>
       </div>
     );
   }
 
   if (error || !progress || !progress.timeline || progress.timeline.length === 0) {
     return (
-      <div className="osrs-card" style={{ padding: '16px' }}>
-        <h3 className="osrs-card-title text-base mb-4">Overall XP</h3>
-        <div className="osrs-text-secondary text-sm text-center py-8">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Overall XP</h3>
+        <div className="text-secondary-500 dark:text-secondary-300 text-sm text-center py-8">
           {error || 'No data available'}
         </div>
       </div>
@@ -68,36 +73,148 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
   const currentXP = progress.timeline[progress.timeline.length - 1]?.experience ?? 0;
   const xpGained = progress.progress.experience_gained ?? 0;
 
-  // Calculate y-axis domain based on first record to avoid flat line appearance
-  const experienceValues = timelineData.map((d) => d.experience).filter((v) => v > 0);
-  const minExperience = experienceValues.length > 0 ? Math.min(...experienceValues) : 0;
-  const maxExperience = experienceValues.length > 0 ? Math.max(...experienceValues) : 0;
-  const range = maxExperience - minExperience;
-  // Add 5% padding below min and above max, but ensure min doesn't go below 0
-  // If range is 0 or very small, use a minimum padding of 1% of the value
-  const padding = range > 0 ? range * 0.05 : Math.max(minExperience * 0.01, 1000);
-  const yAxisDomain = [
-    Math.max(0, minExperience - padding),
-    maxExperience + padding,
+  // Filter to show only every 7th day
+  const filteredData = timelineData.filter((_, index) => index % 7 === 0 || index === timelineData.length - 1);
+
+  const categories = filteredData.map((d) => d.date);
+  const experienceData = filteredData.map((d) => d.experience);
+
+  const options: ApexOptions = {
+    legend: {
+      show: false,
+    },
+    colors: [colors.primary],
+    chart: {
+      fontFamily: 'Inter, sans-serif',
+      height: 350,
+      type: 'area',
+      toolbar: {
+        show: false,
+      },
+      zoom: {
+        enabled: false,
+      },
+    },
+    stroke: {
+      curve: 'straight',
+      width: 2,
+    },
+    fill: {
+      type: 'gradient',
+      gradient: {
+        opacityFrom: 0.55,
+        opacityTo: 0,
+        stops: [0, 100],
+      },
+    },
+    markers: {
+      size: 0,
+      strokeColors: '#fff',
+      strokeWidth: 2,
+      hover: {
+        size: 6,
+      },
+    },
+    grid: {
+      xaxis: {
+        lines: {
+          show: false,
+        },
+      },
+      yaxis: {
+        lines: {
+          show: true,
+        },
+      },
+      strokeDashArray: 3,
+      borderColor: colors.gridBorder,
+    },
+    dataLabels: {
+      enabled: false,
+    },
+    tooltip: {
+      enabled: true,
+      theme: colors.tooltipTheme,
+      style: {
+        fontSize: '12px',
+        fontFamily: 'Inter, sans-serif',
+      },
+      y: {
+        formatter: (value: number) => {
+          if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M XP`;
+          if (value >= 1000) return `${(value / 1000).toFixed(1)}K XP`;
+          return `${value} XP`;
+        },
+      },
+    },
+    xaxis: {
+      type: 'category',
+      categories,
+      axisBorder: {
+        show: false,
+      },
+      axisTicks: {
+        show: false,
+      },
+      labels: {
+        style: {
+          fontSize: '12px',
+          colors: getXAxisLabelColors(categories.length, theme),
+        },
+        rotate: -45,
+        rotateAlways: true,
+        maxHeight: 100,
+        hideOverlappingLabels: true,
+      },
+      tooltip: {
+        enabled: false,
+      },
+    },
+    yaxis: {
+      labels: {
+        style: {
+          fontSize: '12px',
+          colors: [colors.yAxisLabels],
+        },
+        formatter: (value: number) => {
+          if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+          if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+          return value.toString();
+        },
+      },
+      title: {
+        text: '',
+        style: {
+          fontSize: '0px',
+        },
+      },
+    },
+  };
+
+  const series = [
+    {
+      name: 'Experience',
+      data: experienceData,
+    },
   ];
 
   return (
-    <div className="osrs-card" style={{ padding: '16px' }}>
+    <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-        <h3 className="osrs-card-title text-base">Overall XP</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200">Overall XP</h3>
 
         {/* Current Stats */}
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
-            <span className="osrs-stat-label text-xs">Total XP</span>
-            <span className="osrs-text text-sm font-semibold">
+            <span className="text-xs text-secondary-500 dark:text-secondary-300">Total XP</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
               {currentXP ? (currentXP / 1000000).toFixed(2) + 'M' : 'N/A'}
             </span>
           </div>
           {xpGained > 0 && (
             <div className="flex items-center gap-2">
-              <span className="osrs-stat-label text-xs">Gained (90d)</span>
-              <span className="osrs-text text-sm font-medium text-green-400">
+              <span className="text-xs text-secondary-500 dark:text-secondary-300">Gained (90d)</span>
+              <span className="text-sm font-medium text-green-600 dark:text-green-400">
                 +{(xpGained / 1000000).toFixed(2)}M
               </span>
             </div>
@@ -106,62 +223,10 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
       </div>
 
       {/* Graph */}
-      <div className="h-64" style={{ backgroundColor: '#1d1611' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={timelineData} margin={{ top: 20, right: 20, left: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
-            <XAxis
-              dataKey="date"
-              angle={-45}
-              textAnchor="end"
-              height={80}
-              tick={{ fontSize: 11, fill: '#ffd700', fontWeight: 500 }}
-              interval="preserveStartEnd"
-              stroke="#8b7355"
-            />
-            <YAxis
-              domain={yAxisDomain}
-              tick={{ fontSize: 11, fill: '#ffd700', fontWeight: 500 }}
-              stroke="#8b7355"
-              tickFormatter={(value) => {
-                if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-                return value.toString();
-              }}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#2d2418',
-                border: '2px solid #8b7355',
-                borderRadius: '0',
-                fontSize: '12px',
-                fontWeight: 500,
-                padding: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                color: '#ffd700'
-              }}
-              labelStyle={{
-                marginBottom: '4px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#ffd700'
-              }}
-              formatter={(value: number) => {
-                if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M XP`;
-                if (value >= 1000) return `${(value / 1000).toFixed(1)}K XP`;
-                return `${value} XP`;
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey="experience"
-              stroke="#ffd700"
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      <div className="max-w-full overflow-x-auto">
+        <div id="overall-xp-chart" className="min-w-[600px]">
+          <Chart key={theme} options={options} series={series} type="area" height={350} />
+        </div>
       </div>
     </div>
   );
