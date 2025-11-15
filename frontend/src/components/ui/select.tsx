@@ -26,7 +26,7 @@ export const Select: React.FC<SelectProps> = ({
   label,
   error,
   helperText,
-  placeholder = 'Select an option',
+  placeholder: _placeholder = 'Select an option', // Reserved for future use
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);

@@ -23,7 +23,7 @@ export interface PaginationProps {
   limit: number;
 }
 
-export interface SearchConfig {
+export interface SearchConfig<T extends Record<string, any>> {
   placeholder?: string;
   searchKeys?: (keyof T)[];
   value?: string;
@@ -39,12 +39,12 @@ export interface LimitConfig {
   options?: number[];
 }
 
-export interface DataTableProps<T> {
+export interface DataTableProps<T extends Record<string, any>> {
   data: T[];
   columns: Column<T>[];
   keyExtractor: (item: T) => string | number;
   emptyMessage?: string;
-  searchable?: boolean | SearchConfig;
+  searchable?: boolean | SearchConfig<T>;
   searchPlaceholder?: string; // Deprecated, use searchable object
   searchKeys?: (keyof T)[]; // Deprecated, use searchable object
   onRowClick?: (item: T, e?: React.MouseEvent) => void;
@@ -100,7 +100,7 @@ export function DataTable<T extends Record<string, any>>({
     return data.filter((item) => {
       if (keysToSearch) {
         return keysToSearch.some((key) => {
-          const value = item[key];
+          const value = item[key as keyof T];
           return value?.toString().toLowerCase().includes(term);
         });
       }

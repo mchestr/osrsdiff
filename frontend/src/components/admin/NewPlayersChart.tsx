@@ -17,7 +17,6 @@ export const NewPlayersChart: React.FC<NewPlayersChartProps> = ({ players }) => 
   // Calculate data for last 30 days
   const chartData = useMemo(() => {
     const today = startOfDay(new Date());
-    const thirtyDaysAgo = subDays(today, 29); // 29 days ago + today = 30 days total
 
     // Initialize all days with 0
     const dailyCounts: Record<string, number> = {};
