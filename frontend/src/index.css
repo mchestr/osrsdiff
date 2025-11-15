@@ -11,6 +11,19 @@
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Better mobile scrolling */
+    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
+  }
+
+  /* Prevent horizontal scroll on mobile */
+  html {
+    overflow-x: hidden;
+  }
+
+  /* Better touch targets for mobile */
+  button, a, input, select {
+    touch-action: manipulation;
   }
 }
 
@@ -37,12 +50,22 @@
 
   /* Enhanced OSRS input styling */
   input.osrs-btn {
-    @apply px-4 py-2.5 font-medium transition-all duration-200;
+    @apply px-3 sm:px-4 py-2 sm:py-2.5 font-medium transition-all duration-200;
     background-color: #2d2418;
     border: 2px solid #a68b5b;
     border-radius: 8px;
     color: #ffd700;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    width: 100%;
+    min-height: 44px; /* Better touch target */
+    /* Prevent zoom on iOS when focusing input - use 16px minimum */
+    font-size: 16px;
+  }
+
+  @media (min-width: 640px) {
+    input.osrs-btn {
+      font-size: 14px;
+    }
   }
 
   input.osrs-btn:focus {
@@ -56,6 +79,7 @@
     color: #a68b5b;
     opacity: 0.7;
   }
+
 
   /* Enhanced OSRS select styling */
   select.osrs-btn {
@@ -161,7 +185,7 @@
 
   /* Enhanced OSRS card styling */
   .osrs-card {
-    @apply p-6;
+    @apply p-4 sm:p-6;
     background: linear-gradient(135deg, #2d2418 0%, #251e15 100%);
     border: 3px solid #a68b5b;
     border-radius: 12px;
@@ -176,11 +200,17 @@
   }
 
   .osrs-card-title {
-    @apply font-bold mb-3;
+    @apply font-bold mb-2 sm:mb-3;
     color: #ffd700;
-    font-size: 1.125rem;
+    font-size: 1rem;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
     letter-spacing: 0.5px;
+  }
+
+  @media (min-width: 640px) {
+    .osrs-card-title {
+      font-size: 1.125rem;
+    }
   }
 
   .osrs-stat-label {
@@ -206,13 +236,16 @@
 
   /* Enhanced OSRS button */
   .osrs-btn {
-    @apply px-4 py-2.5 font-bold transition-all duration-200;
+    @apply px-3 sm:px-4 py-2 sm:py-2.5 font-bold transition-all duration-200;
     background: linear-gradient(135deg, #3a3024 0%, #2d2418 100%);
     border: 2px solid #a68b5b;
     border-radius: 8px;
     color: #ffd700;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    font-size: 14px;
+    min-height: 44px; /* Better touch target for mobile */
+    white-space: nowrap;
   }
 
   .osrs-btn:hover {
@@ -243,6 +276,9 @@
     position: sticky;
     top: 0;
     z-index: 50;
+    /* Prevent header from causing horizontal scroll */
+    width: 100%;
+    max-width: 100%;
   }
 
   .osrs-nav-logo {
@@ -261,12 +297,15 @@
   }
 
   .osrs-nav-link {
-    @apply px-4 py-2 text-sm font-semibold;
+    @apply px-3 sm:px-4 py-2 text-sm font-semibold;
     color: #e8d5a3;
     text-decoration: none;
     position: relative;
     transition: all 0.2s ease;
     border-radius: 6px;
+    min-height: 44px; /* Better touch target */
+    display: flex;
+    align-items: center;
   }
 
   .osrs-nav-link::before {
@@ -316,7 +355,7 @@
   }
 
   .osrs-nav-logout {
-    @apply px-4 py-2 text-sm font-semibold;
+    @apply px-3 sm:px-4 py-2 text-sm font-semibold;
     background: linear-gradient(135deg, #3a3024 0%, #2d2418 100%);
     border: 2px solid #a68b5b;
     color: #ffd700;
@@ -325,6 +364,10 @@
     cursor: pointer;
     border-radius: 6px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    min-height: 44px; /* Better touch target */
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .osrs-nav-logout:hover {

@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/apiClient';
-import { useAuth } from '../contexts/AuthContext';
 import type { DatabaseStatsResponse } from '../api/models/DatabaseStatsResponse';
 
 export const Home: React.FC = () => {
-  const { isAuthenticated } = useAuth();
   const [stats, setStats] = useState<DatabaseStatsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,10 +22,8 @@ export const Home: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchStats();
-    }
-  }, [isAuthenticated, fetchStats]);
+    fetchStats();
+  }, [fetchStats]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,18 +45,17 @@ export const Home: React.FC = () => {
   return (
     <div className="space-y-16">
       {/* Hero Section */}
-      <div className="text-center py-16">
-        <h1 className="text-6xl md:text-7xl font-bold mb-6" style={{ color: '#ffd700' }}>
+      <div className="text-center py-8 sm:py-12 md:py-16 px-2">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6" style={{ color: '#ffd700' }}>
           OSRS Diff
         </h1>
-        <p className="osrs-text text-xl md:text-2xl mb-8 max-w-3xl mx-auto">
-          The open source Old School RuneScape<br />
-          player progress tracker.
+        <p className="osrs-text text-lg sm:text-xl md:text-2xl mb-6 sm:mb-8 max-w-3xl mx-auto px-2">
+          The open source Old School RuneScape<br className="hidden sm:block" />
+          <span className="sm:hidden"> </span>player progress tracker.
         </p>
 
         {/* Statistics Cards */}
-        {isAuthenticated && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mt-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto mt-8 sm:mt-12 px-2">
             {loading ? (
               <>
                 <div className="text-center">
@@ -109,22 +104,20 @@ export const Home: React.FC = () => {
               </>
             ) : null}
           </div>
-        )}
 
         {/* Search Form */}
-        <div className="max-w-2xl mx-auto mt-12">
-          <form onSubmit={handleSearch} className="flex gap-2">
+        <div className="max-w-2xl mx-auto mt-8 sm:mt-12 px-2">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 sm:gap-2">
             <input
               type="text"
               placeholder="Search for a player by username..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 osrs-btn text-lg py-3"
+              className="flex-1 osrs-btn text-base sm:text-lg py-2.5 sm:py-3"
             />
             <button
               type="submit"
-              className="osrs-btn px-8 text-lg py-3"
-              style={{ whiteSpace: 'nowrap' }}
+              className="osrs-btn px-6 sm:px-8 text-base sm:text-lg py-2.5 sm:py-3 w-full sm:w-auto"
             >
               Search
             </button>
@@ -134,11 +127,11 @@ export const Home: React.FC = () => {
 
       {/* Track your hiscores over time */}
       <div className="osrs-card">
-        <h2 className="osrs-card-title text-3xl mb-6 text-center">Track your hiscores over time</h2>
-        <p className="osrs-text text-lg mb-8 text-center max-w-2xl mx-auto">
+        <h2 className="osrs-card-title text-xl sm:text-2xl md:text-3xl mb-4 sm:mb-6 text-center">Track your hiscores over time</h2>
+        <p className="osrs-text text-base sm:text-lg mb-6 sm:mb-8 text-center max-w-2xl mx-auto px-2">
           By periodically checking your hiscores, OSRS Diff can create a historical record, this allows you to:
         </p>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-6">
           <div className="text-center">
             <div className="text-4xl mb-4">📊</div>
             <h3 className="osrs-card-title text-xl mb-2">Check your gains, all-time records and collect achievements</h3>
@@ -165,8 +158,8 @@ export const Home: React.FC = () => {
 
       {/* How does it work? */}
       <div className="osrs-card">
-        <h2 className="osrs-card-title text-3xl mb-8 text-center">How does it work?</h2>
-        <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+        <h2 className="osrs-card-title text-xl sm:text-2xl md:text-3xl mb-6 sm:mb-8 text-center">How does it work?</h2>
+        <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-4xl mx-auto px-2">
           <div className="text-center">
             <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold" style={{ backgroundColor: '#3a3024', border: '3px solid #a68b5b', color: '#ffd700' }}>
               1
@@ -198,22 +191,22 @@ export const Home: React.FC = () => {
       </div>
 
       {/* Features Grid */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-3 gap-4 sm:gap-6">
         <div className="osrs-card">
-          <h3 className="osrs-card-title text-xl mb-2">📊 Skill Tracking</h3>
-          <p className="osrs-text-secondary">
+          <h3 className="osrs-card-title text-lg sm:text-xl mb-2">📊 Skill Tracking</h3>
+          <p className="osrs-text-secondary text-sm sm:text-base">
             Monitor skill levels and experience gains over time with detailed progress charts and statistics.
           </p>
         </div>
         <div className="osrs-card">
-          <h3 className="osrs-card-title text-xl mb-2">⚔️ Boss Progress</h3>
-          <p className="osrs-text-secondary">
+          <h3 className="osrs-card-title text-lg sm:text-xl mb-2">⚔️ Boss Progress</h3>
+          <p className="osrs-text-secondary text-sm sm:text-base">
             Track boss kill counts and analyze your PvM progress with historical data and trends.
           </p>
         </div>
         <div className="osrs-card">
-          <h3 className="osrs-card-title text-xl mb-2">📈 Analytics</h3>
-          <p className="osrs-text-secondary">
+          <h3 className="osrs-card-title text-lg sm:text-xl mb-2">📈 Analytics</h3>
+          <p className="osrs-text-secondary text-sm sm:text-base">
             Get insights into your gameplay with daily rates, progress summaries, and time estimates.
           </p>
         </div>
@@ -221,8 +214,8 @@ export const Home: React.FC = () => {
 
       {/* Community Section */}
       <div className="osrs-card text-center">
-        <h2 className="osrs-card-title text-3xl mb-4">Community driven</h2>
-        <p className="osrs-text text-lg mb-6 max-w-2xl mx-auto">
+        <h2 className="osrs-card-title text-xl sm:text-2xl md:text-3xl mb-3 sm:mb-4">Community driven</h2>
+        <p className="osrs-text text-base sm:text-lg mb-4 sm:mb-6 max-w-2xl mx-auto px-2">
           OSRS Diff is a free Open Source project, meaning anyone in the community can contribute code or ideas to add new functionality.
         </p>
         <div className="flex justify-center gap-4">

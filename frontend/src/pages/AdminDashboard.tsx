@@ -357,11 +357,11 @@ export const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="osrs-card-title text-3xl">Admin Dashboard</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <h1 className="osrs-card-title text-2xl sm:text-3xl">Admin Dashboard</h1>
 
       {/* System Health & Database Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-4 md:gap-6">
         {health && (
           <>
             <div className="osrs-card flex flex-col">
@@ -430,7 +430,7 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Cost Statistics */}
       <div className="osrs-card">
-        <h2 className="osrs-card-title mb-4">Cost Statistics</h2>
+        <h2 className="osrs-card-title mb-3 sm:mb-4 text-lg sm:text-xl">Cost Statistics</h2>
         {costsLoading ? (
           <div className="flex items-center justify-center py-4">
             <div className="osrs-text-secondary">Loading cost statistics...</div>
@@ -543,8 +543,8 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Task Execution Health Summary */}
       <div className="osrs-card">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="osrs-card-title mb-0">Task Execution Health</h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
+          <h2 className="osrs-card-title mb-0 text-lg sm:text-xl">Task Execution Health</h2>
           <Link
             to="/task-executions"
             className="osrs-btn text-sm"

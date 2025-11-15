@@ -78,17 +78,16 @@ router = APIRouter(prefix="/system", tags=["system"])
 @router.get("/stats", response_model=DatabaseStatsResponse)
 async def get_database_stats(
     db_session: AsyncSession = Depends(get_db_session),
-    current_user: Dict[str, Any] = Depends(require_auth),
 ) -> DatabaseStatsResponse:
     """
     Get comprehensive database statistics.
 
     Returns detailed statistics about players, hiscore records, and system usage.
     Useful for monitoring system growth and usage patterns.
+    This endpoint is publicly accessible and does not require authentication.
 
     Args:
         db_session: Database session dependency
-        current_user: Authenticated user information
 
     Returns:
         DatabaseStatsResponse: Comprehensive database statistics
@@ -97,9 +96,7 @@ async def get_database_stats(
         500 Internal Server Error: Database or calculation errors
     """
     try:
-        logger.info(
-            f"User {current_user.get('username')} requesting database stats"
-        )
+        logger.info("Requesting database stats (public endpoint)")
 
         # Get player counts
         total_players_result = await db_session.execute(

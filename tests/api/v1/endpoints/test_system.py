@@ -115,6 +115,39 @@ class TestSystemStats:
         assert data["records_last_7d"] == 100
         assert data["avg_records_per_player"] == 15.0
 
+    def test_get_database_stats_unauthorized(self, app, mock_db_session):
+        """Test database stats endpoint without authentication (should work)."""
+        from app.models.base import get_db_session
+        from datetime import datetime
+
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        # Don't override require_auth - endpoint should work without it
+        client = TestClient(app)
+
+        # Mock database query results
+        mock_db_session.execute.side_effect = [
+            # total_players
+            AsyncMock(scalar=lambda: 5),
+            # active_players
+            AsyncMock(scalar=lambda: 3),
+            # total_records
+            AsyncMock(scalar=lambda: 75),
+            # oldest_record
+            AsyncMock(scalar=lambda: datetime(2024, 1, 1)),
+            # newest_record
+            AsyncMock(scalar=lambda: datetime(2024, 11, 2)),
+            # records_24h
+            AsyncMock(scalar=lambda: 10),
+            # records_7d
+            AsyncMock(scalar=lambda: 50),
+        ]
+
+        response = client.get("/system/stats")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_players"] == 5
+        assert data["active_players"] == 3
+
 
 class TestSummaryGeneration:
     """Test cases for summary generation endpoints."""

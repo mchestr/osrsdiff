@@ -489,16 +489,16 @@ export const PlayerStats: React.FC = () => {
   return (
     <div className="space-y-1">
       {/* Compact Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 mb-1">
-        <h1 className="osrs-card-title text-xl sm:text-2xl" style={{ marginBottom: 0 }}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-1.5 mb-2 sm:mb-1">
+        <h1 className="osrs-card-title text-lg sm:text-xl md:text-2xl" style={{ marginBottom: 0 }}>
           {stats.username}
           {polling && (
-            <span className="ml-2 osrs-text-secondary text-sm" style={{ opacity: 0.7 }}>
+            <span className="ml-2 osrs-text-secondary text-xs sm:text-sm" style={{ opacity: 0.7 }}>
               (fetching...)
             </span>
           )}
         </h1>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {stats.fetched_at && (
             <p className="osrs-text-secondary text-xs">
               {format(new Date(stats.fetched_at), 'MMM d, HH:mm')}
@@ -1219,14 +1219,14 @@ const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
       </div>
 
       {currentProgress ? (
-        <div className="overflow-x-auto">
-          <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+        <div className="overflow-x-auto -mx-3 sm:mx-0">
+          <table className="w-full min-w-[600px]" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #8b7355' }}>
-                <th className="osrs-text text-left py-2 px-3 font-semibold" style={{ minWidth: '200px' }}>Skill</th>
-                <th className="osrs-text text-right py-2 px-3 font-semibold">Current Level</th>
-                <th className="osrs-text text-right py-2 px-3 font-semibold">Levels Gained</th>
-                <th className="osrs-text text-right py-2 px-3 font-semibold">Experience Gained</th>
+                <th className="osrs-text text-left py-2 px-2 sm:px-3 font-semibold text-xs sm:text-sm" style={{ minWidth: '150px' }}>Skill</th>
+                <th className="osrs-text text-right py-2 px-2 sm:px-3 font-semibold text-xs sm:text-sm whitespace-nowrap">Current Level</th>
+                <th className="osrs-text text-right py-2 px-2 sm:px-3 font-semibold text-xs sm:text-sm whitespace-nowrap">Levels Gained</th>
+                <th className="osrs-text text-right py-2 px-2 sm:px-3 font-semibold text-xs sm:text-sm whitespace-nowrap">Experience Gained</th>
               </tr>
             </thead>
             <tbody>
@@ -1239,9 +1239,9 @@ const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
                     className="hover:bg-opacity-10"
                     style={{ borderBottom: '1px solid #8b7355', backgroundColor: progress.experience > 0 ? 'rgba(255, 215, 0, 0.05)' : 'transparent' }}
                   >
-                    <td className="py-2 px-3">
+                    <td className="py-2 px-2 sm:px-3">
                       <div
-                        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                        className="flex items-center gap-1.5 sm:gap-2 cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => onSkillClick(skill.name)}
                         title={`Click to view ${skill.displayName} details`}
                       >
@@ -1249,33 +1249,33 @@ const SkillsSummaryTable: React.FC<SkillsSummaryTableProps> = ({
                           <img
                             src={iconUrl}
                             alt={skill.displayName}
-                            className="w-5 h-5 flex-shrink-0"
+                            className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.style.display = 'none';
                             }}
                           />
                         ) : (
-                          <span className="w-5 h-5 flex items-center justify-center text-xs">{iconUrl || '❓'}</span>
+                          <span className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs">{iconUrl || '❓'}</span>
                         )}
-                        <span className="osrs-text font-medium">{skill.displayName}</span>
+                        <span className="osrs-text font-medium text-xs sm:text-sm">{skill.displayName}</span>
                       </div>
                     </td>
-                    <td className="osrs-text text-right py-2 px-3">
-                      <span className="font-semibold">{skill.level}</span>
+                    <td className="osrs-text text-right py-2 px-2 sm:px-3">
+                      <span className="font-semibold text-xs sm:text-sm">{skill.level}</span>
                     </td>
-                    <td className="osrs-text text-right py-2 px-3">
+                    <td className="osrs-text text-right py-2 px-2 sm:px-3">
                       {progress.levels > 0 ? (
-                        <span className="font-semibold text-green-400">+{progress.levels}</span>
+                        <span className="font-semibold text-green-400 text-xs sm:text-sm">+{progress.levels}</span>
                       ) : (
-                        <span className="osrs-text-secondary">0</span>
+                        <span className="osrs-text-secondary text-xs sm:text-sm">0</span>
                       )}
                     </td>
-                    <td className="osrs-text text-right py-2 px-3">
+                    <td className="osrs-text text-right py-2 px-2 sm:px-3">
                       {progress.experience > 0 ? (
-                        <span className="font-semibold">{progress.experience.toLocaleString()}</span>
+                        <span className="font-semibold text-xs sm:text-sm">{progress.experience.toLocaleString()}</span>
                       ) : (
-                        <span className="osrs-text-secondary">0</span>
+                        <span className="osrs-text-secondary text-xs sm:text-sm">0</span>
                       )}
                     </td>
                   </tr>
