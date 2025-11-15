@@ -1,13 +1,5 @@
-// Helper function to format large numbers
-export const formatNumber = (num: number): string => {
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  }
-  if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toString();
-};
+// Re-export formatNumber from shared utils for backward compatibility
+export { formatNumber } from '../../utils/formatters';
 
 export const STATUS_COLORS: Record<string, string> = {
   success: '#4caf50',

@@ -1,5 +1,6 @@
 import type { CostStatsResponse } from '../../api/models/OpenAICostStatsResponse';
 import { CostStatisticsChart } from './CostStatisticsChart';
+import { formatCurrency, formatNumberLocale } from '../../utils/formatters';
 import { formatNumber } from './utils';
 
 interface CostStatisticsProps {
@@ -39,25 +40,25 @@ export const CostStatistics: React.FC<CostStatisticsProps> = ({ costs, loading }
           <div className="osrs-card hover:shadow-card-hover transition-shadow">
             <h3 className="osrs-stat-label mb-2">Total Cost</h3>
             <p className="osrs-stat-value text-2xl">
-              ${costs.total_cost_usd.toFixed(4)}
+              {formatCurrency(costs.total_cost_usd)}
             </p>
           </div>
           <div className="osrs-card hover:shadow-card-hover transition-shadow">
             <h3 className="osrs-stat-label mb-2">Last 24 Hours</h3>
             <p className="osrs-stat-value text-2xl text-success-600">
-              ${costs.cost_last_24h_usd.toFixed(4)}
+              {formatCurrency(costs.cost_last_24h_usd)}
             </p>
           </div>
           <div className="osrs-card hover:shadow-card-hover transition-shadow">
             <h3 className="osrs-stat-label mb-2">Last 7 Days</h3>
             <p className="osrs-stat-value text-2xl text-success-600">
-              ${costs.cost_last_7d_usd.toFixed(4)}
+              {formatCurrency(costs.cost_last_7d_usd)}
             </p>
           </div>
           <div className="osrs-card hover:shadow-card-hover transition-shadow">
             <h3 className="osrs-stat-label mb-2">Last 30 Days</h3>
             <p className="osrs-stat-value text-2xl text-success-600">
-              ${costs.cost_last_30d_usd.toFixed(4)}
+              {formatCurrency(costs.cost_last_30d_usd)}
             </p>
           </div>
         </div>
@@ -66,7 +67,7 @@ export const CostStatistics: React.FC<CostStatisticsProps> = ({ costs, loading }
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-secondary-200 dark:border-secondary-700">
           <div>
             <h3 className="osrs-stat-label mb-1">Total Summaries</h3>
-            <p className="osrs-stat-value">{costs.total_summaries.toLocaleString()}</p>
+            <p className="osrs-stat-value">{formatNumberLocale(costs.total_summaries)}</p>
           </div>
           <div>
             <h3 className="osrs-stat-label mb-1">Total Tokens</h3>
@@ -79,8 +80,8 @@ export const CostStatistics: React.FC<CostStatisticsProps> = ({ costs, loading }
             <h3 className="osrs-stat-label mb-1">Avg Cost per Summary</h3>
             <p className="osrs-stat-value">
               {costs.total_summaries > 0
-                ? `$${(costs.total_cost_usd / costs.total_summaries).toFixed(6)}`
-                : '$0.000000'}
+                ? formatCurrency(costs.total_cost_usd / costs.total_summaries, 6)
+                : formatCurrency(0, 6)}
             </p>
           </div>
         </div>
@@ -107,7 +108,7 @@ export const CostStatistics: React.FC<CostStatisticsProps> = ({ costs, loading }
                     <div className="flex justify-between">
                       <span className="osrs-text-secondary">Cost:</span>
                       <span className="osrs-text text-success-600 dark:text-success-400 font-medium">
-                        ${stats.cost_usd.toFixed(4)}
+                        {formatCurrency(stats.cost_usd)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -117,7 +118,7 @@ export const CostStatistics: React.FC<CostStatisticsProps> = ({ costs, loading }
                     <div className="flex justify-between text-xs">
                       <span className="osrs-text-secondary">Avg per summary:</span>
                       <span className="osrs-text-secondary">
-                        ${stats.count > 0 ? (stats.cost_usd / stats.count).toFixed(6) : '0.000000'}
+                        {stats.count > 0 ? formatCurrency(stats.cost_usd / stats.count, 6) : formatCurrency(0, 6)}
                       </span>
                     </div>
                   </div>

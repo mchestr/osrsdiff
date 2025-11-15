@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom';
+import { LoadingSpinner } from './LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -13,11 +14,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, isAdmin, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#1d1611' }}>
-        <div className="osrs-text text-xl">Loading...</div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading..." fullScreen />;
   }
 
   if (!isAuthenticated) {

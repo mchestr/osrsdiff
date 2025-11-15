@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import Chart from 'react-apexcharts';
 import { api } from '../api/apiClient';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../hooks';
 import { getChartColors, getXAxisLabelColors } from '../utils/chartColors';
+import { formatNumberLocale, formatXP } from '../utils/formatters';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface OverallXPGraphProps {
   username: string;
@@ -33,7 +35,6 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
         );
         setProgress(data);
       } catch (err: unknown) {
-        console.error('Failed to load overall XP progress:', err);
         setError('Failed to load XP data');
       } finally {
         setLoading(false);
@@ -47,7 +48,7 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
     return (
       <div>
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-200 mb-4">Overall XP</h3>
-        <div className="text-secondary-500 dark:text-secondary-300 text-sm text-center py-8">Loading...</div>
+        <LoadingSpinner message="Loading..." />
       </div>
     );
   }
@@ -140,11 +141,7 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
         fontFamily: 'Inter, sans-serif',
       },
       y: {
-        formatter: (value: number) => {
-          if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M XP`;
-          if (value >= 1000) return `${(value / 1000).toFixed(1)}K XP`;
-          return `${value} XP`;
-        },
+        formatter: (value: number) => formatXP(value),
       },
     },
     xaxis: {
@@ -179,7 +176,7 @@ export const OverallXPGraph: React.FC<OverallXPGraphProps> = ({ username }) => {
         formatter: (value: number) => {
           if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
           if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-          return value.toString();
+          return formatNumberLocale(value);
         },
       },
       title: {

@@ -2,7 +2,7 @@ import { ApexOptions } from 'apexcharts';
 import { format } from 'date-fns';
 import Chart from 'react-apexcharts';
 import type { SkillProgressResponse } from '../../api/models/SkillProgressResponse';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks';
 import type { SkillData } from '../../types/player';
 import { getChartColors, getXAxisLabelColors } from '../../utils/chartColors';
 import { formatDuration, getExpToMax, getExpToNextLevel } from '../../utils/osrs';

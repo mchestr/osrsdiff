@@ -2,8 +2,9 @@ import { ApexOptions } from 'apexcharts';
 import { useMemo } from 'react';
 import Chart from 'react-apexcharts';
 import type { CostStatsResponse } from '../../api/models/OpenAICostStatsResponse';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks';
 import { getChartColors } from '../../utils/chartColors';
+import { formatCurrency } from '../../utils/formatters';
 
 interface CostStatisticsChartProps {
   costs: CostStatsResponse | null;
@@ -74,14 +75,13 @@ export const CostStatisticsChart: React.FC<CostStatisticsChartProps> = ({ costs 
       .sort((a, b) => b.value - a.value);
   }, [costs]);
 
-  if (!costs) {
-    return null;
-  }
-
-  const formatCurrency = (value: number) => `$${value.toFixed(4)}`;
-
-  const timePeriodOptions: ApexOptions = useMemo(() => ({
-    chart: {
+  // All hooks must be called before any conditional returns
+  const timePeriodOptions: ApexOptions = useMemo(() => {
+    if (!costs) {
+      return {} as ApexOptions;
+    }
+    return {
+      chart: {
       type: 'bar',
       fontFamily: 'Inter, sans-serif',
       height: 350,
@@ -120,7 +120,7 @@ export const CostStatisticsChart: React.FC<CostStatisticsChartProps> = ({ costs 
           fontSize: '12px',
           colors: chartColors.yAxisLabels,
         },
-        formatter: (value: number) => `$${value.toFixed(2)}`,
+        formatter: (value: number) => formatCurrency(value, 2),
       },
     },
     grid: {
@@ -144,20 +144,28 @@ export const CostStatisticsChart: React.FC<CostStatisticsChartProps> = ({ costs 
         fontFamily: 'Inter, sans-serif',
       },
       y: {
-        formatter: (value: number) => formatCurrency(value),
+        formatter: (value: number) => formatCurrency(value, 4),
       },
     },
-  }), [timePeriodData, chartColors, colors]);
+    };
+  }, [timePeriodData, chartColors, colors, costs]);
 
-  const timePeriodSeries = [
-    {
-      name: 'Cost',
-      data: timePeriodData.map((d) => d.cost),
-    },
-  ];
+  const timePeriodSeries = useMemo(() => {
+    if (!costs) return [];
+    return [
+      {
+        name: 'Cost',
+        data: timePeriodData.map((d) => d.cost),
+      },
+    ];
+  }, [timePeriodData, costs]);
 
-  const pieOptions: ApexOptions = useMemo(() => ({
-    chart: {
+  const pieOptions: ApexOptions = useMemo(() => {
+    if (!costs || modelData.length === 0) {
+      return {} as ApexOptions;
+    }
+    return {
+      chart: {
       type: 'pie',
       fontFamily: 'Inter, sans-serif',
       height: 350,
@@ -188,19 +196,24 @@ export const CostStatisticsChart: React.FC<CostStatisticsChartProps> = ({ costs 
         formatter: (value: number) => {
           const total = modelData.reduce((sum, d) => sum + d.value, 0);
           const percentage = ((value / total) * 100).toFixed(1);
-          return `${formatCurrency(value)} (${percentage}%)`;
+            return `${formatCurrency(value, 4)} (${percentage}%)`;
         },
       },
     },
-  }), [modelData, chartColors, colors, isDark]);
+    };
+  }, [modelData, chartColors, colors, isDark, costs]);
 
-  const pieSeries = modelData.map((d) => d.value);
+  const pieSeries = useMemo(() => modelData.map((d) => d.value), [modelData]);
 
   // Reverse data for horizontal bar chart (top to bottom display)
   const reversedModelData = useMemo(() => [...modelData].reverse(), [modelData]);
 
-  const horizontalBarOptions: ApexOptions = useMemo(() => ({
-    chart: {
+  const horizontalBarOptions: ApexOptions = useMemo(() => {
+    if (!costs || modelData.length === 0) {
+      return {} as ApexOptions;
+    }
+    return {
+      chart: {
       type: 'bar',
       fontFamily: 'Inter, sans-serif',
       height: 350,
@@ -241,7 +254,7 @@ export const CostStatisticsChart: React.FC<CostStatisticsChartProps> = ({ costs 
         },
         formatter: (value: number) => {
           if (typeof value === 'number' && !isNaN(value)) {
-            return `$${value.toFixed(2)}`;
+            return formatCurrency(value, 2);
           }
           return String(value);
         },
@@ -267,26 +280,35 @@ export const CostStatisticsChart: React.FC<CostStatisticsChartProps> = ({ costs 
         fontSize: '12px',
         fontFamily: 'Inter, sans-serif',
       },
-      custom: ({ series, seriesIndex, dataPointIndex }) => {
+      custom: ({ series, seriesIndex, dataPointIndex }: { series: number[][]; seriesIndex: number; dataPointIndex: number }) => {
         const model = reversedModelData[dataPointIndex];
         const value = series[seriesIndex][dataPointIndex];
         return `
           <div style="padding: 8px;">
             <div style="font-weight: 600; margin-bottom: 4px;">${model.name}</div>
-            <div>${formatCurrency(value)}</div>
+            <div>${formatCurrency(value, 4)}</div>
             <div style="font-size: 11px; opacity: 0.8;">${model.count} summaries</div>
           </div>
         `;
       },
     },
-  }), [reversedModelData, chartColors, colors]);
+    };
+  }, [reversedModelData, chartColors, colors, costs, modelData]);
 
-  const horizontalBarSeries = useMemo(() => [
-    {
-      name: 'Cost',
-      data: reversedModelData.map((d) => d.value),
-    },
-  ], [reversedModelData]);
+  const horizontalBarSeries = useMemo(() => {
+    if (!costs || reversedModelData.length === 0) return [];
+    return [
+      {
+        name: 'Cost',
+        data: reversedModelData.map((d) => d.value),
+      },
+    ];
+  }, [reversedModelData, costs]);
+
+  // Early return after all hooks are called
+  if (!costs) {
+    return null;
+  }
 
   return (
     <>

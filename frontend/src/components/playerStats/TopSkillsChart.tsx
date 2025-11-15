@@ -1,7 +1,7 @@
 import { ApexOptions } from 'apexcharts';
 import Chart from 'react-apexcharts';
 import type { ProgressAnalysisResponse } from '../../api/models/ProgressAnalysisResponse';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks';
 import { getChartColors, getXAxisLabelColors } from '../../utils/chartColors';
 
 interface TopSkillsChartProps {

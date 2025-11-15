@@ -3,18 +3,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
-
-const STATUS_COLORS: Record<string, string> = {
-  success: '#4caf50',
-  failure: '#d32f2f',
-  retry: '#ff9800',
-  pending: '#2196f3',
-  running: '#9c27b0',
-  cancelled: '#9e9e9e',
-  skipped: '#9e9e9e',
-  warning: '#ff9800',
-  timeout: '#f44336',
-};
+import { ErrorDisplay } from '../components/ErrorDisplay';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { STATUS_COLORS } from '../components/admin/utils';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 export const TaskExecutionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -67,7 +59,7 @@ export const TaskExecutionDetail: React.FC = () => {
           setError('Task execution not found');
         }
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch task execution';
+        const errorMessage = extractErrorMessage(err, 'Failed to fetch task execution');
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -78,11 +70,7 @@ export const TaskExecutionDetail: React.FC = () => {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="osrs-text text-xl">Loading task execution details...</div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading task execution details..." />;
   }
 
   if (error || !execution) {
@@ -90,15 +78,11 @@ export const TaskExecutionDetail: React.FC = () => {
       <div className="space-y-6">
         <div className="osrs-card">
           <h1 className="osrs-card-title text-3xl mb-4">Task Execution Details</h1>
-          <div className="osrs-text text-red-400">
-            {error || 'Task execution not found'}
-          </div>
-          <button
-            onClick={() => navigate('/task-executions')}
-            className="osrs-btn mt-4"
-          >
-            Back to Task Executions
-          </button>
+          <ErrorDisplay
+            error={error || 'Task execution not found'}
+            onRetry={() => navigate('/task-executions')}
+            retryLabel="Back to Task Executions"
+          />
         </div>
       </div>
     );

@@ -3,7 +3,7 @@ import Chart from 'react-apexcharts';
 import { ApexOptions } from 'apexcharts';
 import type { BossProgressResponse } from '../../api/models/BossProgressResponse';
 import type { BossData } from '../../types/player';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks';
 import { getChartColors, getXAxisLabelColors } from '../../utils/chartColors';
 
 interface BossDetailModalProps {

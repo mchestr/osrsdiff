@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/apiClient';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import type { PlayerResponse } from '../api/models/PlayerResponse';
 import {
@@ -7,6 +8,8 @@ import {
   PlayerSearchBar,
   PlayerTable,
 } from '../components/admin';
+import { useModal } from '../hooks';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 export const AdminPlayerList: React.FC = () => {
   const [players, setPlayers] = useState<PlayerResponse[]>([]);
@@ -21,15 +24,11 @@ export const AdminPlayerList: React.FC = () => {
   const [activatingPlayer, setActivatingPlayer] = useState<string | null>(null);
 
   // Modal state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
-  const [modalType, setModalType] = useState<'info' | 'error' | 'success' | 'warning'>('info');
-  const [modalShowConfirm, setModalShowConfirm] = useState(false);
-  const [modalConfirmCallback, setModalConfirmCallback] = useState<(() => void) | null>(null);
+  const { modalState, showModal, showConfirmModal, closeModal, handleConfirm } = useModal();
 
   useEffect(() => {
     fetchPlayers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInactive]);
 
   const fetchPlayers = async () => {
@@ -37,27 +36,12 @@ export const AdminPlayerList: React.FC = () => {
       setLoading(true);
       const response = await api.PlayersService.listPlayersApiV1PlayersGet(!showInactive);
       setPlayers(response.players);
-    } catch (error) {
-      console.error('Failed to fetch players:', error);
-      showModal('Error', 'Failed to fetch players', 'error');
+    } catch (error: unknown) {
+      const errorMessage = extractErrorMessage(error, 'Failed to fetch players');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setLoading(false);
     }
-  };
-
-  const showModal = (
-    title: string,
-    message: string | React.ReactNode,
-    type: 'info' | 'error' | 'success' | 'warning' = 'info',
-    showConfirm = false,
-    onConfirm: (() => void) | null = null
-  ) => {
-    setModalTitle(title);
-    setModalMessage(message);
-    setModalType(type);
-    setModalShowConfirm(showConfirm);
-    setModalConfirmCallback(onConfirm ? () => onConfirm() : null);
-    setModalOpen(true);
   };
 
   const handleAddPlayer = async () => {
@@ -76,9 +60,8 @@ export const AdminPlayerList: React.FC = () => {
       await fetchPlayers();
       showModal('Success', `Player '${username}' added successfully`, 'success');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add player';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
+      const errorMessage = extractErrorMessage(error, 'Failed to add player');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setAddingPlayer(false);
     }
@@ -91,9 +74,8 @@ export const AdminPlayerList: React.FC = () => {
       await fetchPlayers();
       showModal('Success', `Player '${username}' deleted successfully`, 'success');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete player';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
+      const errorMessage = extractErrorMessage(error, 'Failed to delete player');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setDeletingPlayer(null);
     }
@@ -106,9 +88,8 @@ export const AdminPlayerList: React.FC = () => {
       await fetchPlayers();
       showModal('Success', `Player '${username}' deactivated successfully`, 'success');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to deactivate player';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
+      const errorMessage = extractErrorMessage(error, 'Failed to deactivate player');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setActivatingPlayer(null);
     }
@@ -121,9 +102,8 @@ export const AdminPlayerList: React.FC = () => {
       await fetchPlayers();
       showModal('Success', `Player '${username}' reactivated successfully`, 'success');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to reactivate player';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
+      const errorMessage = extractErrorMessage(error, 'Failed to reactivate player');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setActivatingPlayer(null);
     }
@@ -140,9 +120,8 @@ export const AdminPlayerList: React.FC = () => {
       setIntervalValue('');
       showModal('Success', `Fetch interval updated for '${username}'`, 'success');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update interval';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
+      const errorMessage = extractErrorMessage(error, 'Failed to update interval');
+      showModal('Error', errorMessage, 'error');
     }
   };
 
@@ -151,19 +130,17 @@ export const AdminPlayerList: React.FC = () => {
       await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
       showModal('Success', `Manual fetch triggered for '${username}'`, 'success');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetch';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
+      const errorMessage = extractErrorMessage(error, 'Failed to trigger fetch');
+      showModal('Error', errorMessage, 'error');
     }
   };
 
   const confirmDelete = (username: string) => {
-    showModal(
+    showConfirmModal(
       'Confirm Delete',
       `Are you sure you want to delete player '${username}'? This will remove all their historical data and cannot be undone.`,
-      'warning',
-      true,
-      () => handleDeletePlayer(username)
+      () => handleDeletePlayer(username),
+      'warning'
     );
   };
 
@@ -186,7 +163,7 @@ export const AdminPlayerList: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="text-center py-8 osrs-text">Loading players...</div>;
+    return <LoadingSpinner message="Loading players..." />;
   }
 
   return (
@@ -249,25 +226,14 @@ export const AdminPlayerList: React.FC = () => {
 
       {/* Modal */}
       <Modal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setModalShowConfirm(false);
-          setModalConfirmCallback(null);
-        }}
-        title={modalTitle}
-        type={modalType}
-        showConfirm={modalShowConfirm}
-        onConfirm={() => {
-          if (modalConfirmCallback) {
-            modalConfirmCallback();
-          }
-          setModalOpen(false);
-          setModalShowConfirm(false);
-          setModalConfirmCallback(null);
-        }}
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        type={modalState.type}
+        showConfirm={modalState.showConfirm}
+        onConfirm={handleConfirm}
       >
-        {modalMessage}
+        {modalState.message}
       </Modal>
     </div>
   );

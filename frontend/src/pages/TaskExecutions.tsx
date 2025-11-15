@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import {
   TaskExecutionPagination,
@@ -10,20 +11,12 @@ import {
   useDebounce,
   useUrlSync,
 } from '../components/admin';
+import { useModal } from '../hooks';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 // Constants
 const DEBOUNCE_DELAY_MS = 500;
 const DEFAULT_LIMIT = 50;
-
-// Types
-type ModalType = 'info' | 'error' | 'success' | 'warning';
-
-interface ModalState {
-  isOpen: boolean;
-  title: string;
-  message: string | React.ReactNode;
-  type: ModalType;
-}
 
 // Component
 export const TaskExecutions: React.FC = () => {
@@ -50,12 +43,7 @@ export const TaskExecutions: React.FC = () => {
   const [isFiltering, setIsFiltering] = useState(false);
 
   // Modal state
-  const [modalState, setModalState] = useState<ModalState>({
-    isOpen: false,
-    title: '',
-    message: '',
-    type: 'info',
-  });
+  const { modalState, showModal, closeModal } = useModal();
 
   // Refs
   const isInitialMountRef = useRef(true);
@@ -96,19 +84,13 @@ export const TaskExecutions: React.FC = () => {
       setExecutions(response.executions);
       setTotal(response.total);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Failed to fetch task executions';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      setModalState({
-        isOpen: true,
-        title: 'Error',
-        message: errorDetail || errorMessage,
-        type: 'error',
-      });
+      const errorMessage = extractErrorMessage(error, 'Failed to fetch task executions');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setIsLoading(false);
       setIsFiltering(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSearch, limit, offset]);
 
   useEffect(() => {
@@ -137,10 +119,6 @@ export const TaskExecutions: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const handleModalClose = useCallback(() => {
-    setModalState((prev) => ({ ...prev, isOpen: false }));
-  }, []);
-
   // Computed values
   const totalPages = useMemo(() => Math.ceil(total / limit), [total, limit]);
   const currentPage = useMemo(() => Math.floor(offset / limit) + 1, [offset, limit]);
@@ -149,11 +127,7 @@ export const TaskExecutions: React.FC = () => {
 
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="osrs-text text-xl">Loading task executions...</div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading task executions..." />;
   }
 
   return (
@@ -192,7 +166,7 @@ export const TaskExecutions: React.FC = () => {
       {/* Modal */}
       <Modal
         isOpen={modalState.isOpen}
-        onClose={handleModalClose}
+        onClose={closeModal}
         title={modalState.title}
         type={modalState.type}
         showConfirm={false}

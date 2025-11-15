@@ -1,11 +1,11 @@
+import { ApexOptions } from 'apexcharts';
 import { format } from 'date-fns';
 import { useMemo } from 'react';
-import { ApexOptions } from 'apexcharts';
 import Chart from 'react-apexcharts';
 import type { TaskExecutionResponse } from '../../api/models/TaskExecutionResponse';
-import { STATUS_COLORS } from './utils';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks';
 import { getChartColors } from '../../utils/chartColors';
+import { STATUS_COLORS } from './utils';
 
 interface TaskExecutionChartProps {
   executions: TaskExecutionResponse[];
@@ -84,111 +84,117 @@ export const TaskExecutionChart: React.FC<TaskExecutionChartProps> = ({ executio
     return Object.values(timeBuckets);
   }, [executions]);
 
-  if (timeSeriesData.length === 0) {
-    return null;
-  }
+  // All hooks must be called before any conditional returns
+  const categories = useMemo(() => timeSeriesData.map((d) => d.time), [timeSeriesData]);
 
-  const categories = timeSeriesData.map((d) => d.time);
-
-  const options: ApexOptions = useMemo(() => ({
-    chart: {
-      type: 'line',
-      fontFamily: 'Inter, sans-serif',
-      height: 350,
-      toolbar: {
-        show: false,
-      },
-    },
-    colors: ['#ffd700', STATUS_COLORS.success, STATUS_COLORS.failure, STATUS_COLORS.retry],
-    stroke: {
-      curve: 'smooth',
-      width: 2,
-    },
-    markers: {
-      size: 3,
-      strokeWidth: 0,
-      hover: {
-        size: 5,
-      },
-    },
-    xaxis: {
-      categories,
-      labels: {
-        style: {
-          fontSize: '9px',
-          colors: chartColors.xAxisLabels,
-        },
-        rotate: -45,
-        rotateAlways: true,
-      },
-      axisBorder: {
-        show: true,
-        color: chartColors.gridBorder,
-      },
-      axisTicks: {
-        show: false,
-      },
-    },
-    yaxis: {
-      labels: {
-        style: {
-          fontSize: '12px',
-          colors: chartColors.yAxisLabels,
+  const options: ApexOptions = useMemo(() => {
+    if (timeSeriesData.length === 0) {
+      return {} as ApexOptions;
+    }
+    return {
+      chart: {
+        type: 'line',
+        fontFamily: 'Inter, sans-serif',
+        height: 350,
+        toolbar: {
+          show: false,
         },
       },
-    },
-    grid: {
-      borderColor: chartColors.gridBorder,
-      strokeDashArray: 3,
-      opacity: 0.3,
+      colors: ['#ffd700', STATUS_COLORS.success, STATUS_COLORS.failure, STATUS_COLORS.retry],
+      stroke: {
+        curve: 'smooth',
+        width: 2,
+      },
+      markers: {
+        size: 3,
+        strokeWidth: 0,
+        hover: {
+          size: 5,
+        },
+      },
       xaxis: {
-        lines: {
+        categories,
+        labels: {
+          style: {
+            fontSize: '9px',
+            colors: chartColors.xAxisLabels,
+          },
+          rotate: -45,
+          rotateAlways: true,
+        },
+        axisBorder: {
+          show: true,
+          color: chartColors.gridBorder,
+        },
+        axisTicks: {
           show: false,
         },
       },
       yaxis: {
-        lines: {
-          show: true,
+        labels: {
+          style: {
+            fontSize: '12px',
+            colors: chartColors.yAxisLabels,
+          },
         },
       },
-    },
-    legend: {
-      fontSize: '11px',
-      labels: {
-        colors: chartColors.legendLabels,
+      grid: {
+        borderColor: chartColors.gridBorder,
+        strokeDashArray: 3,
+        opacity: 0.3,
+        xaxis: {
+          lines: {
+            show: false,
+          },
+        },
+        yaxis: {
+          lines: {
+            show: true,
+          },
+        },
       },
-      markers: {
-        width: 12,
-        height: 12,
+      legend: {
+        fontSize: '11px',
+        labels: {
+          colors: chartColors.legendLabels,
+        },
       },
-    },
-    tooltip: {
-      theme: chartColors.tooltipTheme,
-      style: {
-        fontSize: '12px',
-        fontFamily: 'Inter, sans-serif',
+      tooltip: {
+        theme: chartColors.tooltipTheme,
+        style: {
+          fontSize: '12px',
+          fontFamily: 'Inter, sans-serif',
+        },
       },
-    },
-  }), [categories, chartColors]);
+    };
+  }, [categories, chartColors, timeSeriesData]);
 
-  const series = [
-    {
-      name: 'Total',
-      data: timeSeriesData.map((d) => d.total),
-    },
-    {
-      name: 'Success',
-      data: timeSeriesData.map((d) => d.success),
-    },
-    {
-      name: 'Failure',
-      data: timeSeriesData.map((d) => d.failure),
-    },
-    {
-      name: 'Retry',
-      data: timeSeriesData.map((d) => d.retry),
-    },
-  ];
+  const series = useMemo(() => {
+    if (timeSeriesData.length === 0) return [];
+    return [
+      {
+        name: 'Total',
+        data: timeSeriesData.map((d) => d.total),
+      },
+      {
+        name: 'Success',
+        data: timeSeriesData.map((d) => d.success),
+      },
+      {
+        name: 'Failure',
+        data: timeSeriesData.map((d) => d.failure),
+      },
+      {
+        name: 'Retry',
+        data: timeSeriesData.map((d) => d.retry),
+      },
+    ];
+  }, [timeSeriesData]);
+
+  // Early return after all hooks are called
+  if (timeSeriesData.length === 0) {
+    return null;
+  }
 
   return (
     <>

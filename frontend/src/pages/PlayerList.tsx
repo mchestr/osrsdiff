@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/apiClient';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 interface Player {
   id: number;
@@ -26,7 +27,7 @@ export const PlayerList: React.FC = () => {
       const response = await api.PlayersService.listPlayersApiV1PlayersGet(false);
       setPlayers(response.players);
     } catch (error) {
-      console.error('Failed to fetch players:', error);
+      // Silently fail for public player list - users can still search
     } finally {
       setLoading(false);
     }
@@ -37,7 +38,7 @@ export const PlayerList: React.FC = () => {
   );
 
   if (loading) {
-    return <div className="text-center py-8 osrs-text">Loading players...</div>;
+    return <LoadingSpinner message="Loading players..." />;
   }
 
   return (

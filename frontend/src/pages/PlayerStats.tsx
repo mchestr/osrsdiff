@@ -7,6 +7,8 @@ import type { PlayerMetadataResponse } from '../api/models/PlayerMetadataRespons
 import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
+import { ErrorDisplay } from '../components/ErrorDisplay';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import { OverallXPGraph } from '../components/OverallXPGraph';
 import {
@@ -23,7 +25,10 @@ import {
 import { SkillsGrid } from '../components/SkillsGrid';
 import { StatsCard } from '../components/StatsCard';
 import { useAuth } from '../contexts/AuthContext';
+import { useModal } from '../hooks';
 import type { BossData, OrderedBoss, OrderedSkill, PlayerSummary, SkillData } from '../types/player';
+import { extractErrorMessage } from '../utils/errorHandler';
+import { formatNumberLocale } from '../utils/formatters';
 import { OSRS_SKILL_ORDER } from '../utils/osrs';
 import { SKILL_ICONS } from '../utils/skillIcons';
 
@@ -46,10 +51,7 @@ export const PlayerStats: React.FC = () => {
   const [fetching, setFetching] = useState(false);
   const [summary, setSummary] = useState<PlayerSummary | null>(null);
   const [generatingSummary, setGeneratingSummary] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
-  const [modalType, setModalType] = useState<'info' | 'error' | 'success' | 'warning'>('info');
+  const { modalState, showModal, closeModal, handleConfirm } = useModal();
   const [polling, setPolling] = useState(false);
   const pollAttemptsRef = useRef(0);
   const MAX_POLL_ATTEMPTS = 15;
@@ -92,9 +94,8 @@ export const PlayerStats: React.FC = () => {
         }
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load player stats';
-      const errorDetail = (err as { body?: { detail?: string } })?.body?.detail;
-      setError(errorDetail || errorMessage);
+      const errorMessage = extractErrorMessage(err, 'Failed to load player stats');
+      setError(errorMessage);
       setPolling(false);
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -159,7 +160,7 @@ export const PlayerStats: React.FC = () => {
     setFetching(true);
     try {
       await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
-      alert('Fetch task enqueued successfully. Refreshing data...');
+      showModal('Success', 'Fetch task enqueued successfully. Refreshing data...', 'success');
       setTimeout(async () => {
         try {
           const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes] = await Promise.all([
@@ -176,13 +177,12 @@ export const PlayerStats: React.FC = () => {
           setProgressMonth(progressMonthRes);
           setMetadata(metadataRes);
         } catch (err) {
-          console.error('Failed to refresh data:', err);
+          // Silently fail - data refresh is optional
         }
       }, 2000);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetch';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      alert(errorDetail || errorMessage);
+      const errorMessage = extractErrorMessage(error, 'Failed to trigger fetch');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setFetching(false);
     }
@@ -202,7 +202,6 @@ export const PlayerStats: React.FC = () => {
       );
       setSkillProgress(skillData);
     } catch (err: unknown) {
-      console.error('Failed to load skill progress:', err);
       setSkillProgress(null);
     } finally {
       setSkillProgressLoading(false);
@@ -228,7 +227,6 @@ export const PlayerStats: React.FC = () => {
       );
       setBossProgress(bossData);
     } catch (err: unknown) {
-      console.error('Failed to load boss progress:', err);
       setBossProgress(null);
     } finally {
       setBossProgressLoading(false);
@@ -242,10 +240,7 @@ export const PlayerStats: React.FC = () => {
 
   const handleGenerateSummary = async () => {
     if (!metadata || !metadata.id) {
-      setModalTitle('Error');
-      setModalMessage('Player ID not available');
-      setModalType('error');
-      setModalOpen(true);
+      showModal('Error', 'Player ID not available', 'error');
       return;
     }
 
@@ -256,17 +251,16 @@ export const PlayerStats: React.FC = () => {
         force_regenerate: false,
       });
 
-      setModalTitle('Success');
-      setModalMessage(
+      showModal(
+        'Success',
         <div className="space-y-2">
           <p>{response.message}</p>
           <p className="text-sm text-secondary-500 dark:text-secondary-300">
             Summary generation task has been enqueued. The summary will appear here once generated.
           </p>
-        </div>
+        </div>,
+        'success'
       );
-      setModalType('success');
-      setModalOpen(true);
 
       setTimeout(async () => {
         if (username) {
@@ -276,38 +270,24 @@ export const PlayerStats: React.FC = () => {
               setSummary(summaryRes as PlayerSummary);
             }
           } catch (err) {
-            console.error('Failed to refresh summary:', err);
+            // Silently fail - summary refresh is optional
           }
         }
       }, 5000);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate summary';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      setModalTitle('Error');
-      setModalMessage(errorDetail || errorMessage);
-      setModalType('error');
-      setModalOpen(true);
+      const errorMessage = extractErrorMessage(error, 'Failed to generate summary');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setGeneratingSummary(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-secondary-600 dark:text-secondary-400 text-xl">
-          {polling ? 'Fetching player stats...' : 'Loading...'}
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message={polling ? 'Fetching player stats...' : 'Loading...'} fullScreen />;
   }
 
   if (error || !stats) {
-    return (
-      <div className="card">
-        <div className="text-red-600 dark:text-red-400">{error || 'Player not found'}</div>
-      </div>
-    );
+    return <ErrorDisplay error={error || 'Player not found'} />;
   }
 
   const bossNames = Object.keys(stats.bosses || {});
@@ -412,7 +392,7 @@ export const PlayerStats: React.FC = () => {
         />
         <StatsCard
           title="Total XP"
-          value={totalXP >= 1000000 ? `${(totalXP / 1000000).toFixed(2)}M` : totalXP >= 1000 ? `${(totalXP / 1000).toFixed(1)}K` : totalXP.toLocaleString()}
+          value={totalXP >= 1000000 ? `${(totalXP / 1000000).toFixed(2)}M` : totalXP >= 1000 ? `${(totalXP / 1000).toFixed(1)}K` : formatNumberLocale(totalXP)}
           color="blue"
           icon={<span className="text-xl">⭐</span>}
           trend={xpGained7d > 0 ? {
@@ -428,7 +408,7 @@ export const PlayerStats: React.FC = () => {
         />
         <StatsCard
           title="Overall Rank"
-          value={overallRank ? overallRank.toLocaleString() : 'N/A'}
+          value={overallRank ? formatNumberLocale(overallRank) : 'N/A'}
           color="purple"
           icon={<span className="text-xl">🏆</span>}
         />
@@ -592,12 +572,14 @@ export const PlayerStats: React.FC = () => {
 
       {/* Modal */}
       <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={modalTitle}
-        type={modalType}
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        type={modalState.type}
+        showConfirm={modalState.showConfirm}
+        onConfirm={handleConfirm}
       >
-        {modalMessage}
+        {modalState.message}
       </Modal>
     </div>
   );

@@ -2,16 +2,19 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/apiClient';
 import type { CostStatsResponse } from '../api/models/OpenAICostStatsResponse';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import {
-  SystemHealthStats,
   CostStatistics,
-  TaskExecutionHealth,
   QuickActions,
+  SystemHealthStats,
+  TaskExecutionHealth,
   useExecutionSummary,
   type DatabaseStats,
   type SystemHealth,
 } from '../components/admin';
+import { useModal } from '../hooks';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DatabaseStats | null>(null);
@@ -34,17 +37,13 @@ export const AdminDashboard: React.FC = () => {
   const [costsLoading, setCostsLoading] = useState(false);
 
   // Modal state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
-  const [modalType, setModalType] = useState<'info' | 'error' | 'success' | 'warning'>('info');
-  const [modalShowConfirm, setModalShowConfirm] = useState(false);
-  const [modalConfirmCallback, setModalConfirmCallback] = useState<(() => void) | null>(null);
+  const { modalState, showModal, showConfirmModal, closeModal, handleConfirm } = useModal();
 
   useEffect(() => {
     fetchData();
     fetchExecutionSummary();
     fetchCosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchCosts = async () => {
@@ -53,7 +52,8 @@ export const AdminDashboard: React.FC = () => {
       const response = await api.SystemService.getCostsApiV1SystemCostsGet();
       setCosts(response);
     } catch (error: unknown) {
-      console.error('Failed to fetch costs:', error);
+      const errorMessage = extractErrorMessage(error, 'Failed to fetch costs');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setCostsLoading(false);
     }
@@ -72,50 +72,14 @@ export const AdminDashboard: React.FC = () => {
       setExecutionsForGraph(response.executions);
       setExecutionTotal(response.total);
     } catch (error: unknown) {
-      console.error('Failed to fetch execution summary:', error);
+      const errorMessage = extractErrorMessage(error, 'Failed to fetch execution summary');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setSummaryLoading(false);
     }
   };
 
 
-  const showModal = (
-    title: string,
-    message: string | React.ReactNode,
-    type: 'info' | 'error' | 'success' | 'warning' = 'info'
-  ) => {
-    setModalTitle(title);
-    setModalMessage(message);
-    setModalType(type);
-    setModalShowConfirm(false);
-    setModalOpen(true);
-  };
-
-  const showConfirmModal = (
-    title: string,
-    message: string | React.ReactNode,
-    onConfirm: () => void,
-    type: 'info' | 'error' | 'success' | 'warning' = 'warning'
-  ) => {
-    setModalTitle(title);
-    setModalMessage(message);
-    setModalType(type);
-    setModalShowConfirm(true);
-    setModalConfirmCallback(() => onConfirm);
-    setModalOpen(true);
-  };
-
-  const handleModalClose = () => {
-    setModalOpen(false);
-    setModalConfirmCallback(null);
-  };
-
-  const handleModalConfirm = () => {
-    if (modalConfirmCallback) {
-      modalConfirmCallback();
-    }
-    handleModalClose();
-  };
 
   const fetchData = async () => {
     try {
@@ -126,8 +90,9 @@ export const AdminDashboard: React.FC = () => {
 
       setStats(statsRes);
       setHealth(healthRes);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
+    } catch (error: unknown) {
+      const errorMessage = extractErrorMessage(error, 'Failed to fetch dashboard data');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -144,17 +109,16 @@ export const AdminDashboard: React.FC = () => {
           <div className="space-y-1 text-sm">
             <p>Total schedules: <span className="font-bold">{response.total_schedules}</span></p>
             <p>Player fetch schedules: <span className="font-bold">{response.player_fetch_schedules}</span></p>
-            <p>Invalid schedules: <span className="font-bold" style={{ color: response.invalid_schedules.length > 0 ? '#d32f2f' : '#4caf50' }}>{response.invalid_schedules.length}</span></p>
-            <p>Orphaned schedules: <span className="font-bold" style={{ color: response.orphaned_schedules.length > 0 ? '#d32f2f' : '#4caf50' }}>{response.orphaned_schedules.length}</span></p>
-            <p>Duplicate schedules: <span className="font-bold" style={{ color: Object.keys(response.duplicate_schedules).length > 0 ? '#d32f2f' : '#4caf50' }}>{Object.keys(response.duplicate_schedules).length}</span></p>
+            <p>Invalid schedules: <span className={`font-bold ${response.invalid_schedules.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{response.invalid_schedules.length}</span></p>
+            <p>Orphaned schedules: <span className={`font-bold ${response.orphaned_schedules.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{response.orphaned_schedules.length}</span></p>
+            <p>Duplicate schedules: <span className={`font-bold ${Object.keys(response.duplicate_schedules).length > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{Object.keys(response.duplicate_schedules).length}</span></p>
           </div>
         </div>
       );
       showModal('Schedule Verification', message, response.invalid_schedules.length > 0 || response.orphaned_schedules.length > 0 ? 'warning' : 'success');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to verify schedules';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
+      const errorMessage = extractErrorMessage(error, 'Failed to verify schedules');
+      showModal('Error', errorMessage, 'error');
     } finally {
       setVerifyingSchedules(false);
     }
@@ -176,15 +140,14 @@ export const AdminDashboard: React.FC = () => {
             <div className="space-y-2">
               <p>{response.message}</p>
               <div className="space-y-1 text-sm">
-                <p>Tasks triggered: <span className="font-bold" style={{ color: '#4caf50' }}>{response.tasks_triggered}</span></p>
+                <p>Tasks triggered: <span className="font-bold text-green-600 dark:text-green-400">{response.tasks_triggered}</span></p>
               </div>
             </div>
           );
           showModal('Summaries Generated', message, 'success');
         } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to generate summaries';
-          const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-          showModal('Error', errorDetail || errorMessage, 'error');
+          const errorMessage = extractErrorMessage(error, 'Failed to generate summaries');
+          showModal('Error', errorMessage, 'error');
         } finally {
           setGeneratingSummaries(false);
         }
@@ -195,11 +158,7 @@ export const AdminDashboard: React.FC = () => {
 
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-secondary-700 text-xl">Loading dashboard...</div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading dashboard..." />;
   }
 
   return (
@@ -229,14 +188,14 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Modal */}
       <Modal
-        isOpen={modalOpen}
-        onClose={handleModalClose}
-        title={modalTitle}
-        type={modalType}
-        showConfirm={modalShowConfirm}
-        onConfirm={handleModalConfirm}
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        title={modalState.title}
+        type={modalState.type}
+        showConfirm={modalState.showConfirm}
+        onConfirm={handleConfirm}
       >
-        {modalMessage}
+        {modalState.message}
       </Modal>
     </div>
   );

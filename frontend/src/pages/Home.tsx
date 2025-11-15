@@ -3,6 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { DatabaseStatsResponse } from '../api/models/DatabaseStatsResponse';
 import { StatsGrid } from '../components/StatsGrid';
+import { formatNumberLocale } from '../utils/formatters';
+
+// Icons for stats cards - defined outside component to avoid recreation on each render
+const UsersIcon = () => (
+  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+  </svg>
+);
+
+const DatabaseIcon = () => (
+  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+  </svg>
+);
+
+const ActiveIcon = () => (
+  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const ClockIcon = () => (
+  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
 
 export const Home: React.FC = () => {
   const [stats, setStats] = useState<DatabaseStatsResponse | null>(null);
@@ -16,7 +42,7 @@ export const Home: React.FC = () => {
       const response = await api.SystemService.getDatabaseStatsApiV1SystemStatsGet();
       setStats(response);
     } catch (error) {
-      console.error('Failed to fetch statistics:', error);
+      // Silently fail for public home page - stats are optional
     } finally {
       setLoading(false);
     }
@@ -26,47 +52,12 @@ export const Home: React.FC = () => {
     fetchStats();
   }, [fetchStats]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
       navigate(`/players/${encodeURIComponent(searchTerm.trim())}`);
     }
-  };
-
-  const formatNumber = (num: number): string => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(2) + 'm';
-    }
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'k';
-    }
-    return num.toLocaleString();
-  };
-
-  // Icons for stats cards
-  const UsersIcon = () => (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  );
-
-  const DatabaseIcon = () => (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-    </svg>
-  );
-
-  const ActiveIcon = () => (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
-
-  const ClockIcon = () => (
-    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  );
+  }, [searchTerm, navigate]);
 
   return (
     <div>
@@ -114,25 +105,25 @@ export const Home: React.FC = () => {
                 ? [
                     {
                       title: 'Total Players',
-                      value: formatNumber(stats.total_players),
+                      value: formatNumberLocale(stats.total_players),
                       icon: <UsersIcon />,
                       color: 'primary',
                     },
                     {
                       title: 'Snapshots',
-                      value: formatNumber(stats.total_hiscore_records),
+                      value: formatNumberLocale(stats.total_hiscore_records),
                       icon: <DatabaseIcon />,
                       color: 'blue',
                     },
                     {
                       title: 'Active Players',
-                      value: formatNumber(stats.active_players),
+                      value: formatNumberLocale(stats.active_players),
                       icon: <ActiveIcon />,
                       color: 'success',
                     },
                     {
                       title: 'Last 24h',
-                      value: formatNumber(stats.records_last_24h),
+                      value: formatNumberLocale(stats.records_last_24h),
                       icon: <ClockIcon />,
                       color: 'purple',
                     },

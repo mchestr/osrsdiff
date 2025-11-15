@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { extractErrorMessage } from '../utils/errorHandler';
 
 export const Login: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -19,8 +20,8 @@ export const Login: React.FC = () => {
       await login(username, password);
       navigate('/');
     } catch (err: unknown) {
-      const errorDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(errorDetail || 'Invalid username or password');
+      const errorMessage = extractErrorMessage(err, 'Invalid username or password');
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
