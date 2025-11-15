@@ -4,9 +4,9 @@ from typing import Any, Dict, Optional
 from jose import JWTError, jwt  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.exceptions import UnauthorizedError
 from app.models.user import User
+from app.services.settings_cache import settings_cache
 from app.services.token_blacklist import token_blacklist_service
 from app.services.user import user_service
 
@@ -16,12 +16,18 @@ class AuthService:
 
     def __init__(self) -> None:
         """Initialize the authentication service."""
-        self.secret_key = settings.jwt.secret_key
-        self.algorithm = settings.jwt.algorithm
+        self._refresh_settings()
+
+    def _refresh_settings(self) -> None:
+        """Refresh settings from cache."""
+        self.secret_key = settings_cache.jwt_secret_key
+        self.algorithm = settings_cache.jwt_algorithm
         self.access_token_expire_minutes = (
-            settings.jwt.access_token_expire_minutes
+            settings_cache.jwt_access_token_expire_minutes
         )
-        self.refresh_token_expire_days = settings.jwt.refresh_token_expire_days
+        self.refresh_token_expire_days = (
+            settings_cache.jwt_refresh_token_expire_days
+        )
 
     async def authenticate_user(
         self, db: AsyncSession, username: str, password: str

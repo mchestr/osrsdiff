@@ -7,7 +7,8 @@ from taskiq import TaskiqScheduler
 from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_redis import ListRedisScheduleSource
 
-from app.config import settings
+from app.config import settings as config_defaults
+from app.services.settings_cache import settings_cache
 from app.workers.main import broker
 
 logger = logging.getLogger(__name__)
@@ -15,10 +16,12 @@ logger = logging.getLogger(__name__)
 
 # Create scheduler sources for direct access
 # Redis-based schedule source for dynamic scheduling
+# Note: This is initialized at import time, so it uses config defaults
+# The scheduler will be recreated if needed after cache loads
 redis_schedule_source = ListRedisScheduleSource(
-    url=settings.redis.url,
-    prefix=settings.taskiq.scheduler_prefix,
-    max_connection_pool_size=settings.redis.max_connections,
+    url=config_defaults.redis.url,
+    prefix=config_defaults.taskiq.scheduler_prefix,
+    max_connection_pool_size=config_defaults.redis.max_connections,
 )
 
 # Label-based schedule source for static schedules

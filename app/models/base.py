@@ -10,6 +10,11 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
 
+# Note: Database connection initialization uses config.py directly because
+# it's needed before the database is available to load settings from it.
+# This is the only place where config.py should be used directly;
+# all other services should use settings_cache from app.services.settings_cache.
+
 
 class Base(DeclarativeBase):
     """Base class for all database models."""

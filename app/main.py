@@ -11,14 +11,35 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.router import router
-from app.config import LogConfig, settings
+from app.config import LogConfig
 from app.exceptions import BaseAPIException
 from app.models.base import init_db
+from app.services.auth import auth_service
+from app.services.settings_cache import settings_cache
 from app.services.startup import startup_service
+from app.services.token_blacklist import token_blacklist_service
 
 logger = logging.getLogger(__name__)
 
 dictConfig(LogConfig().model_dump())
+
+
+async def refresh_services_settings() -> None:
+    """Refresh settings in all services that depend on them."""
+    logger.info("Refreshing service settings...")
+    try:
+        # Refresh auth service settings
+        auth_service._refresh_settings()
+        logger.debug("Refreshed auth service settings")
+
+        # Refresh token blacklist service settings
+        token_blacklist_service._refresh_settings()
+        logger.debug("Refreshed token blacklist service settings")
+
+        logger.info("Service settings refreshed successfully")
+    except Exception as e:
+        logger.error(f"Failed to refresh service settings: {e}")
+        raise
 
 
 @asynccontextmanager
@@ -30,8 +51,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Creates and manages a shared aiohttp session for reuse across requests.
     """
     # Startup
+    logger.info("Starting application lifecycle...")
+
+    # Initialize database connection
     await init_db()
-    await startup_service.startup()
+
+    # Run database migrations
+    await startup_service.run_database_migrations()
+
+    # Initialize settings from config.py (if they don't exist in DB)
+    await startup_service.initialize_settings()
+
+    # Load settings from database into cache
+    await settings_cache.load_from_database()
+
+    # Store settings cache in app state for access throughout the app lifecycle
+    app.state.settings_cache = settings_cache
+    logger.info("Settings cache loaded and stored in app state")
+
+    # Refresh services that depend on settings
+    await refresh_services_settings()
+
+    # Create admin user (uses settings from cache)
+    await startup_service.create_admin_user()
 
     # Create shared aiohttp session with DummyCookieJar to prevent cookie persistence
     # This avoids redirect issues caused by cookies being saved across requests
@@ -46,13 +88,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.osrs_http_session = session
     logger.info("Created shared aiohttp session for OSRS API")
 
+    logger.info("Application startup complete")
+
     yield
 
     # Shutdown
+    logger.info("Shutting down application...")
+
     # Close the shared aiohttp session
     if hasattr(app.state, "osrs_http_session"):
         await app.state.osrs_http_session.close()
         logger.info("Closed shared aiohttp session")
+
+    logger.info("Application shutdown complete")
 
 
 def create_app() -> FastAPI:
@@ -62,11 +110,15 @@ def create_app() -> FastAPI:
     Returns:
         Configured FastAPI application instance
     """
+    # Note: debug setting will be loaded during lifespan startup
+    # For now, use config defaults (will be overridden after cache loads)
+    from app.config import settings as config_defaults
+
     app = FastAPI(
         title="OSRS Diff API",
         description="Backend service for tracking Old School RuneScape character progression",
         version="1.0.0",
-        debug=settings.debug,
+        debug=config_defaults.debug,
         lifespan=lifespan,
         swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
         swagger_ui_init_oauth={

@@ -20,6 +20,7 @@ config = context.config
 from app.models.user import User  # noqa: F401
 from app.models.player import Player  # noqa: F401
 from app.models.hiscore import HiscoreRecord  # noqa: F401
+from app.models.setting import Setting  # noqa: F401
 
 target_metadata = Base.metadata
 

@@ -117,8 +117,9 @@ class TestSystemStats:
 
     def test_get_database_stats_unauthorized(self, app, mock_db_session):
         """Test database stats endpoint without authentication (should work)."""
-        from app.models.base import get_db_session
         from datetime import datetime
+
+        from app.models.base import get_db_session
 
         app.dependency_overrides[get_db_session] = lambda: mock_db_session
         # Don't override require_auth - endpoint should work without it

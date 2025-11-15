@@ -6,6 +6,9 @@ from alembic.config import Config
 
 from app.config import settings
 
+# Note: Migrations use config.py directly because they run before the database
+# is available to load settings from it. This is acceptable for this use case.
+
 logger = logging.getLogger(__name__)
 
 

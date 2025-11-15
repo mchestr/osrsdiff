@@ -9,6 +9,7 @@ import { Home } from './pages/Home';
 import { PlayerStats } from './pages/PlayerStats';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminPlayerList } from './pages/AdminPlayerList';
+import { Settings } from './pages/Settings';
 import { TaskExecutions } from './pages/TaskExecutions';
 import { TaskExecutionDetail } from './pages/TaskExecutionDetail';
 
@@ -59,6 +60,16 @@ const AppRoutes = () => {
           <ProtectedRoute requireAdmin>
             <Layout>
               <AdminPlayerList />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/settings"
+        element={
+          <ProtectedRoute requireAdmin>
+            <Layout>
+              <Settings />
             </Layout>
           </ProtectedRoute>
         }

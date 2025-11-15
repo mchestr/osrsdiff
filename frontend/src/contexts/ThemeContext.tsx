@@ -1,5 +1,14 @@
-import React, { ReactNode, useEffect, useState } from 'react';
-import { Theme, ThemeContext } from './themeContext';
+import { createContext, ReactNode, useEffect, useState } from 'react';
+
+export type Theme = 'light' | 'dark';
+
+export interface ThemeContextType {
+  theme: Theme;
+  toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
+}
+
+export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   // Initialize theme - read from the class already applied by the script in index.html
@@ -48,4 +57,3 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     </ThemeContext.Provider>
   );
 };
-

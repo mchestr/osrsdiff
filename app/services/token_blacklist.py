@@ -4,7 +4,7 @@ from typing import Optional
 import redis.asyncio as redis
 from jose import jwt  # type: ignore
 
-from app.config import settings
+from app.services.settings_cache import settings_cache
 
 
 class TokenBlacklistService:
@@ -13,10 +13,18 @@ class TokenBlacklistService:
     def __init__(self) -> None:
         """Initialize the token blacklist service."""
         self._redis: Optional[redis.Redis] = None
-        self.redis_url = settings.redis.url
-        self.max_connections = settings.redis.max_connections
-        self.jwt_secret = settings.jwt.secret_key
-        self.jwt_algorithm = settings.jwt.algorithm
+        self._refresh_settings()
+
+    def _refresh_settings(self) -> None:
+        """Refresh settings from cache."""
+        self.redis_url = settings_cache.redis_url
+        self.max_connections = settings_cache.redis_max_connections
+        self.jwt_secret = settings_cache.jwt_secret_key
+        self.jwt_algorithm = settings_cache.jwt_algorithm
+        # Close existing Redis connection if settings changed
+        if self._redis:
+            # Connection will be recreated on next use
+            self._redis = None
 
     async def get_redis(self) -> redis.Redis:
         """Get Redis connection, creating it if necessary."""

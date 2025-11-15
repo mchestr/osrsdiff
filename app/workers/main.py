@@ -8,32 +8,48 @@ from taskiq.middlewares import SmartRetryMiddleware
 from taskiq.state import TaskiqState
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
-from app.config import LogConfig, settings
+from app.config import LogConfig
+from app.config import settings as config_defaults
+from app.services.settings_cache import settings_cache
 
 dictConfig(LogConfig().model_dump())
 
 logger = logging.getLogger(__name__)
 
-# Create Redis result backend
+
+def _get_broker_config() -> dict:
+    """Get broker configuration from settings cache."""
+    return {
+        "redis_url": settings_cache.redis_url,
+        "max_connections": settings_cache.redis_max_connections,
+        "retry_count": settings_cache.taskiq_default_retry_count,
+        "retry_delay": settings_cache.taskiq_default_retry_delay,
+        "use_jitter": settings_cache.taskiq_use_jitter,
+        "use_delay_exponent": settings_cache.taskiq_use_delay_exponent,
+        "max_delay_exponent": settings_cache.taskiq_max_delay_exponent,
+    }
+
+
+# Create Redis result backend (will be reconfigured after cache loads)
 result_backend: RedisAsyncResultBackend = RedisAsyncResultBackend(
-    redis_url=settings.redis.url,
-    max_connection_pool_size=settings.redis.max_connections,
+    redis_url=config_defaults.redis.url,
+    max_connection_pool_size=config_defaults.redis.max_connections,
 )
 
-# Create Redis broker with result backend
+# Create Redis broker with result backend (will be reconfigured after cache loads)
 broker = RedisStreamBroker(
-    url=settings.redis.url,
-    max_connection_pool_size=settings.redis.max_connections,
+    url=config_defaults.redis.url,
+    max_connection_pool_size=config_defaults.redis.max_connections,
 ).with_result_backend(result_backend)
 
-# Add smart retry middleware
+# Add smart retry middleware (will be reconfigured after cache loads)
 broker.add_middlewares(
     SmartRetryMiddleware(
-        default_retry_count=settings.taskiq.default_retry_count,
-        default_delay=settings.taskiq.default_retry_delay,
-        use_jitter=settings.taskiq.use_jitter,
-        use_delay_exponent=settings.taskiq.use_delay_exponent,
-        max_delay_exponent=settings.taskiq.max_delay_exponent,
+        default_retry_count=config_defaults.taskiq.default_retry_count,
+        default_delay=config_defaults.taskiq.default_retry_delay,
+        use_jitter=config_defaults.taskiq.use_jitter,
+        use_delay_exponent=config_defaults.taskiq.use_delay_exponent,
+        max_delay_exponent=config_defaults.taskiq.max_delay_exponent,
     )
 )
 
@@ -49,9 +65,9 @@ from taskiq_redis import ListRedisScheduleSource
 from app.workers.scheduler import scheduler
 
 redis_schedule_source = ListRedisScheduleSource(
-    url=settings.redis.url,
-    prefix=settings.taskiq.scheduler_prefix,
-    max_connection_pool_size=settings.redis.max_connections,
+    url=config_defaults.redis.url,
+    prefix=config_defaults.taskiq.scheduler_prefix,
+    max_connection_pool_size=config_defaults.redis.max_connections,
 )
 
 
@@ -59,6 +75,9 @@ redis_schedule_source = ListRedisScheduleSource(
 async def startup_event(context: TaskiqState) -> None:
     """Initialize worker resources on startup."""
     logger.info("TaskIQ worker starting up...")
+
+    # Load settings from database into cache
+    await settings_cache.load_from_database()
 
     # Initialize database connection pool for workers
     from app.models.base import init_db

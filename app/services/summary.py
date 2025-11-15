@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.exceptions import (
     HistoryServiceError,
     InsufficientDataError,
@@ -15,6 +14,7 @@ from app.exceptions import (
 from app.models.player import Player
 from app.models.player_summary import PlayerSummary
 from app.services.history import HistoryService
+from app.services.settings_cache import settings_cache
 from app.utils.template_loader import render_template
 
 logger = logging.getLogger(__name__)
@@ -216,7 +216,7 @@ class SummaryService:
             period_start=seven_days_ago,
             period_end=now,
             summary_text=summary_text,
-            model_used=settings.openai.model,
+            model_used=settings_cache.openai_model,
             prompt_tokens=openai_metadata.get("prompt_tokens"),
             completion_tokens=openai_metadata.get("completion_tokens"),
             total_tokens=openai_metadata.get("total_tokens"),
@@ -323,7 +323,8 @@ class SummaryService:
         Raises:
             SummaryGenerationError: If generation fails
         """
-        if not settings.openai.api_key:
+        api_key = settings_cache.openai_api_key
+        if not api_key:
             raise SummaryGenerationError(
                 "OpenAI API key not configured. Set OPENAI__API_KEY environment variable."
             )
@@ -332,7 +333,7 @@ class SummaryService:
             # Import OpenAI client
             from openai import AsyncOpenAI
 
-            client = AsyncOpenAI(api_key=settings.openai.api_key)
+            client = AsyncOpenAI(api_key=api_key)
 
             # Prepare progress data for the prompt
             day_data = day_progress.to_dict()
@@ -347,13 +348,13 @@ class SummaryService:
             # Call OpenAI API with JSON response format
             # Use response_format if supported by the model (gpt-4o-mini and newer)
             create_kwargs: Dict[str, Any] = {
-                "model": settings.openai.model,
+                "model": settings_cache.openai_model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                "max_tokens": settings.openai.max_tokens,
-                "temperature": settings.openai.temperature,
+                "max_tokens": settings_cache.openai_max_tokens,
+                "temperature": settings_cache.openai_temperature,
             }
 
             # Try to use JSON mode if available (gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo, etc.)

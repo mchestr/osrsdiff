@@ -93,12 +93,14 @@ class TestSummaryService:
             )
             mock_openai.return_value = mock_client
 
-            # Mock settings
-            with patch("app.services.summary.settings") as mock_settings:
-                mock_settings.openai.api_key = "test-key"
-                mock_settings.openai.model = "gpt-4o-mini"
-                mock_settings.openai.max_tokens = 1000
-                mock_settings.openai.temperature = 0.7
+            # Mock settings_cache
+            with patch(
+                "app.services.summary.settings_cache"
+            ) as mock_settings_cache:
+                mock_settings_cache.openai_api_key = "test-key"
+                mock_settings_cache.openai_model = "gpt-4o-mini"
+                mock_settings_cache.openai_max_tokens = 1000
+                mock_settings_cache.openai_temperature = 0.7
 
                 summary = await summary_service.generate_summary_for_player(
                     test_player_with_history.id
@@ -145,8 +147,10 @@ class TestSummaryService:
         self, summary_service, test_player_with_history
     ):
         """Test summary generation fails when API key is missing."""
-        with patch("app.services.summary.settings") as mock_settings:
-            mock_settings.openai.api_key = None
+        with patch(
+            "app.services.summary.settings_cache"
+        ) as mock_settings_cache:
+            mock_settings_cache.openai_api_key = None
 
             with pytest.raises(SummaryGenerationError) as exc_info:
                 await summary_service.generate_summary_for_player(
@@ -167,11 +171,13 @@ class TestSummaryService:
             )
             mock_openai.return_value = mock_client
 
-            with patch("app.services.summary.settings") as mock_settings:
-                mock_settings.openai.api_key = "test-key"
-                mock_settings.openai.model = "gpt-4o-mini"
-                mock_settings.openai.max_tokens = 1000
-                mock_settings.openai.temperature = 0.7
+            with patch(
+                "app.services.summary.settings_cache"
+            ) as mock_settings_cache:
+                mock_settings_cache.openai_api_key = "test-key"
+                mock_settings_cache.openai_model = "gpt-4o-mini"
+                mock_settings_cache.openai_max_tokens = 1000
+                mock_settings_cache.openai_temperature = 0.7
 
                 with pytest.raises(SummaryGenerationError):
                     await summary_service.generate_summary_for_player(
@@ -289,11 +295,13 @@ class TestSummaryService:
             )
             mock_openai.return_value = mock_client
 
-            with patch("app.services.summary.settings") as mock_settings:
-                mock_settings.openai.api_key = "test-key"
-                mock_settings.openai.model = "gpt-4o-mini"
-                mock_settings.openai.max_tokens = 1000
-                mock_settings.openai.temperature = 0.7
+            with patch(
+                "app.services.summary.settings_cache"
+            ) as mock_settings_cache:
+                mock_settings_cache.openai_api_key = "test-key"
+                mock_settings_cache.openai_model = "gpt-4o-mini"
+                mock_settings_cache.openai_max_tokens = 1000
+                mock_settings_cache.openai_temperature = 0.7
 
                 new_summary = (
                     await summary_service.generate_summary_for_player(
@@ -378,11 +386,13 @@ class TestSummaryService:
             )
             mock_openai.return_value = mock_client
 
-            with patch("app.services.summary.settings") as mock_settings:
-                mock_settings.openai.api_key = "test-key"
-                mock_settings.openai.model = "gpt-4o-mini"
-                mock_settings.openai.max_tokens = 1000
-                mock_settings.openai.temperature = 0.7
+            with patch(
+                "app.services.summary.settings_cache"
+            ) as mock_settings_cache:
+                mock_settings_cache.openai_api_key = "test-key"
+                mock_settings_cache.openai_model = "gpt-4o-mini"
+                mock_settings_cache.openai_max_tokens = 1000
+                mock_settings_cache.openai_temperature = 0.7
 
                 summaries = (
                     await summary_service.generate_summaries_for_all_players()

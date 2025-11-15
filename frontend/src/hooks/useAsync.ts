@@ -6,7 +6,7 @@ interface UseAsyncOptions<T> {
   onError?: (error: Error) => void;
 }
 
-interface UseAsyncReturn<T> {
+export interface UseAsyncReturn<T> {
   data: T | null;
   loading: boolean;
   error: Error | null;
