@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,59 +6,76 @@
 
 @layer base {
   body {
-    background-color: #1a1510;
-    color: #e8d5a3;
+    background-color: #ffffff;
+    color: #111827;
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Better mobile scrolling */
     -webkit-overflow-scrolling: touch;
     overflow-x: hidden;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  /* Prevent horizontal scroll on mobile */
+  .dark body {
+    background-color: #111827;
+    color: #f9fafb;
+  }
+
   html {
     overflow-x: hidden;
+    scroll-behavior: smooth;
   }
 
-  /* Better touch targets for mobile */
   button, a, input, select {
     touch-action: manipulation;
   }
 }
 
 @layer components {
+  /* Modern TailAdmin-style buttons */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 shadow-sm hover:shadow-md;
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 shadow-sm hover:shadow-md focus:ring-primary-500;
   }
 
   .btn-secondary {
-    @apply bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:bg-neutral-300 border border-neutral-300;
+    @apply bg-white text-secondary-700 hover:bg-secondary-50 active:bg-secondary-100 border border-secondary-300 shadow-sm hover:shadow-md focus:ring-secondary-500;
   }
 
   .btn-danger {
-    @apply bg-red-500 text-white hover:bg-red-600 active:bg-red-700 shadow-sm hover:shadow-md;
+    @apply bg-danger-500 text-white hover:bg-danger-600 active:bg-danger-700 shadow-sm hover:shadow-md focus:ring-danger-500;
   }
 
+  .btn-success {
+    @apply bg-success-500 text-white hover:bg-success-600 active:bg-success-700 shadow-sm hover:shadow-md focus:ring-success-500;
+  }
+
+  /* Modern input styling */
   .input {
-    @apply w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-neutral-900 transition-all duration-200;
+    @apply w-full px-4 py-2.5 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-secondary-900 transition-all duration-200 placeholder:text-secondary-400;
   }
 
-  /* Enhanced OSRS input styling */
+  /* Modern card styling - TailAdmin style */
+  .card {
+    @apply bg-white rounded-lg shadow-card p-6 border border-secondary-200 transition-shadow duration-200;
+  }
+
+  .card:hover {
+    @apply shadow-card-hover;
+  }
+
+  /* Legacy OSRS input styling - keeping for backward compatibility */
   input.osrs-btn {
-    @apply px-3 sm:px-4 py-2 sm:py-2.5 font-medium transition-all duration-200;
-    background-color: #2d2418;
-    border: 2px solid #a68b5b;
-    border-radius: 8px;
-    color: #ffd700;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    @apply px-3 sm:px-4 py-2 sm:py-2.5 font-medium transition-all duration-200 rounded-md;
+    background-color: white;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     width: 100%;
-    min-height: 44px; /* Better touch target */
-    /* Prevent zoom on iOS when focusing input - use 16px minimum */
+    min-height: 44px;
     font-size: 16px;
   }
 
@@ -70,42 +87,34 @@
 
   input.osrs-btn:focus {
     outline: none;
-    border-color: #d4af37;
-    background-color: #3a3024;
-    box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
   input.osrs-btn::placeholder {
-    color: #a68b5b;
-    opacity: 0.7;
+    color: #94a3b8;
+    opacity: 1;
   }
 
-
-  /* Enhanced OSRS select styling */
+  /* Modern select styling */
   select.osrs-btn {
-    @apply px-4 py-2.5 font-medium transition-all duration-200;
-    background-color: #2d2418;
-    border: 2px solid #a68b5b;
-    border-radius: 8px;
-    color: #ffd700;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    @apply px-4 py-2.5 font-medium transition-all duration-200 rounded-md;
+    background-color: white;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     cursor: pointer;
   }
 
   select.osrs-btn:focus {
     outline: none;
-    border-color: #d4af37;
-    background-color: #3a3024;
-    box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
   select.osrs-btn option {
-    background-color: #2d2418;
-    color: #ffd700;
-  }
-
-  .card {
-    @apply bg-white rounded-xl shadow-sm p-6 border border-neutral-200;
+    background-color: white;
+    color: #1e293b;
   }
 
   /* Enhanced OSRS Skills Panel Styles */
@@ -114,7 +123,7 @@
     max-width: 400px;
     background: linear-gradient(135deg, #2d2418 0%, #251e15 100%);
     border: 3px solid #a68b5b;
-    border-radius: 12px;
+    border-radius: 4px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 215, 0, 0.1);
   }
 
@@ -126,7 +135,7 @@
     @apply relative flex items-center px-2 py-2;
     background: linear-gradient(135deg, #3a3024 0%, #352a1f 100%);
     border: 2px solid #8b7355;
-    border-radius: 8px;
+    border-radius: 4px;
     min-height: 56px;
     gap: 6px;
     transition: all 0.2s ease;
@@ -176,222 +185,159 @@
     @apply px-4 py-3 text-center;
     background: linear-gradient(135deg, #1a1510 0%, #1f1812 100%);
     border: 2px solid #a68b5b;
-    border-radius: 8px;
+    border-radius: 4px;
     @apply font-bold text-base;
     color: #ffd700;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 215, 0, 0.1);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
-  /* Enhanced OSRS card styling */
+  /* Modern TailAdmin-style card */
   .osrs-card {
-    @apply p-4 sm:p-6;
-    background: linear-gradient(135deg, #2d2418 0%, #251e15 100%);
-    border: 3px solid #a68b5b;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 215, 0, 0.1);
-    transition: all 0.2s ease;
+    @apply p-4 sm:p-6 bg-white rounded-lg shadow-card border border-secondary-200 transition-all duration-200;
   }
 
   .osrs-card:hover {
-    box-shadow: 0 6px 16px rgba(255, 215, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.5);
-    border-color: #d4af37;
-    transform: translateY(-2px);
+    @apply shadow-card-hover;
   }
 
   .osrs-card-title {
-    @apply font-bold mb-2 sm:mb-3;
-    color: #ffd700;
-    font-size: 1rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-    letter-spacing: 0.5px;
+    @apply font-semibold mb-2 sm:mb-3 text-secondary-900;
+    font-size: 1.125rem;
+    letter-spacing: -0.025em;
   }
 
   @media (min-width: 640px) {
     .osrs-card-title {
-      font-size: 1.125rem;
+      font-size: 1.25rem;
     }
   }
 
   .osrs-stat-label {
-    @apply text-xs uppercase tracking-wider mb-1;
-    color: #a68b5b;
-    font-weight: 600;
+    @apply text-xs font-medium uppercase tracking-wider mb-1 text-secondary-500;
   }
 
   .osrs-stat-value {
-    @apply font-bold;
-    color: #ffd700;
+    @apply font-bold text-secondary-900;
     font-size: 1.5rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   }
 
   .osrs-text {
-    color: #e8d5a3;
+    @apply text-secondary-700;
   }
 
   .osrs-text-secondary {
-    color: #a68b5b;
+    @apply text-secondary-500;
   }
 
-  /* Enhanced OSRS button */
+  /* Modern TailAdmin-style button */
   .osrs-btn {
-    @apply px-3 sm:px-4 py-2 sm:py-2.5 font-bold transition-all duration-200;
-    background: linear-gradient(135deg, #3a3024 0%, #2d2418 100%);
-    border: 2px solid #a68b5b;
-    border-radius: 8px;
-    color: #ffd700;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    @apply px-4 py-2.5 font-medium transition-all duration-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2;
+    background-color: #3b82f6;
+    border: 1px solid #3b82f6;
+    color: white;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     font-size: 14px;
-    min-height: 44px; /* Better touch target for mobile */
+    min-height: 44px;
     white-space: nowrap;
   }
 
   .osrs-btn:hover {
-    background: linear-gradient(135deg, #4a4034 0%, #3a3024 100%);
-    border-color: #d4af37;
-    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
-    transform: translateY(-2px);
-    color: #ffed4e;
+    background-color: #2563eb;
+    border-color: #2563eb;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
   }
 
   .osrs-btn:active {
-    background: linear-gradient(135deg, #2d2418 0%, #251e15 100%);
+    background-color: #1d4ed8;
     transform: translateY(0);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
   .osrs-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    @apply opacity-50 cursor-not-allowed;
     transform: none;
   }
 
-  /* Enhanced OSRS Navigation Header */
+  .osrs-btn:focus {
+    @apply ring-primary-500;
+  }
+
+  /* Modern TailAdmin-style navigation */
   .osrs-nav-header {
-    background: linear-gradient(180deg, #2d2418 0%, #251e15 100%);
-    border-bottom: 3px solid #a68b5b;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.1);
+    @apply bg-white border-b border-secondary-200 shadow-sm;
     position: sticky;
     top: 0;
     z-index: 50;
-    /* Prevent header from causing horizontal scroll */
     width: 100%;
     max-width: 100%;
   }
 
   .osrs-nav-logo {
-    @apply text-xl font-bold;
-    color: #ffd700;
-    transition: all 0.2s ease;
+    @apply text-xl font-bold text-secondary-900 transition-colors duration-200;
     text-decoration: none;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-    letter-spacing: 0.5px;
+    letter-spacing: -0.025em;
   }
 
   .osrs-nav-logo:hover {
-    color: #ffed4e;
-    transform: translateY(-1px);
-    text-shadow: 0 2px 6px rgba(255, 215, 0, 0.5);
+    @apply text-primary-600;
   }
 
   .osrs-nav-link {
-    @apply px-3 sm:px-4 py-2 text-sm font-semibold;
-    color: #e8d5a3;
+    @apply px-3 sm:px-4 py-2 text-sm font-medium text-secondary-700 rounded-md transition-all duration-200;
     text-decoration: none;
     position: relative;
-    transition: all 0.2s ease;
-    border-radius: 6px;
-    min-height: 44px; /* Better touch target */
+    min-height: 44px;
     display: flex;
     align-items: center;
   }
 
-  .osrs-nav-link::before {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #ffd700, transparent);
-    transition: width 0.3s ease;
-  }
-
   .osrs-nav-link:hover {
-    color: #ffd700;
-    background: rgba(255, 215, 0, 0.1);
-  }
-
-  .osrs-nav-link:hover::before {
-    width: 80%;
+    @apply text-primary-600 bg-primary-50;
   }
 
   .osrs-nav-link-active {
-    color: #ffd700;
-    background: rgba(255, 215, 0, 0.15);
-  }
-
-  .osrs-nav-link-active::before {
-    width: 80%;
-    background: linear-gradient(90deg, transparent, #ffd700, #ffed4e, #ffd700, transparent);
+    @apply text-primary-600 bg-primary-50;
   }
 
   .osrs-nav-user {
-    @apply text-sm font-medium;
-    color: #e8d5a3;
+    @apply text-sm font-medium text-secondary-700;
   }
 
   .osrs-nav-badge {
-    @apply px-2.5 py-1 text-xs font-bold;
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.2));
-    border: 2px solid #ffd700;
-    color: #ffd700;
-    box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    @apply px-2.5 py-1 text-xs font-semibold rounded-md;
+    background-color: #dbeafe;
+    color: #1e40af;
   }
 
   .osrs-nav-logout {
-    @apply px-3 sm:px-4 py-2 text-sm font-semibold;
-    background: linear-gradient(135deg, #3a3024 0%, #2d2418 100%);
-    border: 2px solid #a68b5b;
-    color: #ffd700;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-    transition: all 0.2s ease;
+    @apply px-3 sm:px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-md shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
     cursor: pointer;
-    border-radius: 6px;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-    min-height: 44px; /* Better touch target */
+    min-height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .osrs-nav-logout:hover {
-    background: linear-gradient(135deg, #4a4034 0%, #3a3024 100%);
-    border-color: #d4af37;
-    color: #ffed4e;
-    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4);
-    transform: translateY(-1px);
+    @apply bg-secondary-50 border-secondary-400 text-secondary-900;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
 
   .osrs-nav-logout:active {
-    transform: translateY(0);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    @apply bg-secondary-100;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   }
 
   /* Footer links */
   .osrs-footer-link {
-    color: #a68b5b;
+    @apply text-secondary-500 transition-colors duration-200;
     text-decoration: none;
-    transition: color 0.2s ease;
   }
 
   .osrs-footer-link:hover {
-    color: #ffd700;
+    @apply text-primary-600;
   }
 }
 

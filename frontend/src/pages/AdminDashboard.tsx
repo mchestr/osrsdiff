@@ -351,37 +351,37 @@ export const AdminDashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="osrs-text text-xl">Loading dashboard...</div>
+        <div className="text-secondary-700 text-xl">Loading dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <h1 className="osrs-card-title text-2xl sm:text-3xl">Admin Dashboard</h1>
+    <div className="space-y-6 sm:space-y-8">
+      <h1 className="osrs-card-title text-3xl sm:text-4xl mb-0">Admin Dashboard</h1>
 
       {/* System Health & Database Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-4 md:gap-6">
         {health && (
           <>
-            <div className="osrs-card flex flex-col">
+            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
               <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>System Status</h3>
               <div className="flex items-center justify-center flex-1">
                 <span
                   className="text-4xl"
-                  style={{ color: health.status === 'healthy' ? '#4caf50' : '#d32f2f' }}
+                  style={{ color: health.status === 'healthy' ? '#22c55e' : '#ef4444' }}
                   title={health.status.toUpperCase()}
                 >
                   {health.status === 'healthy' ? '✓' : '✗'}
                 </span>
               </div>
             </div>
-            <div className="osrs-card flex flex-col">
+            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
               <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Database</h3>
               <div className="flex items-center justify-center flex-1">
                 <span
                   className="text-4xl"
-                  style={{ color: health.database_connected ? '#4caf50' : '#d32f2f' }}
+                  style={{ color: health.database_connected ? '#22c55e' : '#ef4444' }}
                   title={health.database_connected ? 'Connected' : 'Disconnected'}
                 >
                   {health.database_connected ? '✓' : '✗'}
@@ -400,25 +400,25 @@ export const AdminDashboard: React.FC = () => {
         )}
         {stats && (
           <>
-            <div className="osrs-card flex flex-col">
+            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
               <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Total Players</h3>
               <p className="osrs-stat-value flex-1 flex items-center" title={stats.total_players.toString()}>
                 {formatNumber(stats.total_players)}
               </p>
             </div>
-            <div className="osrs-card flex flex-col">
+            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
               <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Active Players</h3>
-              <p className="osrs-stat-value flex-1 flex items-center" style={{ color: '#ffd700' }} title={stats.active_players.toString()}>
+              <p className="osrs-stat-value flex-1 flex items-center text-success-600" title={stats.active_players.toString()}>
                 {formatNumber(stats.active_players)}
               </p>
             </div>
-            <div className="osrs-card flex flex-col">
+            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
               <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Total Records</h3>
               <p className="osrs-stat-value flex-1 flex items-center" title={stats.total_hiscore_records.toLocaleString()}>
                 {formatNumber(stats.total_hiscore_records)}
               </p>
             </div>
-            <div className="osrs-card flex flex-col">
+            <div className="osrs-card flex flex-col hover:shadow-card-hover transition-shadow">
               <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Records (24h)</h3>
               <p className="osrs-stat-value flex-1 flex items-center" title={stats.records_last_24h.toString()}>
                 {formatNumber(stats.records_last_24h)}
@@ -439,34 +439,34 @@ export const AdminDashboard: React.FC = () => {
           <div className="space-y-4">
             {/* Cost Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="osrs-card">
+              <div className="osrs-card hover:shadow-card-hover transition-shadow">
                 <h3 className="osrs-stat-label mb-2">Total Cost</h3>
-                <p className="osrs-stat-value" style={{ fontSize: '1.5rem' }}>
+                <p className="osrs-stat-value text-2xl">
                   ${costs.total_cost_usd.toFixed(4)}
                 </p>
               </div>
-              <div className="osrs-card">
+              <div className="osrs-card hover:shadow-card-hover transition-shadow">
                 <h3 className="osrs-stat-label mb-2">Last 24 Hours</h3>
-                <p className="osrs-stat-value" style={{ fontSize: '1.5rem', color: '#4caf50' }}>
+                <p className="osrs-stat-value text-2xl text-success-600">
                   ${costs.cost_last_24h_usd.toFixed(4)}
                 </p>
               </div>
-              <div className="osrs-card">
+              <div className="osrs-card hover:shadow-card-hover transition-shadow">
                 <h3 className="osrs-stat-label mb-2">Last 7 Days</h3>
-                <p className="osrs-stat-value" style={{ fontSize: '1.5rem', color: '#4caf50' }}>
+                <p className="osrs-stat-value text-2xl text-success-600">
                   ${costs.cost_last_7d_usd.toFixed(4)}
                 </p>
               </div>
-              <div className="osrs-card">
+              <div className="osrs-card hover:shadow-card-hover transition-shadow">
                 <h3 className="osrs-stat-label mb-2">Last 30 Days</h3>
-                <p className="osrs-stat-value" style={{ fontSize: '1.5rem', color: '#4caf50' }}>
+                <p className="osrs-stat-value text-2xl text-success-600">
                   ${costs.cost_last_30d_usd.toFixed(4)}
                 </p>
               </div>
             </div>
 
             {/* Token Usage Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t" style={{ borderColor: '#8b7355' }}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-secondary-200">
               <div>
                 <h3 className="osrs-stat-label mb-1">Total Summaries</h3>
                 <p className="osrs-stat-value">{costs.total_summaries.toLocaleString()}</p>
@@ -563,7 +563,7 @@ export const AdminDashboard: React.FC = () => {
             {executionsForGraph.length > 0 && timeSeriesData.length > 0 && (
               <div className="pb-4 border-b" style={{ borderColor: '#8b7355' }}>
                 <h3 className="osrs-stat-label mb-4">Task Executions Over Time</h3>
-                <div className="h-96 rounded-lg p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
+                <div className="h-96 rounded p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={timeSeriesData} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />

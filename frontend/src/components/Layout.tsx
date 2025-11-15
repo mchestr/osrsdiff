@@ -1,219 +1,124 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Header } from './header';
+import { Sidebar } from './sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { logout, isAdmin, isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
+  // Sidebar state - on mobile it's toggleable, on desktop it's always visible via CSS
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Collapsed state - persisted in localStorage
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem('sidebarCollapsed');
+    return stored === 'true';
+  });
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-    setMobileMenuOpen(false);
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => !prev);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchTerm.trim()) {
-      navigate(`/players/${encodeURIComponent(searchTerm.trim())}`);
-      setSearchTerm('');
-      setMobileMenuOpen(false);
-    }
+  const closeSidebar = () => {
+    setSidebarOpen(false);
   };
 
-  const isActive = (path: string) => {
-    if (path === '/') {
-      return location.pathname === '/';
-    }
-    return location.pathname.startsWith(path);
+  const toggleCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const newValue = !prev;
+      localStorage.setItem('sidebarCollapsed', String(newValue));
+      return newValue;
+    });
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#1a1510' }}>
-      <nav className="osrs-nav-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16 sm:h-20 gap-2 sm:gap-4">
-            {/* Logo and Desktop Navigation */}
-            <div className="flex items-center space-x-4 sm:space-x-8 flex-1 min-w-0">
-              <Link
-                to="/"
-                className="osrs-nav-logo flex-shrink-0 text-lg sm:text-xl"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                OSRS Diff
-              </Link>
-              {isAuthenticated && isAdmin && (
-                <div className="hidden lg:flex items-center space-x-1">
-                  <Link
-                    to="/admin"
-                    className={`osrs-nav-link ${isActive('/admin') && !isActive('/admin/players') ? 'osrs-nav-link-active' : ''}`}
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    to="/admin/players"
-                    className={`osrs-nav-link ${isActive('/admin/players') ? 'osrs-nav-link-active' : ''}`}
-                  >
-                    Manage Players
-                  </Link>
-                </div>
-              )}
-            </div>
+    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        collapsed={sidebarCollapsed}
+      />
+      <Header
+        onSidebarToggle={toggleSidebar}
+        onToggleCollapse={toggleCollapse}
+        sidebarCollapsed={sidebarCollapsed}
+      />
 
-            {/* Right Side: Desktop Search Bar and User Section */}
-            <div className="hidden lg:flex items-center space-x-4 flex-shrink-0">
-              {/* Search Bar */}
-              <form onSubmit={handleSearch}>
-                <input
-                  type="text"
-                  placeholder="Search for a player..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="osrs-btn text-sm py-2 w-64"
-                />
-              </form>
-
-              {/* User Section */}
-              {isAuthenticated && (
-                <div className="flex items-center space-x-3">
-                  {isAdmin && (
-                    <span className="osrs-nav-badge">Admin</span>
-                  )}
-                  <button
-                    onClick={handleLogout}
-                    className="osrs-nav-logout"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Mobile Menu Button */}
-            <div className="lg:hidden flex items-center gap-2">
-              {isAuthenticated && (
-                <>
-                  {isAdmin && (
-                    <span className="osrs-nav-badge text-xs px-2 py-0.5">Admin</span>
-                  )}
-                  <button
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="osrs-nav-logout p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    aria-label="Toggle menu"
-                  >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      style={{ color: '#ffd700' }}
-                    >
-                      {mobileMenuOpen ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                      )}
-                    </svg>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile Menu Dropdown */}
-          {mobileMenuOpen && (
-            <div className="lg:hidden pb-4 pt-2 border-t" style={{ borderColor: '#8b7355' }}>
-              <div className="space-y-2">
-                {/* Mobile Search Bar */}
-                <form onSubmit={handleSearch} className="mb-3">
-                  <input
-                    type="text"
-                    placeholder="Search for a player..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full osrs-btn text-sm py-2.5 px-4"
-                  />
-                </form>
-
-                {/* Mobile Navigation Links */}
-                {isAuthenticated && isAdmin && (
-                  <div className="flex flex-col space-y-1">
-                    <Link
-                      to="/admin"
-                      className={`osrs-nav-link py-2.5 px-4 ${isActive('/admin') && !isActive('/admin/players') ? 'osrs-nav-link-active' : ''}`}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      to="/admin/players"
-                      className={`osrs-nav-link py-2.5 px-4 ${isActive('/admin/players') ? 'osrs-nav-link-active' : ''}`}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Manage Players
-                    </Link>
-                  </div>
-                )}
-
-                {/* Mobile Logout Button */}
-                {isAuthenticated && (
-                  <button
-                    onClick={handleLogout}
-                    className="osrs-nav-logout w-full py-2.5 px-4 text-left"
-                  >
-                    Logout
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </nav>
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8 min-h-[calc(100vh-64px)] sm:min-h-[calc(100vh-80px)]" style={{ backgroundColor: '#1a1510' }}>
+      {/* Main Content with top padding for fixed nav and left padding for sidebar */}
+      <main
+        className={`pt-20 transition-all duration-300 ${
+          sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
+        }`}
+      >
         {children}
       </main>
-      <footer className="border-t" style={{ borderColor: '#a68b5b', backgroundColor: '#1a1510' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-wrap justify-center gap-6">
-            {!isAuthenticated && (
-              <Link
-                to="/login"
-                className="osrs-footer-link"
-              >
-                Login
-              </Link>
-            )}
-            <a
-              href="https://github.com/mchestr/osrsdiff"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="osrs-footer-link"
-            >
-              GitHub
-            </a>
-            <a
-              href="https://github.com/mchestr/osrsdiff/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="osrs-footer-link"
-            >
-              Report Bug
-            </a>
-            <a
-              href="https://github.com/mchestr/osrsdiff/issues"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="osrs-footer-link"
-            >
-              Request Feature
-            </a>
+
+      {/* Footer */}
+      <footer className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="col-span-1 md:col-span-2">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">OSRS Diff</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                The open source Old School RuneScape player progress tracker.
+              </p>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Links</h4>
+              <ul className="space-y-2">
+                {!isAuthenticated && (
+                  <li>
+                    <Link
+                      to="/login"
+                      className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                    >
+                      Login
+                    </Link>
+                  </li>
+                )}
+                <li>
+                  <a
+                    href="https://github.com/mchestr/osrsdiff"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  >
+                    GitHub
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">Support</h4>
+              <ul className="space-y-2">
+                <li>
+                  <a
+                    href="https://github.com/mchestr/osrsdiff/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  >
+                    Report Bug
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/mchestr/osrsdiff/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                  >
+                    Request Feature
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p>© {new Date().getFullYear()} OSRS Diff. Open source project.</p>
           </div>
         </div>
       </footer>

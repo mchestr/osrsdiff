@@ -439,7 +439,7 @@ export const PlayerStats: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="osrs-text text-xl">
+        <div className="text-secondary-700 text-xl">
           {polling ? 'Fetching player stats...' : 'Loading...'}
         </div>
       </div>
@@ -449,7 +449,7 @@ export const PlayerStats: React.FC = () => {
   if (error || !stats) {
     return (
       <div className="osrs-card">
-        <div className="osrs-text" style={{ color: '#ff6b6b' }}>{error || 'Player not found'}</div>
+        <div className="text-danger-600">{error || 'Player not found'}</div>
       </div>
     );
   }
@@ -489,23 +489,23 @@ export const PlayerStats: React.FC = () => {
   return (
     <div className="space-y-1">
       {/* Compact Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-1.5 mb-2 sm:mb-1">
-        <h1 className="osrs-card-title text-lg sm:text-xl md:text-2xl" style={{ marginBottom: 0 }}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4">
+        <h1 className="osrs-card-title text-xl sm:text-2xl md:text-3xl mb-0">
           {stats.username}
           {polling && (
-            <span className="ml-2 osrs-text-secondary text-xs sm:text-sm" style={{ opacity: 0.7 }}>
+            <span className="ml-2 text-secondary-500 text-sm font-normal">
               (fetching...)
             </span>
           )}
         </h1>
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {stats.fetched_at && (
-            <p className="osrs-text-secondary text-xs">
+            <p className="text-secondary-500 text-sm">
               {format(new Date(stats.fetched_at), 'MMM d, HH:mm')}
             </p>
           )}
           {polling && !stats.fetched_at && (
-            <p className="osrs-text-secondary text-xs" style={{ color: '#ffd700', opacity: 0.8 }}>
+            <p className="text-primary-600 text-sm">
               Fetching stats...
             </p>
           )}
@@ -513,7 +513,7 @@ export const PlayerStats: React.FC = () => {
             href={`https://secure.runescape.com/m=hiscore_oldschool/hiscorepersonal.ws?user1=${encodeURIComponent(stats.username)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="osrs-btn text-xs px-2 py-1"
+            className="osrs-btn text-sm px-3 py-1.5"
             title="View on official OSRS hiscore"
           >
             OSRS
@@ -522,7 +522,7 @@ export const PlayerStats: React.FC = () => {
             <button
               onClick={handleTriggerFetch}
               disabled={fetching}
-              className="osrs-btn text-xs px-2 py-1"
+              className="osrs-btn text-sm px-3 py-1.5"
             >
               {fetching ? '...' : 'Fetch'}
             </button>
@@ -531,7 +531,7 @@ export const PlayerStats: React.FC = () => {
             <button
               onClick={handleGenerateSummary}
               disabled={generatingSummary}
-              className="osrs-btn text-xs px-2 py-1"
+              className="osrs-btn text-sm px-3 py-1.5"
               title="Generate AI summary for this player"
             >
               {generatingSummary ? '...' : '✨ Summary'}
@@ -549,75 +549,46 @@ export const PlayerStats: React.FC = () => {
 
       {/* Progress Analysis - Subtle */}
       {summary && (
-        <div className="mb-1.5">
-          <div className="osrs-card" style={{
-            background: 'rgba(0, 0, 0, 0.2)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '4px',
-            padding: '12px',
-          }}>
-            <div className="flex items-start gap-2">
-              <div style={{
-                fontSize: '14px',
-                lineHeight: '1',
-                flexShrink: 0,
-                opacity: 0.6,
-                marginTop: '2px',
-              }}>✨</div>
+        <div className="mb-4">
+          <div className="osrs-card bg-primary-50 border-primary-200">
+            <div className="flex items-start gap-3">
+              <div className="text-xl flex-shrink-0 mt-0.5">✨</div>
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-1.5">
-                  <h3 className="osrs-card-title text-xs" style={{ margin: 0, opacity: 0.7 }}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="osrs-card-title text-sm mb-0">
                     Progress Analysis
                   </h3>
-                  <span className="osrs-text-secondary text-xs" style={{ opacity: 0.5 }}>
+                  <span className="text-secondary-500 text-xs">
                     {format(new Date(summary.generated_at), 'MMM d')}
                   </span>
                 </div>
 
                 {/* Summary overview (if available) */}
                 {summary.summary && (
-                  <p className="osrs-text text-xs leading-relaxed mb-2" style={{
-                    lineHeight: '1.5',
-                    opacity: 0.9,
-                  }}>
+                  <p className="osrs-text text-sm leading-relaxed mb-3">
                     {summary.summary}
                   </p>
                 )}
 
                 {/* Bullet points (structured format) */}
                 {summary.summary_points && summary.summary_points.length > 0 ? (
-                  <ul className="list-none pl-0 mb-2" style={{ margin: 0, padding: 0 }}>
+                  <ul className="list-none pl-0 mb-3 space-y-2">
                     {summary.summary_points.map((point, index) => (
-                      <li key={index} className="osrs-text text-xs leading-relaxed mb-1.5 flex items-start" style={{
-                        lineHeight: '1.5',
-                        opacity: 0.85,
-                      }}>
-                        <span style={{
-                          display: 'inline-block',
-                          width: '4px',
-                          height: '4px',
-                          borderRadius: '50%',
-                          backgroundColor: 'rgba(255, 255, 255, 0.5)',
-                          marginRight: '8px',
-                          marginTop: '5px',
-                          flexShrink: 0,
-                        }} />
+                      <li key={index} className="osrs-text text-sm leading-relaxed flex items-start">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary-400 mr-2 mt-2 flex-shrink-0" />
                         <span>{point}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
                   /* Fallback to plain text for legacy summaries */
-                  <p className="osrs-text text-xs leading-relaxed mb-2" style={{
-                    lineHeight: '1.5',
-                    opacity: 0.9,
-                  }}>
+                  <p className="osrs-text text-sm leading-relaxed mb-3">
                     {summary.summary_text}
                   </p>
                 )}
 
-                <div className="mt-1.5 pt-1.5 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                  <p className="osrs-text-secondary text-xs" style={{ opacity: 0.5 }}>
+                <div className="mt-3 pt-3 border-t border-secondary-200">
+                  <p className="text-secondary-500 text-xs">
                     {format(new Date(summary.period_start), 'MMM d')} - {format(new Date(summary.period_end), 'MMM d, yyyy')}
                   </p>
                 </div>
@@ -1451,7 +1422,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
       {timelineData.length > 0 && (
         <div className="osrs-card">
           <h3 className="osrs-card-title mb-4">Experience History</h3>
-          <div className="h-80 rounded-lg p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
+          <div className="h-80 rounded p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={timelineData} margin={{ top: 20, right: 60, left: 100 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
@@ -1647,7 +1618,7 @@ const BossDetailModal: React.FC<BossDetailModalProps> = ({
       {timelineData.length > 0 && (
         <div className="osrs-card">
           <h3 className="osrs-card-title mb-4">Kill Count History</h3>
-          <div className="h-80 rounded-lg p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
+          <div className="h-80 rounded p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={timelineData} margin={{ top: 20, right: 60, left: 100 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
