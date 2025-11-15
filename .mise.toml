@@ -20,6 +20,7 @@ echo "  mise run test:cov     - Run tests with coverage"
 echo "  mise run lint         - Run linting"
 echo "  mise run format       - Format code"
 echo "  mise run typecheck    - Run type checking"
+echo "  mise run ci           - Run CI checks (format, typecheck, frontend lint)"
 echo ""
 echo "Docker:"
 echo "  mise run docker:up    - Start development environment"
@@ -84,6 +85,14 @@ uv run isort app/ tests/
 [tasks.typecheck]
 description = "Run type checking"
 run = "uv run mypy app/"
+
+[tasks.ci]
+description = "Run CI checks (format code, typecheck, frontend lint)"
+run = """
+uv run black app/ tests/
+uv run mypy app/
+cd frontend && npm run lint
+"""
 
 [tasks.clean]
 description = "Clean up build artifacts"

@@ -410,4 +410,31 @@ export class PlayersService {
         });
     }
 
+    /**
+     * Recalculate Player Game Mode
+     * Recalculate and update a player's game mode.
+     *
+     * This endpoint reclassifies the player's game mode by checking all hiscores
+     * endpoints (regular, ironman, hardcore, ultimate) and comparing experiences
+     * to determine the correct game mode.
+     *
+     * @param username
+     * @returns PlayerResponse Successful Response
+     * @throws ApiError
+     */
+    public static recalculateGameModeApiV1PlayersUsernameRecalculateGameModePost(
+        username: string,
+    ): CancelablePromise<PlayerResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/players/{username}/recalculate-game-mode',
+            path: {
+                'username': username,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+
 }

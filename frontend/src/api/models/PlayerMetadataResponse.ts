@@ -1,7 +1,7 @@
 /* generated using openapi-typescript-codegen -- do no edit */
 /* istanbul ignore file */
 /* tslint:disable */
- 
+
 
 /**
  * Response model for player metadata and admin information.
@@ -41,5 +41,9 @@ export type PlayerMetadataResponse = {
      * Average time between fetches in hours
      */
     avg_fetch_frequency_hours: (number | null);
+    /**
+     * Player game mode (regular, ironman, hardcore, ultimate)
+     */
+    game_mode?: (string | null);
 };
 

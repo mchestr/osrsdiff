@@ -15,11 +15,13 @@ interface PlayerTableProps {
   onSaveInterval: (username: string, interval: number) => void;
   onCancelEditInterval: () => void;
   onTriggerFetch: (username: string) => void;
+  onRecalculateGameMode: (username: string) => void;
   onDeactivate: (username: string) => void;
   onReactivate: (username: string) => void;
   onDelete: (username: string) => void;
   activatingPlayer: string | null;
   deletingPlayer: string | null;
+  recalculatingGameMode: string | null;
 }
 
 export const PlayerTable: React.FC<PlayerTableProps> = ({
@@ -31,11 +33,13 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({
   onSaveInterval,
   onCancelEditInterval,
   onTriggerFetch,
+  onRecalculateGameMode,
   onDeactivate,
   onReactivate,
   onDelete,
   activatingPlayer,
   deletingPlayer,
+  recalculatingGameMode,
 }) => {
   const columns: Column<PlayerResponse>[] = [
     {
@@ -142,11 +146,13 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({
         <PlayerActions
           player={player}
           onTriggerFetch={onTriggerFetch}
+          onRecalculateGameMode={onRecalculateGameMode}
           onDeactivate={onDeactivate}
           onReactivate={onReactivate}
           onDelete={onDelete}
           activatingPlayer={activatingPlayer}
           deletingPlayer={deletingPlayer}
+          recalculatingGameMode={recalculatingGameMode}
         />
       ),
       className: 'whitespace-nowrap',

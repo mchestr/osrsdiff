@@ -22,6 +22,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNotificationContext = (): UseNotificationReturn => {
   const context = useContext(NotificationContext);
   if (!context) {

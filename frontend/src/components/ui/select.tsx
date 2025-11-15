@@ -26,7 +26,7 @@ export const Select: React.FC<SelectProps> = ({
   label,
   error,
   helperText,
-  placeholder: _placeholder = 'Select an option', // Reserved for future use
+  placeholder = 'Select an option',
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,7 +34,7 @@ export const Select: React.FC<SelectProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const selectedOption = options.find((opt) => opt.value === value) || options[0];
+  const selectedOption = options.find((opt) => opt.value === value);
 
   useEffect(() => {
     const updatePosition = () => {
@@ -155,7 +155,9 @@ export const Select: React.FC<SelectProps> = ({
           disabled={disabled}
           className={buttonClasses}
         >
-          <span className="flex-1 text-left">{selectedOption?.label || selectedOption?.value || ''}</span>
+          <span className="flex-1 text-left">
+            {selectedOption ? selectedOption.label || selectedOption.value : placeholder}
+          </span>
           <svg
             className={`w-4 h-4 ms-1.5 -me-0.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
             aria-hidden="true"

@@ -19,6 +19,7 @@ export const AdminPlayerList: React.FC = () => {
   const [intervalValue, setIntervalValue] = useState<string>('');
   const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null);
   const [activatingPlayer, setActivatingPlayer] = useState<string | null>(null);
+  const [recalculatingGameMode, setRecalculatingGameMode] = useState<string | null>(null);
 
   // Modal state (for confirmations only)
   const { modalState, showConfirmModal, closeModal, handleConfirm } = useModal();
@@ -110,6 +111,21 @@ export const AdminPlayerList: React.FC = () => {
     }
   };
 
+  const handleRecalculateGameMode = async (username: string) => {
+    setRecalculatingGameMode(username);
+    try {
+      const updatedPlayer = await api.PlayersService.recalculateGameModeApiV1PlayersUsernameRecalculateGameModePost(username);
+      await fetchPlayers();
+      const gameModeDisplay = updatedPlayer.game_mode ? updatedPlayer.game_mode.charAt(0).toUpperCase() + updatedPlayer.game_mode.slice(1) : 'Unknown';
+      showNotification(`Game mode recalculated for '${username}': ${gameModeDisplay}`, 'success');
+    } catch (error: unknown) {
+      const errorMessage = extractErrorMessage(error, 'Failed to recalculate game mode');
+      showNotification(errorMessage, 'error');
+    } finally {
+      setRecalculatingGameMode(null);
+    }
+  };
+
   const confirmDelete = (username: string) => {
     showConfirmModal(
       'Confirm Delete',
@@ -172,11 +188,13 @@ export const AdminPlayerList: React.FC = () => {
         onSaveInterval={handleSaveInterval}
         onCancelEditInterval={handleCancelEditInterval}
         onTriggerFetch={handleTriggerFetch}
+        onRecalculateGameMode={handleRecalculateGameMode}
         onDeactivate={handleDeactivatePlayer}
         onReactivate={handleReactivatePlayer}
         onDelete={confirmDelete}
         activatingPlayer={activatingPlayer}
         deletingPlayer={deletingPlayer}
+        recalculatingGameMode={recalculatingGameMode}
       />
 
       {/* Confirmation Modal */}

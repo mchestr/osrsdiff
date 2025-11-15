@@ -1,5 +1,6 @@
 """Tests for player service."""
 
+from unittest import mock
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -348,3 +349,41 @@ class TestPlayerService:
 
         result = await player_service.add_player(username)
         assert result.username == username
+
+    @pytest.mark.asyncio
+    async def test_recalculate_game_mode_success(
+        self, player_service, mock_osrs_client, test_session
+    ):
+        """Test successfully recalculating game mode."""
+        from app.models.player_type import PlayerType
+        from app.services.player_type_classifier import PlayerTypeClassifier
+
+        username = "testplayer"
+        player = Player(username=username, game_mode="regular")
+        test_session.add(player)
+        await test_session.commit()
+
+        # Mock the classifier
+        mock_classifier = AsyncMock(spec=PlayerTypeClassifier)
+        mock_classifier.assert_player_type.return_value = (
+            PlayerType.IRONMAN,
+            True,
+        )
+
+        with mock.patch(
+            "app.services.player.PlayerTypeClassifier",
+            return_value=mock_classifier,
+        ):
+            result = await player_service.recalculate_game_mode(username)
+
+        assert result is True
+        await test_session.refresh(player)
+        assert player.game_mode == "ironman"
+
+    @pytest.mark.asyncio
+    async def test_recalculate_game_mode_player_not_found(
+        self, player_service, mock_osrs_client
+    ):
+        """Test recalculating game mode for non-existent player."""
+        result = await player_service.recalculate_game_mode("nonexistent")
+        assert result is False

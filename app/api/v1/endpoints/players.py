@@ -27,6 +27,7 @@ from app.services.player import (
     PlayerService,
     get_player_service,
 )
+from app.services.player_type_classifier import PlayerTypeClassificationError
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,10 @@ class PlayerResponse(BaseModel):
     schedule_id: str | None = Field(
         description="TaskIQ schedule ID for this player's fetch task"
     )
+    game_mode: str | None = Field(
+        None,
+        description="Player game mode (regular, ironman, hardcore, ultimate)",
+    )
 
     @classmethod
     def from_player(cls, player: Player) -> "PlayerResponse":
@@ -120,6 +125,7 @@ class PlayerResponse(BaseModel):
             is_active=player.is_active,
             fetch_interval_minutes=player.fetch_interval_minutes,
             schedule_id=player.schedule_id,
+            game_mode=player.game_mode,
         )
 
 
@@ -172,6 +178,10 @@ class PlayerMetadataResponse(BaseModel):
     avg_fetch_frequency_hours: float | None = Field(
         description="Average time between fetches in hours"
     )
+    game_mode: str | None = Field(
+        None,
+        description="Player game mode (regular, ironman, hardcore, ultimate)",
+    )
 
     @classmethod
     def from_player_with_metadata(
@@ -198,6 +208,7 @@ class PlayerMetadataResponse(BaseModel):
             avg_fetch_frequency_hours=metadata.get(
                 "avg_fetch_frequency_hours"
             ),
+            game_mode=player.game_mode,
         )
 
 
@@ -730,6 +741,75 @@ async def update_player_fetch_interval(
         raise PlayerServiceError(
             f"Failed to update player fetch interval: {e}"
         )
+
+
+@router.post(
+    "/{username}/recalculate-game-mode", response_model=PlayerResponse
+)
+async def recalculate_player_game_mode(
+    username: str,
+    player_service: PlayerService = Depends(get_player_service),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> PlayerResponse:
+    """
+    Recalculate and update a player's game mode.
+
+    This endpoint reclassifies the player's game mode by checking all hiscores
+    endpoints (regular, ironman, hardcore, ultimate) and comparing experiences
+    to determine the correct game mode. Useful when a player's game mode may
+    have changed (e.g., de-ironing) or was not correctly classified initially.
+
+    Args:
+        username: OSRS player username
+        player_service: Player service dependency
+        current_user: Authenticated user information
+
+    Returns:
+        PlayerResponse: Updated player information with new game_mode
+
+    Raises:
+        404 Not Found: Player not found in system
+        502 Bad Gateway: OSRS API unavailable
+        500 Internal Server Error: Classification or service errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} recalculating game mode "
+            f"for player: {username}"
+        )
+
+        # Recalculate the player's game mode
+        updated = await player_service.recalculate_game_mode(username)
+
+        if not updated:
+            raise PlayerNotFoundError(username)
+
+        # Get updated player to return
+        player = await player_service.get_player(username)
+        if not player:
+            raise PlayerServiceError(
+                "Failed to retrieve updated player information"
+            )
+
+        logger.info(
+            f"Successfully recalculated game mode for player {username}: "
+            f"{player.game_mode}"
+        )
+
+        return PlayerResponse.from_player(player)
+
+    except PlayerTypeClassificationError as e:
+        logger.error(
+            f"Failed to classify game mode for player {username}: {e}"
+        )
+        raise OSRSAPIError(f"Failed to classify game mode: {e}", detail=str(e))
+    except (PlayerNotFoundError, PlayerServiceError):
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error recalculating game mode for player {username}: {e}"
+        )
+        raise PlayerServiceError(f"Failed to recalculate game mode: {e}")
 
 
 @router.get("/schedules", response_model=ScheduleListResponse)

@@ -6,21 +6,25 @@ import type { PlayerResponse } from '../../api/models/PlayerResponse';
 interface PlayerActionsProps {
   player: PlayerResponse;
   onTriggerFetch: (username: string) => void;
+  onRecalculateGameMode: (username: string) => void;
   onDeactivate: (username: string) => void;
   onReactivate: (username: string) => void;
   onDelete: (username: string) => void;
   activatingPlayer: string | null;
   deletingPlayer: string | null;
+  recalculatingGameMode: string | null;
 }
 
 export const PlayerActions: React.FC<PlayerActionsProps> = ({
   player,
   onTriggerFetch,
+  onRecalculateGameMode,
   onDeactivate,
   onReactivate,
   onDelete,
   activatingPlayer,
   deletingPlayer,
+  recalculatingGameMode,
 }) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -29,6 +33,7 @@ export const PlayerActions: React.FC<PlayerActionsProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isActivating = activatingPlayer === player.username;
   const isDeleting = deletingPlayer === player.username;
+  const isRecalculating = recalculatingGameMode === player.username;
 
   const handleToggle = () => {
     if (!isOpen && buttonRef.current) {
@@ -109,6 +114,18 @@ export const PlayerActions: React.FC<PlayerActionsProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           Trigger Fetch
+        </button>
+
+        <button
+          onClick={() => handleAction(() => onRecalculateGameMode(player.username))}
+          disabled={isRecalculating}
+          className="w-full text-left px-4 py-2 text-sm osrs-text hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          role="menuitem"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+          {isRecalculating ? 'Recalculating...' : 'Recalculate Game Mode'}
         </button>
 
         {player.is_active ? (

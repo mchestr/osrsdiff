@@ -23,7 +23,7 @@ export interface PaginationProps {
   limit: number;
 }
 
-export interface SearchConfig<T extends Record<string, any>> {
+export interface SearchConfig<T extends Record<string, unknown>> {
   placeholder?: string;
   searchKeys?: (keyof T)[];
   value?: string;
@@ -39,7 +39,7 @@ export interface LimitConfig {
   options?: number[];
 }
 
-export interface DataTableProps<T extends Record<string, any>> {
+export interface DataTableProps<T extends Record<string, unknown>> {
   data: T[];
   columns: Column<T>[];
   keyExtractor: (item: T) => string | number;
@@ -55,7 +55,7 @@ export interface DataTableProps<T extends Record<string, any>> {
   limitConfig?: LimitConfig;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends Record<string, unknown>>({
   data,
   columns,
   keyExtractor,

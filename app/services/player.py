@@ -19,6 +19,10 @@ from app.services.osrs_api import (
     OSRSAPIClient,
     get_osrs_api_client,
 )
+from app.services.player_type_classifier import (
+    PlayerTypeClassificationError,
+    PlayerTypeClassifier,
+)
 from app.utils.common import normalize_username
 
 if TYPE_CHECKING:
@@ -96,8 +100,31 @@ class PlayerService:
                     f"Skipping OSRS validation for {username} (already verified)"
                 )
 
+            # Classify player game mode
+            game_mode = None
+            try:
+                logger.debug(f"Classifying game mode for player: {username}")
+                classifier = PlayerTypeClassifier(self.osrs_api_client)
+                player_type, _ = await classifier.assert_player_type(username)
+                game_mode = player_type.value
+                logger.info(
+                    f"Classified player {username} as {game_mode} game mode"
+                )
+            except PlayerTypeClassificationError as e:
+                logger.warning(
+                    f"Failed to classify game mode for {username}: {e}. "
+                    "Player will be added without game mode classification."
+                )
+                # Continue without game mode - it's optional
+            except Exception as e:
+                logger.warning(
+                    f"Unexpected error classifying game mode for {username}: {e}. "
+                    "Player will be added without game mode classification."
+                )
+                # Continue without game mode - it's optional
+
             # Create new player entity
-            new_player = Player(username=username)
+            new_player = Player(username=username, game_mode=game_mode)
             self.db_session.add(new_player)
 
             try:
@@ -616,6 +643,100 @@ class PlayerService:
             )
             raise PlayerServiceError(
                 f"Failed to update fetch interval for player '{username}': {e}"
+            )
+
+    async def recalculate_game_mode(self, username: str) -> bool:
+        """
+        Recalculate and update a player's game mode.
+
+        This method reclassifies the player's game mode by checking all hiscores
+        endpoints and comparing experiences, then updates the player's game_mode field.
+
+        Args:
+            username: OSRS player username
+
+        Returns:
+            bool: True if game mode was updated, False if player was not found
+
+        Raises:
+            PlayerServiceError: For database or other service errors
+            PlayerTypeClassificationError: If classification fails
+        """
+        if not username:
+            return False
+
+        username = normalize_username(username)
+
+        try:
+            logger.info(f"Recalculating game mode for player: {username}")
+
+            player = await self.get_player(username)
+            if not player:
+                logger.debug(
+                    f"Player not found for game mode recalculation: {username}"
+                )
+                return False
+
+            # Get current game mode for comparison
+            current_game_mode_str = (
+                player.game_mode if player.game_mode else None
+            )
+            current_game_mode = None
+            if current_game_mode_str:
+                from app.models.player_type import PlayerType
+
+                try:
+                    current_game_mode = PlayerType(current_game_mode_str)
+                except ValueError:
+                    # Invalid game mode value, treat as None
+                    current_game_mode = None
+
+            # Classify player game mode
+            try:
+                classifier = PlayerTypeClassifier(self.osrs_api_client)
+                player_type, changed = await classifier.assert_player_type(
+                    username, current_type=current_game_mode
+                )
+                new_game_mode = player_type.value
+
+                # Update the player's game mode
+                player.game_mode = new_game_mode
+                await self.db_session.commit()
+
+                if changed:
+                    logger.info(
+                        f"Game mode updated for {username}: "
+                        f"{current_game_mode_str} -> {new_game_mode}"
+                    )
+                else:
+                    logger.info(
+                        f"Game mode verified for {username}: {new_game_mode} "
+                        f"(unchanged)"
+                    )
+
+                return True
+
+            except PlayerTypeClassificationError as e:
+                logger.error(
+                    f"Failed to classify game mode for {username}: {e}"
+                )
+                raise
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error classifying game mode for {username}: {e}"
+                )
+                raise PlayerServiceError(
+                    f"Failed to recalculate game mode: {e}"
+                )
+
+        except (PlayerTypeClassificationError, PlayerServiceError):
+            await self.db_session.rollback()
+            raise
+        except Exception as e:
+            await self.db_session.rollback()
+            logger.error(f"Error recalculating game mode for {username}: {e}")
+            raise PlayerServiceError(
+                f"Failed to recalculate game mode for player '{username}': {e}"
             )
 
 

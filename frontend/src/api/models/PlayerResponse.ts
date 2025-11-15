@@ -1,7 +1,7 @@
 /* generated using openapi-typescript-codegen -- do no edit */
 /* istanbul ignore file */
 /* tslint:disable */
- 
+
 
 /**
  * Response model for player data.
@@ -17,5 +17,9 @@ export type PlayerResponse = {
      * TaskIQ schedule ID for this player's fetch task
      */
     schedule_id: (string | null);
+    /**
+     * Player game mode (regular, ironman, hardcore, ultimate)
+     */
+    game_mode?: (string | null);
 };
 

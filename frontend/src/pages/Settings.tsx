@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { axiosInstance } from '../api/apiClient';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useNotificationContext } from '../contexts/NotificationContext';
@@ -28,11 +28,7 @@ export const Settings: React.FC = () => {
 
   const { showNotification } = useNotificationContext();
 
-  useEffect(() => {
-    fetchSettings();
-  }, []);
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axiosInstance.get('/api/v1/settings');
@@ -43,7 +39,11 @@ export const Settings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showNotification]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   const handleRowClick = (setting: Setting, e: React.MouseEvent) => {
     // Don't open modal if clicking on action buttons

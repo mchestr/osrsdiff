@@ -14,11 +14,13 @@ interface PlayerTableRowProps {
   onSaveInterval: (username: string, interval: number) => void;
   onCancelEditInterval: () => void;
   onTriggerFetch: (username: string) => void;
+  onRecalculateGameMode: (username: string) => void;
   onDeactivate: (username: string) => void;
   onReactivate: (username: string) => void;
   onDelete: (username: string) => void;
   activatingPlayer: string | null;
   deletingPlayer: string | null;
+  recalculatingGameMode: string | null;
 }
 
 export const PlayerTableRow: React.FC<PlayerTableRowProps> = ({
@@ -30,11 +32,13 @@ export const PlayerTableRow: React.FC<PlayerTableRowProps> = ({
   onSaveInterval,
   onCancelEditInterval,
   onTriggerFetch,
+  onRecalculateGameMode,
   onDeactivate,
   onReactivate,
   onDelete,
   activatingPlayer,
   deletingPlayer,
+  recalculatingGameMode,
 }) => {
   const isEditing = editingInterval === player.id;
 
@@ -96,11 +100,13 @@ export const PlayerTableRow: React.FC<PlayerTableRowProps> = ({
         <PlayerActions
           player={player}
           onTriggerFetch={onTriggerFetch}
+          onRecalculateGameMode={onRecalculateGameMode}
           onDeactivate={onDeactivate}
           onReactivate={onReactivate}
           onDelete={onDelete}
           activatingPlayer={activatingPlayer}
           deletingPlayer={deletingPlayer}
+          recalculatingGameMode={recalculatingGameMode}
         />
       </td>
     </tr>

@@ -855,3 +855,66 @@ class TestPlayerSummary:
         )
 
         assert response.status_code == 403
+
+    def test_recalculate_game_mode_success(self, client, mock_player_service):
+        """Test successful game mode recalculation."""
+        mock_player = create_test_player(1, "testplayer")
+        mock_player.game_mode = "regular"
+        mock_player_service.get_player.return_value = mock_player
+        mock_player_service.recalculate_game_mode.return_value = True
+
+        response = client.post("/players/testplayer/recalculate-game-mode")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["username"] == "testplayer"
+        mock_player_service.recalculate_game_mode.assert_called_once_with(
+            "testplayer"
+        )
+
+    def test_recalculate_game_mode_player_not_found(
+        self, client, mock_player_service
+    ):
+        """Test recalculating game mode for non-existent player."""
+        mock_player_service.recalculate_game_mode.return_value = False
+
+        response = client.post("/players/nonexistent/recalculate-game-mode")
+
+        assert response.status_code == 404
+
+    def test_recalculate_game_mode_without_auth(
+        self, app, mock_player_service
+    ):
+        """Test that recalculating game mode requires authentication."""
+        from app.api.v1.endpoints.players import get_db_session
+
+        app.dependency_overrides[get_player_service] = (
+            lambda: mock_player_service
+        )
+        # Don't override require_auth, so it will raise 401
+
+        client = TestClient(app)
+        response = client.post("/players/testplayer/recalculate-game-mode")
+
+        assert response.status_code == 401
+
+    def test_recalculate_game_mode_classification_error(
+        self, client, mock_player_service
+    ):
+        """Test handling classification errors during recalculation."""
+        from app.services.player_type_classifier import (
+            PlayerTypeClassificationError,
+        )
+
+        mock_player_service.recalculate_game_mode.side_effect = (
+            PlayerTypeClassificationError("Failed to classify")
+        )
+
+        response = client.post("/players/testplayer/recalculate-game-mode")
+
+        assert response.status_code == 502
+        data = response.json()
+        assert (
+            "classify" in data["detail"].lower()
+            or "classify" in data.get("message", "").lower()
+        )

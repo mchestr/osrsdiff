@@ -14,6 +14,7 @@ from app.exceptions import (
     OSRSPlayerNotFoundError,
     RateLimitError,
 )
+from app.models.player_type import PlayerType
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,14 @@ class OSRSAPIClient:
     BASE_URL = (
         "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json"
     )
+
+    # Game mode specific endpoints
+    GAME_MODE_ENDPOINTS = {
+        PlayerType.REGULAR: "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json",
+        PlayerType.IRONMAN: "https://secure.runescape.com/m=hiscore_oldschool_ironman/index_lite.json",
+        PlayerType.HARDCORE: "https://secure.runescape.com/m=hiscore_oldschool_hardcore_ironman/index_lite.json",
+        PlayerType.ULTIMATE: "https://secure.runescape.com/m=hiscore_oldschool_ultimate/index_lite.json",
+    }
 
     # Retry configuration
     MAX_RETRIES = 3
@@ -99,12 +108,29 @@ class OSRSAPIClient:
             await self._session.close()
             self._session = None
 
-    async def _make_request(self, username: str) -> Dict[str, Any]:
+    def _get_base_url(self, game_mode: Optional[PlayerType] = None) -> str:
+        """
+        Get the base URL for a specific game mode.
+
+        Args:
+            game_mode: Optional game mode type. If None, uses regular hiscores.
+
+        Returns:
+            str: Base URL for the game mode
+        """
+        if game_mode is None:
+            return self.BASE_URL
+        return self.GAME_MODE_ENDPOINTS.get(game_mode, self.BASE_URL)
+
+    async def _make_request(
+        self, username: str, game_mode: Optional[PlayerType] = None
+    ) -> Dict[str, Any]:
         """Make HTTP request to OSRS API with retry logic."""
         await self._ensure_session()
         assert self._session is not None
 
-        url = f"{self.BASE_URL}?player={quote(username)}"
+        base_url = self._get_base_url(game_mode)
+        url = f"{base_url}?player={quote(username)}"
 
         for attempt in range(self.MAX_RETRIES + 1):
             try:
@@ -310,12 +336,15 @@ class OSRSAPIClient:
 
         return HiscoreData(overall=overall, skills=skills, bosses=bosses)
 
-    async def fetch_player_hiscores(self, username: str) -> HiscoreData:
+    async def fetch_player_hiscores(
+        self, username: str, game_mode: Optional[PlayerType] = None
+    ) -> HiscoreData:
         """
         Fetch hiscore data for a player from OSRS API.
 
         Args:
             username: OSRS player username
+            game_mode: Optional game mode type. If None, uses regular hiscores.
 
         Returns:
             HiscoreData: Parsed hiscore data
@@ -332,7 +361,7 @@ class OSRSAPIClient:
         username = username.strip()
 
         try:
-            json_data = await self._make_request(username)
+            json_data = await self._make_request(username, game_mode)
             return self._parse_hiscore_data(json_data)
 
         except (OSRSPlayerNotFoundError, RateLimitError, APIUnavailableError):

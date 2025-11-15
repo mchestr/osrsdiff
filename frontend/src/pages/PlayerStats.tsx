@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { BossProgressResponse } from '../api/models/BossProgressResponse';
@@ -8,6 +9,7 @@ import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
 import { ErrorDisplay } from '../components/ErrorDisplay';
+import { GameModeBadge } from '../components/GameModeBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { OverallXPGraph } from '../components/OverallXPGraph';
 import {
@@ -50,11 +52,16 @@ export const PlayerStats: React.FC = () => {
   const [fetching, setFetching] = useState(false);
   const [summary, setSummary] = useState<PlayerSummary | null>(null);
   const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [recalculatingGameMode, setRecalculatingGameMode] = useState(false);
   const { showNotification } = useNotificationContext();
   const [polling, setPolling] = useState(false);
   const pollAttemptsRef = useRef(0);
   const MAX_POLL_ATTEMPTS = 15;
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [actionsMenuPosition, setActionsMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const actionsMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const actionsMenuDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async (isPolling = false) => {
     if (!username) return;
@@ -152,6 +159,78 @@ export const PlayerStats: React.FC = () => {
       }
     };
   }, [polling, username, fetchData]);
+
+  // Handle actions menu dropdown
+  const handleActionsMenuToggle = () => {
+    if (!isActionsMenuOpen && actionsMenuButtonRef.current) {
+      const rect = actionsMenuButtonRef.current.getBoundingClientRect();
+      setActionsMenuPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setIsActionsMenuOpen(!isActionsMenuOpen);
+  };
+
+  useEffect(() => {
+    if (!isActionsMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        actionsMenuButtonRef.current &&
+        !actionsMenuButtonRef.current.contains(event.target as Node) &&
+        actionsMenuDropdownRef.current &&
+        !actionsMenuDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsActionsMenuOpen(false);
+        setActionsMenuPosition(null);
+      }
+    };
+
+    const handleScroll = () => {
+      setIsActionsMenuOpen(false);
+      setActionsMenuPosition(null);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [isActionsMenuOpen]);
+
+  const handleActionClick = (action: () => void) => {
+    action();
+    setIsActionsMenuOpen(false);
+    setActionsMenuPosition(null);
+  };
+
+  const handleRecalculateGameMode = async () => {
+    if (!username) return;
+
+    setRecalculatingGameMode(true);
+    try {
+      const updatedPlayer = await api.PlayersService.recalculateGameModeApiV1PlayersUsernameRecalculateGameModePost(username);
+
+      // Refresh metadata to get updated game mode
+      const metadataRes = await api.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username).catch(() => null);
+      if (metadataRes) {
+        setMetadata(metadataRes);
+      }
+
+      const gameModeDisplay = updatedPlayer.game_mode
+        ? (updatedPlayer.game_mode.charAt(0).toUpperCase() + updatedPlayer.game_mode.slice(1))
+        : 'Unknown';
+      showNotification(`Game mode recalculated: ${gameModeDisplay}`, 'success');
+    } catch (error: unknown) {
+      const errorMessage = extractErrorMessage(error, 'Failed to recalculate game mode');
+      showNotification(errorMessage, 'error');
+    } finally {
+      setRecalculatingGameMode(false);
+    }
+  };
 
   const handleTriggerFetch = async () => {
     if (!username) return;
@@ -332,7 +411,10 @@ export const PlayerStats: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-secondary-900 dark:text-secondary-100 mb-2">
+          <h1 className="text-3xl font-bold text-secondary-900 dark:text-secondary-100 mb-2 flex items-center gap-2">
+            {metadata && (
+              <GameModeBadge gameMode={metadata.game_mode} size="lg" className="mr-1" />
+            )}
             {stats.username}
             {polling && (
               <span className="ml-2 text-sm font-normal text-secondary-500 dark:text-secondary-300">
@@ -347,31 +429,91 @@ export const PlayerStats: React.FC = () => {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={`https://secure.runescape.com/m=hiscore_oldschool/hiscorepersonal.ws?user1=${encodeURIComponent(stats.username)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-secondary text-sm"
-          >
-            View on OSRS
-          </a>
           {isAuthenticated && (
             <button
               onClick={handleTriggerFetch}
               disabled={fetching}
               className="btn btn-primary text-sm"
             >
-              {fetching ? 'Fetching...' : 'Fetch'}
+              {fetching ? 'Updating...' : 'Update'}
             </button>
           )}
-          {isAdmin && metadata && (
-            <button
-              onClick={handleGenerateSummary}
-              disabled={generatingSummary}
-              className="btn btn-secondary text-sm"
+          <button
+            ref={actionsMenuButtonRef}
+            onClick={handleActionsMenuToggle}
+            className="btn btn-secondary text-sm p-2 dark:bg-secondary-800 dark:text-secondary-200 dark:border-secondary-600 dark:hover:bg-secondary-700 dark:hover:text-secondary-100"
+            aria-label="More actions"
+            aria-expanded={isActionsMenuOpen}
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {generatingSummary ? 'Generating...' : '✨ Summary'}
-            </button>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+          </button>
+          {isActionsMenuOpen && actionsMenuPosition && (
+            <>
+              {createPortal(
+                <div
+                  ref={actionsMenuDropdownRef}
+                  className="fixed w-56 rounded-md shadow-lg bg-white dark:bg-secondary-800 border border-secondary-200 dark:border-secondary-700 z-[9999]"
+                  style={{
+                    top: `${actionsMenuPosition.top}px`,
+                    right: `${actionsMenuPosition.right}px`,
+                  }}
+                  role="menu"
+                >
+                  <div className="py-1">
+                    <a
+                      href={`https://secure.runescape.com/m=hiscore_oldschool/hiscorepersonal.ws?user1=${encodeURIComponent(stats.username)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full text-left px-4 py-2 text-sm text-secondary-900 dark:text-secondary-100 hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors flex items-center gap-2 whitespace-nowrap"
+                      role="menuitem"
+                      onClick={() => {
+                        setIsActionsMenuOpen(false);
+                        setActionsMenuPosition(null);
+                      }}
+                    >
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      View on OSRS
+                    </a>
+                    {isAuthenticated && metadata && (
+                      <button
+                        onClick={() => handleActionClick(handleRecalculateGameMode)}
+                        disabled={recalculatingGameMode}
+                        className="w-full text-left px-4 py-2 text-sm text-secondary-900 dark:text-secondary-100 hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        role="menuitem"
+                      >
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        {recalculatingGameMode ? 'Recalculating...' : 'Recalculate Game Mode'}
+                      </button>
+                    )}
+                    {isAdmin && metadata && (
+                      <button
+                        onClick={() => handleActionClick(handleGenerateSummary)}
+                        disabled={generatingSummary}
+                        className="w-full text-left px-4 py-2 text-sm text-secondary-900 dark:text-secondary-100 hover:bg-secondary-100 dark:hover:bg-secondary-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        role="menuitem"
+                      >
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        {generatingSummary ? 'Generating...' : 'Generate Summary'}
+                      </button>
+                    )}
+                  </div>
+                </div>,
+                document.body
+              )}
+            </>
           )}
         </div>
       </div>

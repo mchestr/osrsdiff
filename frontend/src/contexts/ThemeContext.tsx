@@ -8,6 +8,7 @@ export interface ThemeContextType {
   setTheme: (theme: Theme) => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {

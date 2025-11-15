@@ -8,6 +8,7 @@ from sqlalchemy import Boolean, DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+from .player_type import PlayerType
 
 if TYPE_CHECKING:
     from .hiscore import HiscoreRecord
@@ -70,6 +71,14 @@ class Player(Base):
         nullable=True,
         index=True,
         doc="TaskIQ schedule ID for this player's fetch task",
+    )
+
+    # Game mode classification
+    game_mode: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        index=True,
+        doc="Player game mode (regular, ironman, hardcore, ultimate)",
     )
 
     # Relationships
