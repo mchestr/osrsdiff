@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { DatabaseStatsResponse } from '../api/models/DatabaseStatsResponse';
+import { StatsGrid } from '../components/StatsGrid';
 
 export const Home: React.FC = () => {
   const [stats, setStats] = useState<DatabaseStatsResponse | null>(null);
@@ -42,6 +43,31 @@ export const Home: React.FC = () => {
     return num.toLocaleString();
   };
 
+  // Icons for stats cards
+  const UsersIcon = () => (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+
+  const DatabaseIcon = () => (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+    </svg>
+  );
+
+  const ActiveIcon = () => (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+
+  const ClockIcon = () => (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+
   return (
     <div>
       {/* Hero Section - TailAdmin Marketing Style */}
@@ -79,47 +105,41 @@ export const Home: React.FC = () => {
       </section>
 
       {/* Statistics Section */}
-      <section className="py-16 sm:py-20 bg-white">
+      <section className="py-16 sm:py-20 bg-white dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
-            {loading ? (
-              <>
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="text-center p-6 bg-gray-50 rounded-xl">
-                    <div className="text-3xl md:text-4xl font-bold mb-2 text-gray-300">...</div>
-                    <div className="text-sm text-gray-500">Loading...</div>
-                  </div>
-                ))}
-              </>
-            ) : stats ? (
-              <>
-                <div className="text-center p-6 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl border border-primary-200 hover:shadow-lg transition-shadow">
-                  <div className="text-3xl md:text-4xl font-bold mb-2 text-primary-600">
-                    {formatNumber(stats.total_players)}
-                  </div>
-                  <div className="text-sm font-medium text-gray-700">Players</div>
-                </div>
-                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 hover:shadow-lg transition-shadow">
-                  <div className="text-3xl md:text-4xl font-bold mb-2 text-blue-600">
-                    {formatNumber(stats.total_hiscore_records)}
-                  </div>
-                  <div className="text-sm font-medium text-gray-700">Snapshots</div>
-                </div>
-                <div className="text-center p-6 bg-gradient-to-br from-success-50 to-success-100 rounded-xl border border-success-200 hover:shadow-lg transition-shadow">
-                  <div className="text-3xl md:text-4xl font-bold mb-2 text-success-600">
-                    {formatNumber(stats.active_players)}
-                  </div>
-                  <div className="text-sm font-medium text-gray-700">Active</div>
-                </div>
-                <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 hover:shadow-lg transition-shadow">
-                  <div className="text-3xl md:text-4xl font-bold mb-2 text-purple-600">
-                    {formatNumber(stats.records_last_24h)}
-                  </div>
-                  <div className="text-sm font-medium text-gray-700">Last 24h</div>
-                </div>
-              </>
-            ) : null}
-          </div>
+          <StatsGrid
+            loading={loading}
+            stats={
+              stats
+                ? [
+                    {
+                      title: 'Total Players',
+                      value: formatNumber(stats.total_players),
+                      icon: <UsersIcon />,
+                      color: 'primary',
+                    },
+                    {
+                      title: 'Snapshots',
+                      value: formatNumber(stats.total_hiscore_records),
+                      icon: <DatabaseIcon />,
+                      color: 'blue',
+                    },
+                    {
+                      title: 'Active Players',
+                      value: formatNumber(stats.active_players),
+                      icon: <ActiveIcon />,
+                      color: 'success',
+                    },
+                    {
+                      title: 'Last 24h',
+                      value: formatNumber(stats.records_last_24h),
+                      icon: <ClockIcon />,
+                      color: 'purple',
+                    },
+                  ]
+                : []
+            }
+          />
         </div>
       </section>
 
