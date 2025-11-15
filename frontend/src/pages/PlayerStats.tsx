@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api/apiClient';
@@ -187,39 +187,113 @@ export const PlayerStats: React.FC = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
   const [modalType, setModalType] = useState<'info' | 'error' | 'success' | 'warning'>('info');
+  const [polling, setPolling] = useState(false);
+  const pollAttemptsRef = useRef(0);
+  const MAX_POLL_ATTEMPTS = 15; // Poll for up to 30 seconds (15 attempts * 2 seconds)
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!username) return;
+  const fetchData = useCallback(async (isPolling = false) => {
+    if (!username) return;
 
-      try {
+    try {
+      if (!isPolling) {
         setLoading(true);
-        const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes, summaryRes] = await Promise.all([
-          api.StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username),
-          api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 1).catch(() => null),
-          api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 7).catch(() => null),
-          api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 30).catch(() => null),
-          api.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username).catch(() => null),
-          api.PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username).catch(() => null),
-        ]);
+      }
+      const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes, summaryRes] = await Promise.all([
+        api.StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username),
+        api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 1).catch(() => null),
+        api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 7).catch(() => null),
+        api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 30).catch(() => null),
+        api.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username).catch(() => null),
+        api.PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username).catch(() => null),
+      ]);
 
-        setStats(statsRes);
-        setProgressDay(progressDayRes);
-        setProgressWeek(progressWeekRes);
-        setProgressMonth(progressMonthRes);
-        setMetadata(metadataRes);
-        setSummary(summaryRes ? (summaryRes as PlayerSummary) : null);
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load player stats';
-        const errorDetail = (err as { body?: { detail?: string } })?.body?.detail;
-        setError(errorDetail || errorMessage);
-      } finally {
+      setStats(statsRes);
+      setProgressDay(progressDayRes);
+      setProgressWeek(progressWeekRes);
+      setProgressMonth(progressMonthRes);
+      setMetadata(metadataRes);
+      setSummary(summaryRes ? (summaryRes as PlayerSummary) : null);
+
+      // Check if we need to start polling (no data available and player was just added)
+      if (statsRes.error === 'No data available' && !statsRes.fetched_at && !polling && pollAttemptsRef.current === 0) {
+        setPolling(true);
+        pollAttemptsRef.current = 1;
+      }
+
+      // Stop polling if data is now available
+      if (isPolling && statsRes.fetched_at && !statsRes.error) {
+        setPolling(false);
+        pollAttemptsRef.current = 0;
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load player stats';
+      const errorDetail = (err as { body?: { detail?: string } })?.body?.detail;
+      setError(errorDetail || errorMessage);
+      setPolling(false);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    } finally {
+      if (!isPolling) {
         setLoading(false);
       }
-    };
+    }
+  }, [username, polling]);
 
+  useEffect(() => {
+    setPolling(false);
+    pollAttemptsRef.current = 0;
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
     fetchData();
-  }, [username]);
+  }, [username, fetchData]);
+
+  // Polling effect: refresh stats when no data is available
+  useEffect(() => {
+    if (!polling || !username) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Clear any existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    pollingIntervalRef.current = setInterval(async () => {
+      // Check if we should stop polling
+      if (pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
+        setPolling(false);
+        pollAttemptsRef.current = 0;
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        return;
+      }
+
+      pollAttemptsRef.current += 1;
+      await fetchData(true);
+    }, 2000); // Poll every 2 seconds
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [polling, username, fetchData]);
 
   const handleTriggerFetch = async () => {
     if (!username) return;
@@ -365,7 +439,9 @@ export const PlayerStats: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="osrs-text text-xl">Loading...</div>
+        <div className="osrs-text text-xl">
+          {polling ? 'Fetching player stats...' : 'Loading...'}
+        </div>
       </div>
     );
   }
@@ -416,11 +492,21 @@ export const PlayerStats: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 mb-1">
         <h1 className="osrs-card-title text-xl sm:text-2xl" style={{ marginBottom: 0 }}>
           {stats.username}
+          {polling && (
+            <span className="ml-2 osrs-text-secondary text-sm" style={{ opacity: 0.7 }}>
+              (fetching...)
+            </span>
+          )}
         </h1>
         <div className="flex flex-wrap items-center gap-1.5">
           {stats.fetched_at && (
             <p className="osrs-text-secondary text-xs">
               {format(new Date(stats.fetched_at), 'MMM d, HH:mm')}
+            </p>
+          )}
+          {polling && !stats.fetched_at && (
+            <p className="osrs-text-secondary text-xs" style={{ color: '#ffd700', opacity: 0.8 }}>
+              Fetching stats...
             </p>
           )}
           <a

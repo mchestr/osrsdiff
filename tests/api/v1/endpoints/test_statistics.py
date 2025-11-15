@@ -8,10 +8,12 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
+from app.api.v1.endpoints.players import get_player_service
 from app.api.v1.endpoints.statistics import get_statistics_service, router
 from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.services.player import PlayerService
 from app.services.statistics import (
     NoDataAvailableError,
     PlayerNotFoundError,
@@ -69,6 +71,12 @@ def mock_statistics_service():
 
 
 @pytest.fixture
+def mock_player_service():
+    """Mock player service dependency."""
+    return AsyncMock(spec=PlayerService)
+
+
+@pytest.fixture
 def mock_auth_user():
     """Mock authenticated user."""
     return {"username": "test_user", "user_id": 1}
@@ -92,12 +100,13 @@ def app():
 
 
 @pytest.fixture
-def client(app, mock_statistics_service):
+def client(app, mock_statistics_service, mock_player_service):
     """Create test client with dependency overrides."""
     # Override dependencies
     app.dependency_overrides[get_statistics_service] = (
         lambda: mock_statistics_service
     )
+    app.dependency_overrides[get_player_service] = lambda: mock_player_service
     # Note: require_auth is no longer needed for stats endpoint
 
     return TestClient(app)
@@ -106,13 +115,16 @@ def client(app, mock_statistics_service):
 class TestStatisticsEndpoints:
     """Test cases for statistics API endpoints."""
 
-    def test_get_player_stats_success(self, client, mock_statistics_service):
+    def test_get_player_stats_success(
+        self, client, mock_statistics_service, mock_player_service
+    ):
         """Test successful retrieval of player statistics."""
         # Create test data
         player = create_test_player(1, "test_player")
         record = create_test_hiscore_record(1, player)
 
         # Mock service responses
+        mock_player_service.ensure_player_exists.return_value = player
         mock_statistics_service.get_current_stats.return_value = record
         mock_statistics_service.format_stats_response.return_value = {
             "username": "test_player",
@@ -163,9 +175,13 @@ class TestStatisticsEndpoints:
             record, "test_player"
         )
 
-    def test_get_player_stats_no_data(self, client, mock_statistics_service):
+    def test_get_player_stats_no_data(
+        self, client, mock_statistics_service, mock_player_service
+    ):
         """Test getting stats for player with no data."""
         # Mock service to return None (no data)
+        player = create_test_player(1, "test_player")
+        mock_player_service.ensure_player_exists.return_value = player
         mock_statistics_service.get_current_stats.return_value = None
 
         response = client.get("/players/test_player/stats")
@@ -185,11 +201,14 @@ class TestStatisticsEndpoints:
         assert data["metadata"]["record_id"] is None
 
     def test_get_player_stats_player_not_found(
-        self, client, mock_statistics_service
+        self, client, mock_statistics_service, mock_player_service
     ):
         """Test getting stats for non-existent player."""
-        mock_statistics_service.get_current_stats.side_effect = (
-            PlayerNotFoundError("Player 'nonexistent' not found")
+        from app.exceptions import OSRSPlayerNotFoundError
+
+        # Mock ensure_player_exists to raise OSRSPlayerNotFoundError
+        mock_player_service.ensure_player_exists.side_effect = (
+            OSRSPlayerNotFoundError("nonexistent")
         )
 
         response = client.get(
@@ -198,12 +217,14 @@ class TestStatisticsEndpoints:
         )
 
         assert response.status_code == 404
-        assert "not found in tracking system" in response.json()["detail"]
+        assert "not found in OSRS hiscores" in response.json()["detail"]
 
     def test_get_player_stats_service_error(
-        self, client, mock_statistics_service
+        self, client, mock_statistics_service, mock_player_service
     ):
         """Test handling of statistics service errors."""
+        player = create_test_player(1, "test_player")
+        mock_player_service.ensure_player_exists.return_value = player
         mock_statistics_service.get_current_stats.side_effect = (
             StatisticsServiceError("Database connection failed")
         )
@@ -214,12 +235,13 @@ class TestStatisticsEndpoints:
         assert "Statistics service error" in response.json()["detail"]
 
     def test_get_player_stats_no_auth_required(
-        self, client, mock_statistics_service
+        self, client, mock_statistics_service, mock_player_service
     ):
         """Test that authentication is not required for single player stats endpoint."""
         # Mock service responses
         player = create_test_player(1, "test_player")
         record = create_test_hiscore_record(1, player)
+        mock_player_service.ensure_player_exists.return_value = player
         mock_statistics_service.get_current_stats.return_value = record
         mock_statistics_service.format_stats_response.return_value = {
             "username": "test_player",

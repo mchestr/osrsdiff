@@ -10,11 +10,16 @@ from app.exceptions import (
     BadRequestError,
     HistoryServiceError,
     InsufficientDataError,
+    OSRSPlayerNotFoundError,
     PlayerNotFoundError,
 )
 from app.models.base import get_db_session
 from app.services.history import (
     HistoryService,
+)
+from app.services.player import (
+    PlayerService,
+    get_player_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,12 +186,15 @@ async def get_player_history(
         le=365,
     ),
     history_service: HistoryService = Depends(get_history_service),
+    player_service: PlayerService = Depends(get_player_service),
 ) -> ProgressAnalysisResponse:
     """
     Get historical progress analysis for a player.
 
     This endpoint analyzes a player's progress between two dates, calculating
     experience gained, levels gained, boss kills gained, and daily rates.
+    If the player doesn't exist in the database but exists in OSRS, they will
+    be automatically added.
 
     Args:
         username: OSRS player username
@@ -194,19 +202,24 @@ async def get_player_history(
         end_date: End date for analysis (ISO format)
         days: Alternative to start_date - number of days to look back
         history_service: History service dependency
+        player_service: Player service dependency
 
     Returns:
         ProgressAnalysisResponse: Progress analysis data (returns whatever data is available,
         even if less than requested)
 
     Raises:
-        400 Bad Request: Invalid date parameters
-        404 Not Found: Player not found
+        400 Bad Request: Invalid date parameters or username format
+        404 Not Found: Player not found in OSRS hiscores
         422 Unprocessable Entity: No data available at all
+        502 Bad Gateway: OSRS API unavailable
         500 Internal Server Error: Service errors
     """
     try:
         logger.debug(f"Requesting history for player: {username}")
+
+        # Ensure player exists (auto-add if they exist in OSRS)
+        await player_service.ensure_player_exists(username)
 
         # Parse and validate dates
         now = datetime.now(timezone.utc)
@@ -269,6 +282,7 @@ async def get_player_history(
     except (
         BadRequestError,
         PlayerNotFoundError,
+        OSRSPlayerNotFoundError,
         InsufficientDataError,
         HistoryServiceError,
     ):
@@ -288,33 +302,40 @@ async def get_skill_progress(
         30, description="Number of days to analyze", ge=1, le=365
     ),
     history_service: HistoryService = Depends(get_history_service),
+    player_service: PlayerService = Depends(get_player_service),
 ) -> SkillProgressResponse:
     """
     Get progress analysis for a specific skill.
 
     This endpoint analyzes a player's progress in a specific skill over a
     specified number of days, including experience gained, levels gained,
-    and a timeline of progress.
+    and a timeline of progress. If the player doesn't exist in the database
+    but exists in OSRS, they will be automatically added.
 
     Args:
         username: OSRS player username
         skill: Skill name (e.g., 'attack', 'defence', 'magic')
         days: Number of days to analyze (1-365)
         history_service: History service dependency
+        player_service: Player service dependency
 
     Returns:
         SkillProgressResponse: Skill progress analysis data (returns whatever data is available,
         even if less than requested. period_days reflects actual data available)
 
     Raises:
-        400 Bad Request: Invalid parameters
-        404 Not Found: Player not found
+        400 Bad Request: Invalid parameters or username format
+        404 Not Found: Player not found in OSRS hiscores
+        502 Bad Gateway: OSRS API unavailable
         500 Internal Server Error: Service errors
     """
     try:
         logger.debug(
             f"Requesting {skill} progress for player: {username} over {days} days"
         )
+
+        # Ensure player exists (auto-add if they exist in OSRS)
+        await player_service.ensure_player_exists(username)
 
         # Validate skill name
         skill = skill.lower().strip()
@@ -349,6 +370,7 @@ async def get_skill_progress(
     except (
         BadRequestError,
         PlayerNotFoundError,
+        OSRSPlayerNotFoundError,
         InsufficientDataError,
         HistoryServiceError,
     ):
@@ -370,32 +392,40 @@ async def get_boss_progress(
         30, description="Number of days to analyze", ge=1, le=365
     ),
     history_service: HistoryService = Depends(get_history_service),
+    player_service: PlayerService = Depends(get_player_service),
 ) -> BossProgressResponse:
     """
     Get progress analysis for a specific boss.
 
     This endpoint analyzes a player's progress against a specific boss over a
     specified number of days, including kills gained and a timeline of progress.
+    If the player doesn't exist in the database but exists in OSRS, they will
+    be automatically added.
 
     Args:
         username: OSRS player username
         boss: Boss name (e.g., 'zulrah', 'vorkath', 'chambers_of_xeric')
         days: Number of days to analyze (1-365)
         history_service: History service dependency
+        player_service: Player service dependency
 
     Returns:
         BossProgressResponse: Boss progress analysis data (returns whatever data is available,
         even if less than requested. period_days reflects actual data available)
 
     Raises:
-        400 Bad Request: Invalid parameters
-        404 Not Found: Player not found
+        400 Bad Request: Invalid parameters or username format
+        404 Not Found: Player not found in OSRS hiscores
+        502 Bad Gateway: OSRS API unavailable
         500 Internal Server Error: Service errors
     """
     try:
         logger.debug(
             f"Requesting {boss} progress for player: {username} over {days} days"
         )
+
+        # Ensure player exists (auto-add if they exist in OSRS)
+        await player_service.ensure_player_exists(username)
 
         # Validate boss name
         boss = boss.lower().strip()
@@ -430,6 +460,7 @@ async def get_boss_progress(
     except (
         BadRequestError,
         PlayerNotFoundError,
+        OSRSPlayerNotFoundError,
         InsufficientDataError,
         HistoryServiceError,
     ):

@@ -7,16 +7,6 @@ import type { CostStatsResponse } from '../api/models/OpenAICostStatsResponse';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
 import { Modal } from '../components/Modal';
 
-interface Player {
-  id: number;
-  username: string;
-  created_at: string;
-  last_fetched: string | null;
-  is_active: boolean;
-  fetch_interval_minutes: number;
-  schedule_id: string | null;
-}
-
 interface DatabaseStats {
   total_players: number;
   active_players: number;
@@ -61,16 +51,10 @@ const formatNumber = (num: number): string => {
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [players, setPlayers] = useState<Player[]>([]);
   const [stats, setStats] = useState<DatabaseStats | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
-  const [newPlayerUsername, setNewPlayerUsername] = useState('');
-  const [addingPlayer, setAddingPlayer] = useState(false);
-  const [editingInterval, setEditingInterval] = useState<number | null>(null);
-  const [intervalValue, setIntervalValue] = useState<string>('');
   const [verifyingSchedules, setVerifyingSchedules] = useState(false);
-  const [fetchingAllPlayers, setFetchingAllPlayers] = useState(false);
   const [generatingSummaries, setGeneratingSummaries] = useState(false);
 
 
@@ -289,13 +273,11 @@ export const AdminDashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [playersRes, statsRes, healthRes] = await Promise.all([
-        api.PlayersService.listPlayersApiV1PlayersGet(false),
+      const [statsRes, healthRes] = await Promise.all([
         api.SystemService.getDatabaseStatsApiV1SystemStatsGet(),
         api.SystemService.getSystemHealthApiV1SystemHealthGet(),
       ]);
 
-      setPlayers(playersRes.players);
       setStats(statsRes);
       setHealth(healthRes);
     } catch (error) {
@@ -305,102 +287,6 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleAddPlayer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPlayerUsername.trim()) return;
-
-    setAddingPlayer(true);
-    try {
-      await api.PlayersService.addPlayerApiV1PlayersPost({
-        username: newPlayerUsername.trim(),
-      });
-      setNewPlayerUsername('');
-      await fetchData();
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add player';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
-    } finally {
-      setAddingPlayer(false);
-    }
-  };
-
-  const handleToggleActive = async (username: string, isActive: boolean) => {
-    try {
-      if (isActive) {
-        await api.PlayersService.deactivatePlayerApiV1PlayersUsernameDeactivatePost(username);
-      } else {
-        await api.PlayersService.reactivatePlayerApiV1PlayersUsernameReactivatePost(username);
-      }
-      await fetchData();
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update player';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
-    }
-  };
-
-  const handleDeletePlayer = async (username: string) => {
-    showConfirmModal(
-      'Delete Player',
-      `Are you sure you want to delete player "${username}"? This action cannot be undone.`,
-      async () => {
-        try {
-          await api.PlayersService.removePlayerApiV1PlayersUsernameDelete(username);
-          await fetchData();
-          showModal('Success', `Player "${username}" has been deleted.`, 'success');
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to delete player';
-          const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-          showModal('Error', errorDetail || errorMessage, 'error');
-        }
-      },
-      'warning'
-    );
-  };
-
-  const handleTriggerFetch = async (username: string) => {
-    try {
-      await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
-      showModal('Success', 'Fetch task enqueued successfully', 'success');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetch';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
-    }
-  };
-
-  const handleStartEditInterval = (playerId: number, currentInterval: number) => {
-    setEditingInterval(playerId);
-    setIntervalValue(currentInterval.toString());
-  };
-
-  const handleCancelEditInterval = () => {
-    setEditingInterval(null);
-    setIntervalValue('');
-  };
-
-  const handleSaveInterval = async (username: string) => {
-    const newInterval = parseInt(intervalValue, 10);
-    if (isNaN(newInterval) || newInterval < 1 || newInterval > 10080) {
-      showModal('Invalid Interval', 'Interval must be between 1 and 10080 minutes (1 week)', 'error');
-      return;
-    }
-
-    try {
-      await api.PlayersService.updatePlayerFetchIntervalApiV1PlayersUsernameFetchIntervalPut(
-        username,
-        { fetch_interval_minutes: newInterval }
-      );
-      setEditingInterval(null);
-      setIntervalValue('');
-      await fetchData();
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update interval';
-      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
-      showModal('Error', errorDetail || errorMessage, 'error');
-    }
-  };
 
   const handleVerifySchedules = async () => {
     setVerifyingSchedules(true);
@@ -428,64 +314,10 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleFetchAllPlayers = async () => {
-    const activePlayers = players.filter((p) => p.is_active);
-    if (activePlayers.length === 0) {
-      showModal('No Active Players', 'No active players to fetch', 'info');
-      return;
-    }
-
-    showConfirmModal(
-      'Fetch All Active Players',
-      `Trigger fetch for all ${activePlayers.length} active players?`,
-      async () => {
-        setFetchingAllPlayers(true);
-        try {
-          let successCount = 0;
-          let errorCount = 0;
-
-          // Trigger fetch for each active player
-          for (const player of activePlayers) {
-            try {
-              await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(player.username);
-              successCount++;
-            } catch (error) {
-              errorCount++;
-              console.error(`Failed to trigger fetch for ${player.username}:`, error);
-            }
-          }
-
-          const message = (
-            <div className="space-y-2">
-              <p>Fetch tasks triggered:</p>
-              <div className="space-y-1 text-sm">
-                <p>Success: <span className="font-bold" style={{ color: '#4caf50' }}>{successCount}</span></p>
-                <p>Errors: <span className="font-bold" style={{ color: errorCount > 0 ? '#d32f2f' : '#4caf50' }}>{errorCount}</span></p>
-              </div>
-            </div>
-          );
-          showModal('Fetch Complete', message, errorCount > 0 ? 'warning' : 'success');
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to trigger fetches';
-          showModal('Error', errorMessage, 'error');
-        } finally {
-          setFetchingAllPlayers(false);
-        }
-      },
-      'info'
-    );
-  };
-
   const handleGenerateSummaries = async () => {
-    const activePlayers = players.filter((p) => p.is_active);
-    if (activePlayers.length === 0) {
-      showModal('No Active Players', 'No active players to generate summaries for', 'info');
-      return;
-    }
-
     showConfirmModal(
       'Generate Summaries',
-      `Generate summaries for all ${activePlayers.length} active players? This will trigger AI-powered summary generation tasks.`,
+      'Generate summaries for all active players? This will trigger AI-powered summary generation tasks.',
       async () => {
         setGeneratingSummaries(true);
         try {
@@ -955,254 +787,52 @@ export const AdminDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Quick Actions & Player Management */}
+      {/* Quick Actions */}
       <div className="osrs-card">
         <h2 className="osrs-card-title mb-6">Quick Actions</h2>
-        <div className="space-y-6">
-          {/* Add Player Section */}
-          <div>
-            <h3 className="osrs-stat-label mb-3 flex items-center gap-2">
-              <span style={{ color: '#ffd700' }}>➕</span>
-              Add New Player
-            </h3>
-            <form onSubmit={handleAddPlayer} className="flex gap-3">
-              <input
-                type="text"
-                value={newPlayerUsername}
-                onChange={(e) => setNewPlayerUsername(e.target.value)}
-                placeholder="Enter OSRS username (max 12 chars)"
-                className="osrs-btn flex-1"
-                style={{
-                  backgroundColor: '#3a3024',
-                  color: '#ffd700',
-                  border: '1px solid #8b7355',
-                  padding: '0.75rem 1rem'
-                }}
-                maxLength={12}
-                required
-              />
-              <button
-                type="submit"
-                disabled={addingPlayer || !newPlayerUsername.trim()}
-                className="osrs-btn"
-                style={{
-                  minWidth: '140px',
-                  opacity: addingPlayer || !newPlayerUsername.trim() ? 0.6 : 1,
-                  cursor: addingPlayer || !newPlayerUsername.trim() ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {addingPlayer ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin">⏳</span>
-                    Adding...
-                  </span>
-                ) : (
-                  'Add Player'
-                )}
-              </button>
-            </form>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t" style={{ borderColor: '#8b7355' }}></div>
-
-          {/* Admin Actions */}
-          <div>
-            <h3 className="osrs-stat-label mb-3 flex items-center gap-2">
-              <span style={{ color: '#ffd700' }}>⚙️</span>
-              System Actions
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                onClick={handleVerifySchedules}
-                disabled={verifyingSchedules}
-                className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
-                style={{
-                  backgroundColor: '#3a3024',
-                  border: '1px solid #8b7355',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  minHeight: '80px'
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold osrs-text">Verify Schedules</span>
-                  <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>🔍</span>
-                </div>
-                <span className="text-xs osrs-text-secondary">
-                  {verifyingSchedules ? 'Checking schedule integrity...' : 'Validate all player fetch schedules'}
-                </span>
-              </button>
-              <button
-                onClick={handleFetchAllPlayers}
-                disabled={fetchingAllPlayers}
-                className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
-                style={{
-                  backgroundColor: '#3a3024',
-                  border: '1px solid #8b7355',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  minHeight: '80px'
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold osrs-text">Fetch All Players</span>
-                  <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>🚀</span>
-                </div>
-                <span className="text-xs osrs-text-secondary">
-                  {fetchingAllPlayers ? 'Triggering fetches...' : 'Manually trigger fetch for all active players'}
-                </span>
-              </button>
-              <button
-                onClick={handleGenerateSummaries}
-                disabled={generatingSummaries}
-                className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
-                style={{
-                  backgroundColor: '#3a3024',
-                  border: '1px solid #8b7355',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  minHeight: '80px'
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold osrs-text">Generate Summaries</span>
-                  <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>✨</span>
-                </div>
-                <span className="text-xs osrs-text-secondary">
-                  {generatingSummaries ? 'Generating summaries...' : 'Generate AI summaries for all active players'}
-                </span>
-              </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            onClick={handleVerifySchedules}
+            disabled={verifyingSchedules}
+            className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
+            style={{
+              backgroundColor: '#3a3024',
+              border: '1px solid #8b7355',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              minHeight: '80px'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold osrs-text">Verify Schedules</span>
+              <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>🔍</span>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Players List */}
-      <div className="osrs-card">
-        <h2 className="osrs-card-title mb-4">Players Management</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-            <thead>
-              <tr style={{ backgroundColor: '#1a1510' }}>
-                <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
-                  Username
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
-                  Last Fetched
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
-                  Interval
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((player) => (
-                <tr key={player.id} style={{ borderBottom: '1px solid #8b7355' }} className="hover:opacity-80">
-                  <td className="px-6 py-4 whitespace-nowrap font-medium">
-                    <button
-                      onClick={() => navigate(`/players/${player.username}`)}
-                      className="osrs-text hover:opacity-80 font-medium"
-                    >
-                      {player.username}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className="px-2 inline-flex text-xs leading-5 font-semibold"
-                      style={{
-                        backgroundColor: player.is_active ? 'rgba(255, 215, 0, 0.2)' : 'rgba(139, 115, 85, 0.2)',
-                        border: `1px solid ${player.is_active ? '#ffd700' : '#8b7355'}`,
-                        color: player.is_active ? '#ffd700' : '#8b7355'
-                      }}
-                    >
-                      {player.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm osrs-text-secondary">
-                    {player.last_fetched
-                      ? format(new Date(player.last_fetched), 'MMM d, yyyy HH:mm')
-                      : 'Never'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm osrs-text-secondary">
-                    {editingInterval === player.id ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          value={intervalValue}
-                          onChange={(e) => setIntervalValue(e.target.value)}
-                          min={1}
-                          max={10080}
-                          className="osrs-btn text-sm"
-                          style={{ width: '80px', backgroundColor: '#3a3024', color: '#ffd700' }}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSaveInterval(player.username);
-                            } else if (e.key === 'Escape') {
-                              handleCancelEditInterval();
-                            }
-                          }}
-                        />
-                        <button
-                          onClick={() => handleSaveInterval(player.username)}
-                          className="osrs-text text-xs hover:opacity-80"
-                          style={{ color: '#ffd700' }}
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={handleCancelEditInterval}
-                          className="osrs-text-secondary text-xs hover:opacity-80"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleStartEditInterval(player.id, player.fetch_interval_minutes)}
-                        className="osrs-text hover:opacity-80"
-                        title="Click to edit"
-                      >
-                        {player.fetch_interval_minutes} min
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => handleToggleActive(player.username, player.is_active)}
-                      className="osrs-text hover:opacity-80"
-                    >
-                      {player.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      onClick={() => handleTriggerFetch(player.username)}
-                      className="osrs-text hover:opacity-80"
-                      style={{ color: '#d4af37' }}
-                    >
-                      Fetch
-                    </button>
-                    <button
-                      onClick={() => handleDeletePlayer(player.username)}
-                      className="osrs-text-secondary hover:opacity-80"
-                      style={{ color: '#8b7355' }}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <span className="text-xs osrs-text-secondary">
+              {verifyingSchedules ? 'Checking schedule integrity...' : 'Validate all player fetch schedules'}
+            </span>
+          </button>
+          <button
+            onClick={handleGenerateSummaries}
+            disabled={generatingSummaries}
+            className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
+            style={{
+              backgroundColor: '#3a3024',
+              border: '1px solid #8b7355',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              minHeight: '80px'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold osrs-text">Generate Summaries</span>
+              <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>✨</span>
+            </div>
+            <span className="text-xs osrs-text-secondary">
+              {generatingSummaries ? 'Generating summaries...' : 'Generate AI summaries for all active players'}
+            </span>
+          </button>
         </div>
       </div>
 

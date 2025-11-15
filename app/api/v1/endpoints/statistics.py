@@ -6,10 +6,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import (
+    OSRSPlayerNotFoundError,
     PlayerNotFoundError,
     StatisticsServiceError,
 )
 from app.models.base import get_db_session
+from app.services.player import (
+    PlayerService,
+    get_player_service,
+)
 from app.services.statistics import (
     StatisticsService,
 )
@@ -77,27 +82,35 @@ router = APIRouter(prefix="/players", tags=["statistics"])
 async def get_player_stats(
     username: str,
     statistics_service: StatisticsService = Depends(get_statistics_service),
+    player_service: PlayerService = Depends(get_player_service),
 ) -> PlayerStatsResponse:
     """
     Get current statistics for a specific player.
 
     This endpoint returns the most recent hiscore record for the specified player,
     including skill levels, experience points, boss kill counts, and calculated
-    combat level.
+    combat level. If the player doesn't exist in the database but exists in OSRS,
+    they will be automatically added.
 
     Args:
         username: OSRS player username
         statistics_service: Statistics service dependency
+        player_service: Player service dependency
 
     Returns:
         PlayerStatsResponse: Current player statistics
 
     Raises:
-        404 Not Found: Player not found in system
+        400 Bad Request: Invalid username format
+        404 Not Found: Player not found in OSRS hiscores
+        502 Bad Gateway: OSRS API unavailable
         500 Internal Server Error: Service errors
     """
     try:
         logger.debug(f"Requesting stats for player: {username}")
+
+        # Ensure player exists (auto-add if they exist in OSRS)
+        await player_service.ensure_player_exists(username)
 
         # Get current stats for the player
         record = await statistics_service.get_current_stats(username)
@@ -144,7 +157,11 @@ async def get_player_stats(
         logger.debug(f"Successfully retrieved stats for player: {username}")
         return response
 
-    except (PlayerNotFoundError, StatisticsServiceError):
+    except (
+        PlayerNotFoundError,
+        OSRSPlayerNotFoundError,
+        StatisticsServiceError,
+    ):
         raise
     except Exception as e:
         logger.error(f"Unexpected error getting stats for {username}: {e}")

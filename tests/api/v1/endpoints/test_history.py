@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from starlette import status
 
 from app.api.v1.endpoints.history import get_history_service, router
+from app.api.v1.endpoints.players import get_player_service
 from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
@@ -22,6 +23,7 @@ from app.services.history import (
     ProgressAnalysis,
     SkillProgress,
 )
+from app.services.player import PlayerService
 
 
 def create_test_player(id: int, username: str):
@@ -69,6 +71,12 @@ def mock_history_service():
 
 
 @pytest.fixture
+def mock_player_service():
+    """Mock player service dependency."""
+    return AsyncMock(spec=PlayerService)
+
+
+@pytest.fixture
 def mock_auth_user():
     """Mock authenticated user."""
     return {"username": "test_user", "user_id": 1}
@@ -92,12 +100,13 @@ def app():
 
 
 @pytest.fixture
-def client(app, mock_history_service):
+def client(app, mock_history_service, mock_player_service):
     """Create test client with dependency overrides."""
     # Override dependencies
     app.dependency_overrides[get_history_service] = (
         lambda: mock_history_service
     )
+    app.dependency_overrides[get_player_service] = lambda: mock_player_service
     # Note: require_auth is no longer needed for history endpoints
 
     return TestClient(app)
@@ -107,7 +116,7 @@ class TestHistoryEndpoints:
     """Test cases for history API endpoints."""
 
     def test_get_player_history_success_with_dates(
-        self, client, mock_history_service
+        self, client, mock_history_service, mock_player_service
     ):
         """Test successful retrieval of player history with specific dates."""
         # Create test data
@@ -127,6 +136,7 @@ class TestHistoryEndpoints:
             end_record=end_record,
         )
 
+        mock_player_service.ensure_player_exists.return_value = player
         mock_history_service.get_progress_between_dates.return_value = progress
 
         response = client.get(
@@ -272,11 +282,13 @@ class TestHistoryEndpoints:
         assert "Date range cannot exceed 365 days" in response.json()["detail"]
 
     def test_get_player_history_player_not_found(
-        self, client, mock_history_service
+        self, client, mock_history_service, mock_player_service
     ):
         """Test handling of non-existent player."""
-        mock_history_service.get_progress_between_dates.side_effect = (
-            PlayerNotFoundError("Player 'nonexistent' not found")
+        from app.exceptions import OSRSPlayerNotFoundError
+
+        mock_player_service.ensure_player_exists.side_effect = (
+            OSRSPlayerNotFoundError("nonexistent")
         )
 
         response = client.get(
@@ -284,9 +296,11 @@ class TestHistoryEndpoints:
         )
 
         assert response.status_code == 404
-        assert "not found in tracking system" in response.json()["detail"]
+        assert "not found in OSRS hiscores" in response.json()["detail"]
 
-    def test_get_player_history_no_data(self, client, mock_history_service):
+    def test_get_player_history_no_data(
+        self, client, mock_history_service, mock_player_service
+    ):
         """Test handling of no data available error."""
         mock_history_service.get_progress_between_dates.side_effect = (
             InsufficientDataError("No data available for progress analysis")
@@ -314,7 +328,9 @@ class TestHistoryEndpoints:
         assert response.status_code == 500
         assert "History service error" in response.json()["detail"]
 
-    def test_get_skill_progress_success(self, client, mock_history_service):
+    def test_get_skill_progress_success(
+        self, client, mock_history_service, mock_player_service
+    ):
         """Test successful retrieval of skill progress."""
         # Create test data
         player = create_test_player(1, "test_player")
@@ -412,11 +428,13 @@ class TestHistoryEndpoints:
         assert "Skill name cannot be empty" in response.json()["detail"]
 
     def test_get_skill_progress_player_not_found(
-        self, client, mock_history_service
+        self, client, mock_history_service, mock_player_service
     ):
         """Test skill progress for non-existent player."""
-        mock_history_service.get_skill_progress.side_effect = (
-            PlayerNotFoundError("Player 'nonexistent' not found")
+        from app.exceptions import OSRSPlayerNotFoundError
+
+        mock_player_service.ensure_player_exists.side_effect = (
+            OSRSPlayerNotFoundError("nonexistent")
         )
 
         response = client.get(
@@ -424,7 +442,7 @@ class TestHistoryEndpoints:
         )
 
         assert response.status_code == 404
-        assert "not found in tracking system" in response.json()["detail"]
+        assert "not found in OSRS hiscores" in response.json()["detail"]
 
     def test_get_skill_progress_partial_data(
         self, client, mock_history_service
@@ -460,7 +478,9 @@ class TestHistoryEndpoints:
         assert data["period_days"] == 2  # Reflects actual data available
         assert data["total_records"] == 2
 
-    def test_get_boss_progress_success(self, client, mock_history_service):
+    def test_get_boss_progress_success(
+        self, client, mock_history_service, mock_player_service
+    ):
         """Test successful retrieval of boss progress."""
         # Create test data
         player = create_test_player(1, "test_player")
@@ -538,11 +558,13 @@ class TestHistoryEndpoints:
         assert "Boss name cannot be empty" in response.json()["detail"]
 
     def test_get_boss_progress_player_not_found(
-        self, client, mock_history_service
+        self, client, mock_history_service, mock_player_service
     ):
         """Test boss progress for non-existent player."""
-        mock_history_service.get_boss_progress.side_effect = (
-            PlayerNotFoundError("Player 'nonexistent' not found")
+        from app.exceptions import OSRSPlayerNotFoundError
+
+        mock_player_service.ensure_player_exists.side_effect = (
+            OSRSPlayerNotFoundError("nonexistent")
         )
 
         response = client.get(
@@ -550,7 +572,7 @@ class TestHistoryEndpoints:
         )
 
         assert response.status_code == 404
-        assert "not found in tracking system" in response.json()["detail"]
+        assert "not found in OSRS hiscores" in response.json()["detail"]
 
     def test_get_boss_progress_partial_data(
         self, client, mock_history_service

@@ -47,15 +47,18 @@ class PlayerService:
         self.osrs_api_client = osrs_api_client
         self.schedule_manager = schedule_manager
 
-    async def add_player(self, username: str) -> Player:
+    async def add_player(
+        self, username: str, skip_osrs_validation: bool = False
+    ) -> Player:
         """
         Add a new player to the tracking system.
 
         This method validates the username format, checks if the player exists
-        in OSRS hiscores, prevents duplicates, and creates a new Player entity.
+        in OSRS hiscores (unless skipped), prevents duplicates, and creates a new Player entity.
 
         Args:
             username: OSRS player username to add
+            skip_osrs_validation: If True, skip OSRS API validation (use when already verified)
 
         Returns:
             Player: The created player entity
@@ -89,15 +92,20 @@ class PlayerService:
             if existing_player:
                 raise PlayerAlreadyExistsError(username)
 
-            # Verify player exists in OSRS hiscores
-            logger.debug(
-                f"Verifying player exists in OSRS hiscores: {username}"
-            )
-            player_exists = await self.osrs_api_client.check_player_exists(
-                username
-            )
-            if not player_exists:
-                raise OSRSPlayerNotFoundError(username)
+            # Verify player exists in OSRS hiscores (unless validation is skipped)
+            if not skip_osrs_validation:
+                logger.debug(
+                    f"Verifying player exists in OSRS hiscores: {username}"
+                )
+                player_exists = await self.osrs_api_client.check_player_exists(
+                    username
+                )
+                if not player_exists:
+                    raise OSRSPlayerNotFoundError(username)
+            else:
+                logger.debug(
+                    f"Skipping OSRS validation for {username} (already verified)"
+                )
 
             # Create new player entity
             new_player = Player(username=username)
@@ -194,6 +202,110 @@ class PlayerService:
         except Exception as e:
             logger.error(f"Error getting player {username}: {e}")
             raise PlayerServiceError(f"Failed to get player '{username}': {e}")
+
+    async def ensure_player_exists(self, username: str) -> Player:
+        """
+        Ensure a player exists in the database, auto-adding if they exist in OSRS.
+
+        This method checks if the player exists in our database. If not, it checks
+        if they exist in OSRS hiscores and automatically adds them if valid.
+
+        Args:
+            username: OSRS player username
+
+        Returns:
+            Player: Player entity (existing or newly created)
+
+        Raises:
+            InvalidUsernameError: If username format is invalid
+            OSRSPlayerNotFoundError: If player doesn't exist in OSRS hiscores
+            OSRSAPIError: If OSRS API is unavailable or other API errors
+            PlayerServiceError: For other service-level errors
+        """
+        if not username:
+            raise InvalidUsernameError("Username cannot be empty")
+
+        username = username.strip()
+
+        # Validate username format
+        if not Player.validate_username(username):
+            raise InvalidUsernameError(
+                f"Invalid username format: '{username}'. "
+                "Username must be 1-12 characters, contain only letters, numbers, "
+                "spaces, hyphens, and underscores, and not start/end with spaces."
+            )
+
+        try:
+            logger.debug(f"Ensuring player exists: {username}")
+
+            # Check if player already exists in our database
+            player = await self.get_player(username)
+            if player:
+                logger.debug(
+                    f"Player already exists: {username} (ID: {player.id})"
+                )
+                return player
+
+            # Player doesn't exist in our DB, check if they exist in OSRS
+            logger.info(
+                f"Player {username} not found in database, checking OSRS hiscores"
+            )
+            player_exists = await self.osrs_api_client.check_player_exists(
+                username
+            )
+            if not player_exists:
+                raise OSRSPlayerNotFoundError(username)
+
+            # Player exists in OSRS, add them to our database
+            # Skip OSRS validation since we already verified above
+            logger.info(
+                f"Player {username} exists in OSRS, adding to database"
+            )
+            try:
+                player = await self.add_player(
+                    username, skip_osrs_validation=True
+                )
+
+                # Trigger initial fetch task for the newly added player
+                try:
+                    from app.workers.tasks import fetch_player_hiscores_task
+
+                    await fetch_player_hiscores_task.kiq(player.username)
+                    logger.info(
+                        f"Triggered initial fetch task for player {player.username}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to trigger initial fetch for {player.username}: {e}"
+                    )
+                    # Don't fail player creation if fetch trigger fails
+
+                return player
+            except PlayerAlreadyExistsError:
+                # Race condition: player was added by another request between our check and add
+                # Just return the existing player
+                logger.debug(
+                    f"Player {username} was added concurrently, retrieving existing player"
+                )
+                existing_player = await self.get_player(username)
+                if existing_player:
+                    return existing_player
+                # If we still can't find it, re-raise the original error
+                raise
+
+        except (
+            OSRSPlayerNotFoundError,
+            OSRSAPIError,
+            InvalidUsernameError,
+            PlayerAlreadyExistsError,
+        ):
+            # Re-raise these exceptions (PlayerAlreadyExistsError is handled in inner try-except)
+            raise
+        except Exception as e:
+            logger.error(f"Error ensuring player exists {username}: {e}")
+            raise PlayerServiceError(
+                f"Failed to ensure player '{username}' exists: {e}"
+            )
 
     async def list_players(self, active_only: bool = True) -> List[Player]:
         """

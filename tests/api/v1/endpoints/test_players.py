@@ -460,49 +460,59 @@ class TestPlayerMetadata:
         """Test successful player metadata retrieval."""
         from datetime import datetime
 
+        # Create mock database session - use a regular object to avoid async wrapping
+        from types import SimpleNamespace
+
         from app.models.base import get_db_session
 
-        # Create mock database session
-        mock_db_session = AsyncMock()
+        mock_db_session = SimpleNamespace()
 
         # Create test player
         test_player = create_test_player(1, "testuser")
 
+        # Mock ensure_player_exists (async function)
+        async def mock_ensure_player_exists(username):
+            return test_player
+
+        mock_player_service.ensure_player_exists = mock_ensure_player_exists
+
         # Mock database queries in order
-        # Player query result
-        player_result = AsyncMock()
+        # Player query result (not used anymore but kept for compatibility)
+        player_result = SimpleNamespace()
         player_result.scalar_one_or_none = lambda: test_player
 
-        # Record count result
-        count_result = AsyncMock()
-        count_result.scalar = lambda: 50
+        # Record count result - use a simple class to avoid async issues
+        class MockResult:
+            def __init__(self, value):
+                self._value = value
 
-        # First record result
-        first_result = AsyncMock()
-        first_result.scalar = lambda: datetime(2024, 1, 1, tzinfo=timezone.utc)
+            def scalar(self):
+                return self._value
 
-        # Latest record result
-        latest_result = AsyncMock()
-        latest_result.scalar = lambda: datetime(
-            2024, 11, 2, tzinfo=timezone.utc
-        )
+        count_result = MockResult(50)
+        first_result = MockResult(datetime(2024, 1, 1, tzinfo=timezone.utc))
+        latest_result = MockResult(datetime(2024, 11, 2, tzinfo=timezone.utc))
+        records_24h_result = MockResult(5)
+        records_7d_result = MockResult(25)
 
-        # Records last 24h result
-        records_24h_result = AsyncMock()
-        records_24h_result.scalar = lambda: 5
-
-        # Records last 7d result
-        records_7d_result = AsyncMock()
-        records_7d_result.scalar = lambda: 25
-
-        mock_db_session.execute.side_effect = [
-            player_result,  # Player query
-            count_result,  # Record count
-            first_result,  # First record
-            latest_result,  # Latest record
-            records_24h_result,  # Records last 24h
-            records_7d_result,  # Records last 7d
+        # Create async execute function
+        # Note: ensure_player_exists is called first, so the first execute() call
+        # is for the record count query, not the player query
+        call_count = [0]
+        results_list = [
+            count_result,  # Record count (first execute call)
+            first_result,  # First record (second execute call)
+            latest_result,  # Latest record (third execute call)
+            records_24h_result,  # Records last 24h (fourth execute call)
+            records_7d_result,  # Records last 7d (fifth execute call)
         ]
+
+        async def mock_execute(query):
+            result = results_list[call_count[0]]
+            call_count[0] += 1
+            return result
+
+        mock_db_session.execute = mock_execute
 
         # Override the database dependency
         client.app.dependency_overrides[get_db_session] = (
@@ -522,19 +532,11 @@ class TestPlayerMetadata:
 
     def test_get_player_metadata_not_found(self, client, mock_player_service):
         """Test player metadata for non-existent player."""
-        from app.models.base import get_db_session
+        from app.exceptions import OSRSPlayerNotFoundError
 
-        # Create mock database session
-        mock_db_session = AsyncMock()
-
-        # Mock player not found
-        player_result = AsyncMock()
-        player_result.scalar_one_or_none = lambda: None
-        mock_db_session.execute.return_value = player_result
-
-        # Override the database dependency
-        client.app.dependency_overrides[get_db_session] = (
-            lambda: mock_db_session
+        # Mock ensure_player_exists to raise OSRSPlayerNotFoundError
+        mock_player_service.ensure_player_exists.side_effect = (
+            OSRSPlayerNotFoundError("nonexistent")
         )
 
         response = client.get("/players/nonexistent/metadata")
@@ -557,41 +559,52 @@ class TestPlayerMetadata:
         # Don't override require_auth for this test
         client = TestClient(app)
 
-        # Create mock database session
-        mock_db_session = AsyncMock()
+        # Create mock database session - use a regular object to avoid async wrapping
+        from types import SimpleNamespace
+
+        mock_db_session = SimpleNamespace()
 
         # Create test player
         test_player = create_test_player(1, "testuser")
 
-        # Mock database queries in order
-        player_result = AsyncMock()
-        player_result.scalar_one_or_none = lambda: test_player
+        # Mock ensure_player_exists (async function)
+        async def mock_ensure_player_exists(username):
+            return test_player
 
-        count_result = AsyncMock()
-        count_result.scalar = lambda: 50
+        mock_player_service.ensure_player_exists = mock_ensure_player_exists
 
-        first_result = AsyncMock()
-        first_result.scalar = lambda: datetime(2024, 1, 1, tzinfo=timezone.utc)
+        # Use a simple class to avoid async issues
+        class MockResult:
+            def __init__(self, value):
+                self._value = value
 
-        latest_result = AsyncMock()
-        latest_result.scalar = lambda: datetime(
-            2024, 11, 2, tzinfo=timezone.utc
-        )
+            def scalar(self):
+                return self._value
 
-        records_24h_result = AsyncMock()
-        records_24h_result.scalar = lambda: 5
+        count_result = MockResult(50)
+        first_result = MockResult(datetime(2024, 1, 1, tzinfo=timezone.utc))
+        latest_result = MockResult(datetime(2024, 11, 2, tzinfo=timezone.utc))
+        records_24h_result = MockResult(5)
+        records_7d_result = MockResult(25)
 
-        records_7d_result = AsyncMock()
-        records_7d_result.scalar = lambda: 25
-
-        mock_db_session.execute.side_effect = [
-            player_result,
-            count_result,
-            first_result,
-            latest_result,
-            records_24h_result,
-            records_7d_result,
+        # Create async execute function
+        # Note: ensure_player_exists is called first, so the first execute() call
+        # is for the record count query
+        call_count = [0]
+        results_list = [
+            count_result,  # Record count (first execute call)
+            first_result,  # First record (second execute call)
+            latest_result,  # Latest record (third execute call)
+            records_24h_result,  # Records last 24h (fourth execute call)
+            records_7d_result,  # Records last 7d (fifth execute call)
         ]
+
+        async def mock_execute(query):
+            result = results_list[call_count[0]]
+            call_count[0] += 1
+            return result
+
+        mock_db_session.execute = mock_execute
 
         # Override the database dependency
         app.dependency_overrides[get_db_session] = lambda: mock_db_session
@@ -678,7 +691,7 @@ class TestPlayerSummary:
         return AsyncMock()
 
     def test_get_player_summary_success(
-        self, app, mock_db_session, mock_auth_user
+        self, app, mock_db_session, mock_auth_user, mock_player_service
     ):
         """Test successful retrieval of player summary."""
         from datetime import datetime, timedelta, timezone
@@ -698,15 +711,22 @@ class TestPlayerSummary:
             model_used="gpt-4o-mini",
         )
 
+        # Mock ensure_player_exists
+        async def mock_ensure_player_exists(username):
+            return player
+
+        mock_player_service.ensure_player_exists = mock_ensure_player_exists
+
         async def mock_execute(query):
-            if "players" in str(query).lower():
-                return AsyncMock(scalar_one_or_none=lambda: player)
-            elif "player_summaries" in str(query).lower():
+            if "player_summaries" in str(query).lower():
                 return AsyncMock(scalar_one_or_none=lambda: summary)
             return AsyncMock()
 
         mock_db_session.execute = mock_execute
         app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        app.dependency_overrides[get_player_service] = (
+            lambda: mock_player_service
+        )
         app.dependency_overrides[require_auth] = lambda: mock_auth_user
 
         client = TestClient(app)
@@ -718,18 +738,20 @@ class TestPlayerSummary:
         assert data["player_id"] == 1
 
     def test_get_player_summary_not_found(
-        self, app, mock_db_session, mock_auth_user
+        self, app, mock_db_session, mock_auth_user, mock_player_service
     ):
         """Test getting summary for non-existent player."""
-        from app.models.player import Player
+        from app.exceptions import OSRSPlayerNotFoundError
 
-        async def mock_execute(query):
-            if "players" in str(query).lower():
-                return AsyncMock(scalar_one_or_none=lambda: None)
-            return AsyncMock()
+        # Mock ensure_player_exists to raise OSRSPlayerNotFoundError
+        mock_player_service.ensure_player_exists.side_effect = (
+            OSRSPlayerNotFoundError("nonexistent")
+        )
 
-        mock_db_session.execute = mock_execute
         app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        app.dependency_overrides[get_player_service] = (
+            lambda: mock_player_service
+        )
         app.dependency_overrides[require_auth] = lambda: mock_auth_user
 
         client = TestClient(app)
@@ -738,22 +760,29 @@ class TestPlayerSummary:
         assert response.status_code == 404
 
     def test_get_player_summary_no_summary(
-        self, app, mock_db_session, mock_auth_user
+        self, app, mock_db_session, mock_auth_user, mock_player_service
     ):
         """Test getting summary when player has no summary."""
         from app.models.player import Player
 
         player = Player(id=1, username="testplayer")
 
+        # Mock ensure_player_exists
+        async def mock_ensure_player_exists(username):
+            return player
+
+        mock_player_service.ensure_player_exists = mock_ensure_player_exists
+
         async def mock_execute(query):
-            if "players" in str(query).lower():
-                return AsyncMock(scalar_one_or_none=lambda: player)
-            elif "player_summaries" in str(query).lower():
+            if "player_summaries" in str(query).lower():
                 return AsyncMock(scalar_one_or_none=lambda: None)
             return AsyncMock()
 
         mock_db_session.execute = mock_execute
         app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        app.dependency_overrides[get_player_service] = (
+            lambda: mock_player_service
+        )
         app.dependency_overrides[require_auth] = lambda: mock_auth_user
 
         client = TestClient(app)

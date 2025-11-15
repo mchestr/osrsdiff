@@ -461,36 +461,35 @@ async def trigger_manual_fetch(
 async def get_player_metadata(
     username: str,
     db_session: AsyncSession = Depends(get_db_session),
+    player_service: PlayerService = Depends(get_player_service),
 ) -> PlayerMetadataResponse:
     """
     Get detailed metadata and statistics for a specific player.
 
     Returns comprehensive information about a player including record counts,
     fetch history, and timing statistics. Useful for monitoring individual
-    player tracking performance and troubleshooting.
+    player tracking performance and troubleshooting. If the player doesn't exist
+    in the database but exists in OSRS, they will be automatically added.
 
     Args:
         username: OSRS player username
         db_session: Database session dependency
+        player_service: Player service dependency
 
     Returns:
         PlayerMetadataResponse: Detailed player metadata and statistics
 
     Raises:
-        404 Not Found: Player not found in system
+        400 Bad Request: Invalid username format
+        404 Not Found: Player not found in OSRS hiscores
+        502 Bad Gateway: OSRS API unavailable
         500 Internal Server Error: Database or calculation errors
     """
     try:
         logger.info(f"Requesting metadata for player: {username}")
 
-        # Get player
-        player_result = await db_session.execute(
-            select(Player).where(Player.username.ilike(username))
-        )
-        player = player_result.scalar_one_or_none()
-
-        if not player:
-            raise PlayerNotFoundError(username)
+        # Ensure player exists (auto-add if they exist in OSRS)
+        player = await player_service.ensure_player_exists(username)
 
         # Get record count
         total_records_result = await db_session.execute(
@@ -565,7 +564,7 @@ async def get_player_metadata(
         logger.info(f"Successfully retrieved metadata for player: {username}")
         return response
 
-    except PlayerNotFoundError:
+    except (PlayerNotFoundError, OSRSPlayerNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Error retrieving metadata for player {username}: {e}")
@@ -984,36 +983,34 @@ class PlayerSummaryResponse(BaseModel):
 async def get_player_summary(
     username: str,
     db_session: AsyncSession = Depends(get_db_session),
-    current_user: Dict[str, Any] = Depends(require_auth),
+    player_service: PlayerService = Depends(get_player_service),
 ) -> Optional[PlayerSummaryResponse]:
     """
     Get the most recent AI-generated summary for a player.
 
     Returns the latest summary if available, or None if no summary exists.
+    If the player doesn't exist in the database but exists in OSRS, they will
+    be automatically added.
 
     Args:
         username: OSRS player username
         db_session: Database session dependency
-        current_user: Authenticated user information
+        player_service: Player service dependency
 
     Returns:
         PlayerSummaryResponse: Most recent summary or None
 
     Raises:
-        404 Not Found: Player not found in system
+        400 Bad Request: Invalid username format
+        404 Not Found: Player not found in OSRS hiscores
+        502 Bad Gateway: OSRS API unavailable
         500 Internal Server Error: Database errors
     """
     try:
         logger.info(f"Requesting summary for player: {username}")
 
-        # Get player
-        player_result = await db_session.execute(
-            select(Player).where(Player.username.ilike(username))
-        )
-        player = player_result.scalar_one_or_none()
-
-        if not player:
-            raise PlayerNotFoundError(username)
+        # Ensure player exists (auto-add if they exist in OSRS)
+        player = await player_service.ensure_player_exists(username)
 
         # Get most recent summary
         summary_stmt = (
@@ -1030,7 +1027,7 @@ async def get_player_summary(
 
         return PlayerSummaryResponse.from_summary(summary)
 
-    except PlayerNotFoundError:
+    except (PlayerNotFoundError, OSRSPlayerNotFoundError):
         raise
     except Exception as e:
         logger.error(f"Error retrieving summary for player {username}: {e}")
