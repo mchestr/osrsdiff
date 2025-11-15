@@ -310,13 +310,10 @@ export const TaskExecutions: React.FC = () => {
         </div>
       </div>
 
-      {/* Results Summary */}
-      <div className="osrs-card">
-        <div className="flex justify-between items-center">
-          <p className="osrs-text">
-            Showing {executions.length} of {total} executions
-          </p>
-          {totalPages > 1 && (
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="osrs-card">
+          <div className="flex justify-end items-center">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handlePageChange(Math.max(0, offset - limit))}
@@ -338,9 +335,9 @@ export const TaskExecutions: React.FC = () => {
                 Next
               </button>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Executions Table */}
       <div className="osrs-card">
