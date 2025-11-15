@@ -228,7 +228,7 @@ export class PlayersService {
      */
     public static getPlayerSummaryApiV1PlayersUsernameSummaryGet(
         username: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<unknown> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/players/{username}/summary',
