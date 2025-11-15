@@ -90,6 +90,15 @@ interface BossData {
   rank?: number | null;
 }
 
+type PlayerSummary = {
+  summary_text: string;
+  summary?: string;
+  summary_points?: string[];
+  generated_at: string;
+  period_start: string;
+  period_end: string;
+};
+
 // OSRS experience table - experience required for each level
 const getExpForLevel = (level: number): number => {
   if (level <= 1) return 0;
@@ -171,14 +180,7 @@ export const PlayerStats: React.FC = () => {
   const [bossProgressLoading, setBossProgressLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
-  const [summary, setSummary] = useState<{
-    summary_text: string;
-    summary?: string;
-    summary_points?: string[];
-    generated_at: string;
-    period_start: string;
-    period_end: string
-  } | null>(null);
+  const [summary, setSummary] = useState<PlayerSummary | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -200,7 +202,7 @@ export const PlayerStats: React.FC = () => {
         setProgressWeek(progressWeekRes);
         setProgressMonth(progressMonthRes);
         setMetadata(metadataRes);
-        setSummary(summaryRes || null);
+        setSummary(summaryRes ? (summaryRes as PlayerSummary) : null);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load player stats';
         const errorDetail = (err as { body?: { detail?: string } })?.body?.detail;
