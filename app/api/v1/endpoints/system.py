@@ -755,11 +755,11 @@ class GenerateSummaryResponse(BaseModel):
     """Response model for summary generation."""
 
     message: str = Field(description="Success message")
-    summaries_generated: int = Field(
-        description="Number of summaries generated"
+    tasks_triggered: int = Field(
+        description="Number of summary generation tasks triggered"
     )
-    summaries: List[PlayerSummaryResponse] = Field(
-        description="List of generated summaries"
+    task_ids: List[str] = Field(
+        description="List of task IDs for triggered tasks"
     )
 
 
@@ -770,10 +770,12 @@ async def generate_summaries(
     current_user: Dict[str, Any] = Depends(require_admin),
 ) -> GenerateSummaryResponse:
     """
-    Generate AI-powered progress summaries for players.
+    Trigger AI-powered progress summary generation for players.
 
-    This endpoint generates summaries using OpenAI API that analyze player progress
-    over the last day and week. Admins can trigger this for all players or a specific player.
+    This endpoint triggers asynchronous background tasks to generate summaries
+    using OpenAI API that analyze player progress over the last day and week.
+    Admins can trigger this for all players or a specific player. The API returns
+    immediately after enqueuing tasks without waiting for summary generation.
 
     Args:
         request: Summary generation request with optional player_id
@@ -781,63 +783,82 @@ async def generate_summaries(
         current_user: Authenticated admin user information
 
     Returns:
-        GenerateSummaryResponse: Generated summaries and count
+        GenerateSummaryResponse: Number of tasks triggered and their IDs
 
     Raises:
         403 Forbidden: User is not an admin
         404 Not Found: Player not found (if player_id specified)
-        500 Internal Server Error: Summary generation errors
+        500 Internal Server Error: Task enqueue errors
     """
     try:
         logger.info(
-            f"Admin {current_user.get('username')} generating summaries "
+            f"Admin {current_user.get('username')} triggering summary generation tasks "
             f"(player_id={request.player_id}, force={request.force_regenerate})"
         )
 
-        from app.services.summary import SummaryService, get_summary_service
+        from app.workers.tasks import generate_player_summary_task
 
-        summary_service = get_summary_service(db_session)
+        task_ids = []
 
         if request.player_id:
-            # Generate for specific player
-            try:
-                summary = await summary_service.generate_summary_for_player(
-                    request.player_id,
-                    force_regenerate=request.force_regenerate,
+            # Verify player exists
+            player_result = await db_session.execute(
+                select(Player).where(Player.id == request.player_id)
+            )
+            player = player_result.scalar_one_or_none()
+            if not player:
+                raise NotFoundError(
+                    f"Player with ID {request.player_id} not found"
                 )
-                if summary is None:
-                    raise InternalServerError(
-                        "Failed to generate summary: returned None"
-                    )
-                summaries: List[PlayerSummary] = [summary]
-            except Exception as e:
-                logger.error(
-                    f"Failed to generate summary for player {request.player_id}: {e}"
-                )
-                raise InternalServerError(
-                    f"Failed to generate summary: {e}", detail=str(e)
-                )
+
+            # Trigger task for specific player
+            task_result = await generate_player_summary_task.kiq(
+                request.player_id, force_regenerate=request.force_regenerate
+            )
+            task_ids.append(task_result.task_id)
+            logger.info(
+                f"Triggered summary generation task for player {request.player_id} "
+                f"(task ID: {task_result.task_id})"
+            )
         else:
-            # Generate for all active players
-            summaries = (
-                await summary_service.generate_summaries_for_all_players(
-                    force_regenerate=request.force_regenerate
-                )
+            # Get all active players and trigger a task for each
+            players_stmt = select(Player).where(Player.is_active.is_(True))
+            players_result = await db_session.execute(players_stmt)
+            players = list(players_result.scalars().all())
+
+            logger.info(
+                f"Triggering summary generation tasks for {len(players)} active players"
             )
 
+            for player in players:
+                try:
+                    task_result = await generate_player_summary_task.kiq(
+                        player.id, force_regenerate=request.force_regenerate
+                    )
+                    task_ids.append(task_result.task_id)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to enqueue summary task for player {player.id} ({player.username}): {e}"
+                    )
+                    # Continue with other players even if one fails
+
         response = GenerateSummaryResponse(
-            message=f"Successfully generated {len(summaries)} summaries",
-            summaries_generated=len(summaries),
-            summaries=[
-                PlayerSummaryResponse.from_summary(s) for s in summaries
-            ],
+            message=f"Successfully triggered {len(task_ids)} summary generation tasks",
+            tasks_triggered=len(task_ids),
+            task_ids=task_ids,
         )
 
-        logger.info(f"Successfully generated {len(summaries)} summaries")
+        logger.info(
+            f"Successfully triggered {len(task_ids)} summary generation tasks"
+        )
         return response
 
+    except NotFoundError:
+        raise
     except Exception as e:
-        logger.error(f"Error generating summaries: {e}", exc_info=True)
+        logger.error(
+            f"Error triggering summary generation tasks: {e}", exc_info=True
+        )
         raise InternalServerError(
-            "Failed to generate summaries", detail=str(e)
+            "Failed to trigger summary generation tasks", detail=str(e)
         )

@@ -9,7 +9,10 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, Dict, List
 
+from sqlalchemy import select
+
 from app.models.base import AsyncSessionLocal
+from app.models.player import Player
 from app.services.summary import SummaryService
 from app.workers.main import broker
 
@@ -26,40 +29,59 @@ logger = logging.getLogger(__name__)
 )
 async def daily_summary_generation_job() -> Dict[str, Any]:
     """
-    Periodic job to generate AI-powered summaries for all active players.
+    Periodic job to trigger AI-powered summary generation for all active players.
 
-    This task runs daily to generate summaries analyzing player progress
-    over the last day and week. Summaries are stored in the database
-    and can be retrieved via the API.
+    This task runs daily to trigger asynchronous summary generation tasks for
+    each active player. Summaries analyze player progress over the last day
+    and week and are stored in the database.
 
     Returns:
-        Dict containing generation results and statistics
+        Dict containing task triggering results and statistics
     """
     logger.info("Starting daily summary generation job")
     start_time = datetime.now(UTC)
 
     async with AsyncSessionLocal() as db_session:
         try:
-            summary_service = SummaryService(db_session)
+            # Get all active players
+            players_stmt = select(Player).where(Player.is_active.is_(True))
+            players_result = await db_session.execute(players_stmt)
+            players = list(players_result.scalars().all())
 
-            # Generate summaries for all active players
-            summaries = (
-                await summary_service.generate_summaries_for_all_players(
-                    force_regenerate=False
-                )
+            logger.info(
+                f"Triggering summary generation tasks for {len(players)} active players"
             )
+
+            task_ids = []
+            errors = []
+
+            # Trigger a task for each player
+            for player in players:
+                try:
+                    task_result = await generate_player_summary_task.kiq(
+                        player.id, force_regenerate=False
+                    )
+                    task_ids.append(task_result.task_id)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to enqueue summary task for player {player.id} ({player.username}): {e}"
+                    )
+                    errors.append({"player_id": player.id, "error": str(e)})
 
             duration = (datetime.now(UTC) - start_time).total_seconds()
 
             result = {
                 "status": "success",
-                "summaries_generated": len(summaries),
+                "tasks_triggered": len(task_ids),
+                "task_ids": task_ids,
+                "errors": errors,
                 "timestamp": datetime.now(UTC).isoformat(),
                 "duration_seconds": duration,
             }
 
             logger.info(
-                f"Daily summary generation completed: {len(summaries)} summaries generated in {duration:.2f}s"
+                f"Daily summary generation job completed: {len(task_ids)} tasks triggered "
+                f"({len(errors)} errors) in {duration:.2f}s"
             )
 
             return result

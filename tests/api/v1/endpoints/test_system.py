@@ -122,29 +122,47 @@ class TestSummaryGeneration:
     def test_generate_summaries_for_all_players(
         self, admin_client, mock_db_session
     ):
-        """Test generating summaries for all players."""
-        from datetime import datetime, timezone
-        from unittest.mock import AsyncMock, patch
+        """Test triggering summary generation tasks for all players."""
+        from unittest.mock import AsyncMock, MagicMock, patch
 
-        from app.models.player_summary import PlayerSummary
+        from app.models.player import Player
 
-        mock_summary = PlayerSummary(
-            id=1,
-            player_id=1,
-            period_start=datetime.now(timezone.utc) - timedelta(days=7),
-            period_end=datetime.now(timezone.utc),
-            summary_text="Generated summary",
-            generated_at=datetime.now(timezone.utc),
-        )
+        # Mock players query result
+        mock_player1 = Player(id=1, username="player1", is_active=True)
+        mock_player2 = Player(id=2, username="player2", is_active=True)
+
+        mock_scalars_result = MagicMock()
+        mock_scalars_result.all.return_value = [
+            mock_player1,
+            mock_player2,
+        ]
+
+        mock_players_result = MagicMock()
+        mock_players_result.scalars.return_value = mock_scalars_result
+
+        # Mock task result
+        class MockTaskResult:
+            def __init__(self, task_id):
+                self.task_id = task_id
 
         with patch(
-            "app.services.summary.get_summary_service"
-        ) as mock_get_service:
-            mock_service = AsyncMock()
-            mock_service.generate_summaries_for_all_players = AsyncMock(
-                return_value=[mock_summary]
+            "app.workers.tasks.generate_player_summary_task"
+        ) as mock_task:
+            # Mock the .kiq() method to return task results
+            mock_task.kiq = AsyncMock(
+                side_effect=[
+                    MockTaskResult("task-id-1"),
+                    MockTaskResult("task-id-2"),
+                ]
             )
-            mock_get_service.return_value = mock_service
+
+            # Mock database query for players
+            async def mock_execute(query):
+                if "is_active" in str(query):
+                    return mock_players_result
+                return AsyncMock()
+
+            mock_db_session.execute = AsyncMock(side_effect=mock_execute)
 
             response = admin_client.post(
                 "/system/generate-summaries",
@@ -153,35 +171,42 @@ class TestSummaryGeneration:
 
             assert response.status_code == 200
             data = response.json()
-            assert data["summaries_generated"] == 1
-            assert len(data["summaries"]) == 1
+            assert data["tasks_triggered"] == 2
+            assert len(data["task_ids"]) == 2
+            assert "task-id-1" in data["task_ids"]
+            assert "task-id-2" in data["task_ids"]
 
     def test_generate_summaries_for_specific_player(
         self, admin_client, mock_db_session
     ):
-        """Test generating summary for specific player."""
-        from datetime import datetime, timezone
-        from unittest.mock import AsyncMock, patch
+        """Test triggering summary generation task for specific player."""
+        from unittest.mock import AsyncMock, MagicMock, patch
 
-        from app.models.player_summary import PlayerSummary
+        from app.models.player import Player
 
-        mock_summary = PlayerSummary(
-            id=1,
-            player_id=1,
-            period_start=datetime.now(timezone.utc) - timedelta(days=7),
-            period_end=datetime.now(timezone.utc),
-            summary_text="Generated summary",
-            generated_at=datetime.now(timezone.utc),
-        )
+        # Mock player query result
+        mock_player = Player(id=1, username="testplayer", is_active=True)
+        mock_player_result = AsyncMock()
+        mock_player_result.scalar_one_or_none.return_value = mock_player
+
+        # Mock task result
+        class MockTaskResult:
+            def __init__(self, task_id):
+                self.task_id = task_id
 
         with patch(
-            "app.services.summary.get_summary_service"
-        ) as mock_get_service:
-            mock_service = AsyncMock()
-            mock_service.generate_summary_for_player = AsyncMock(
-                return_value=mock_summary
-            )
-            mock_get_service.return_value = mock_service
+            "app.workers.tasks.generate_player_summary_task"
+        ) as mock_task:
+            # Mock the .kiq() method to return task result
+            mock_task.kiq = AsyncMock(return_value=MockTaskResult("task-id-1"))
+
+            # Mock database query for player
+            async def mock_execute(query):
+                if "id" in str(query) and "1" in str(query):
+                    return mock_player_result
+                return AsyncMock()
+
+            mock_db_session.execute = AsyncMock(side_effect=mock_execute)
 
             response = admin_client.post(
                 "/system/generate-summaries",
@@ -190,7 +215,46 @@ class TestSummaryGeneration:
 
             assert response.status_code == 200
             data = response.json()
-            assert data["summaries_generated"] == 1
+            assert data["tasks_triggered"] == 1
+            assert len(data["task_ids"]) == 1
+            assert data["task_ids"][0] == "task-id-1"
+
+    def test_generate_summaries_player_not_found(
+        self, admin_client, mock_db_session
+    ):
+        """Test triggering summary generation for non-existent player."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from sqlalchemy import select
+
+        from app.models.player import Player
+
+        # Mock player query result - player not found
+        mock_player_result = MagicMock()
+        mock_player_result.scalar_one_or_none.return_value = None
+
+        # Mock database query for player - need to match the actual query structure
+        async def mock_execute(query):
+            # Check if this is a select query for Player with id filter
+            query_str = str(query)
+            # The query will be something like: SELECT ... FROM players WHERE players.id = :id_1
+            if (
+                hasattr(query, "column_descriptions")
+                or "players" in query_str.lower()
+            ):
+                # Check if it's filtering by id=999
+                if hasattr(query, "whereclause") or "999" in query_str:
+                    return mock_player_result
+            return MagicMock()
+
+        mock_db_session.execute = AsyncMock(side_effect=mock_execute)
+
+        response = admin_client.post(
+            "/system/generate-summaries",
+            json={"player_id": 999, "force_regenerate": False},
+        )
+
+        assert response.status_code == 404
 
     def test_generate_summaries_not_admin(
         self, app, mock_db_session, mock_auth_user
