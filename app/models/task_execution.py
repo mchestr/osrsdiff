@@ -257,11 +257,17 @@ class TaskExecution(Base):
         try:
             status = TaskExecutionStatus(status_str)
         except ValueError:
-            # Handle unknown status values
-            status = (
-                TaskExecutionStatus.SUCCESS
-                if status_str == "success"
-                else TaskExecutionStatus.WARNING
+            # Map maintenance job status values to TaskExecutionStatus enum
+            # Maintenance jobs return: "healthy", "cleaned", "issues_remain", "error"
+            status_mapping = {
+                "healthy": TaskExecutionStatus.SUCCESS,
+                "cleaned": TaskExecutionStatus.SUCCESS,
+                "issues_remain": TaskExecutionStatus.WARNING,
+                "error": TaskExecutionStatus.FAILURE,
+                "success": TaskExecutionStatus.SUCCESS,
+            }
+            status = status_mapping.get(
+                status_str, TaskExecutionStatus.WARNING
             )
 
         completed_at = now
