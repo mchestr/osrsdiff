@@ -11,6 +11,7 @@ from .base import Base
 
 if TYPE_CHECKING:
     from .hiscore import HiscoreRecord
+    from .player_summary import PlayerSummary
 
 
 class Player(Base):
@@ -78,6 +79,14 @@ class Player(Base):
         cascade="all, delete-orphan",
         order_by="HiscoreRecord.fetched_at.desc()",
         doc="Historical hiscore records for this player",
+    )
+
+    summaries: Mapped[List["PlayerSummary"]] = relationship(
+        "PlayerSummary",
+        back_populates="player",
+        cascade="all, delete-orphan",
+        order_by="PlayerSummary.generated_at.desc()",
+        doc="AI-generated progress summaries for this player",
     )
 
     def __init__(self, **kwargs: Any) -> None:

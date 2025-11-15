@@ -171,6 +171,7 @@ export const PlayerStats: React.FC = () => {
   const [bossProgressLoading, setBossProgressLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
+  const [summary, setSummary] = useState<{ summary_text: string; generated_at: string; period_start: string; period_end: string } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -178,12 +179,13 @@ export const PlayerStats: React.FC = () => {
 
       try {
         setLoading(true);
-        const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes] = await Promise.all([
+        const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes, summaryRes] = await Promise.all([
           api.StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username),
           api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 1).catch(() => null),
           api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 7).catch(() => null),
           api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 30).catch(() => null),
           api.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username).catch(() => null),
+          api.PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username).catch(() => null),
         ]);
 
         setStats(statsRes);
@@ -191,6 +193,7 @@ export const PlayerStats: React.FC = () => {
         setProgressWeek(progressWeekRes);
         setProgressMonth(progressMonthRes);
         setMetadata(metadataRes);
+        setSummary(summaryRes || null);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load player stats';
         const errorDetail = (err as { body?: { detail?: string } })?.body?.detail;
@@ -377,6 +380,58 @@ export const PlayerStats: React.FC = () => {
       {username && (
         <div className="mb-1.5">
           <OverallXPGraph username={username} />
+        </div>
+      )}
+
+      {/* AI Summary Highlight */}
+      {summary && (
+        <div className="mb-1.5">
+          <div className="osrs-card" style={{
+            background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%)',
+            border: '2px solid rgba(255, 215, 0, 0.3)',
+            borderRadius: '4px',
+            padding: '16px',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '100px',
+              height: '100px',
+              background: 'radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+            <div className="flex items-start gap-3">
+              <div style={{
+                fontSize: '24px',
+                lineHeight: '1',
+                flexShrink: 0,
+              }}>✨</div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="osrs-card-title text-sm" style={{ margin: 0 }}>
+                    AI Progress Summary
+                  </h3>
+                  <span className="osrs-text-secondary text-xs">
+                    {format(new Date(summary.generated_at), 'MMM d, yyyy')}
+                  </span>
+                </div>
+                <p className="osrs-text text-sm leading-relaxed" style={{
+                  lineHeight: '1.6',
+                  color: '#ffd700',
+                }}>
+                  {summary.summary_text}
+                </p>
+                <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(255, 215, 0, 0.2)' }}>
+                  <p className="osrs-text-secondary text-xs">
+                    Period: {format(new Date(summary.period_start), 'MMM d')} - {format(new Date(summary.period_end), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

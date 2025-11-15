@@ -89,6 +89,8 @@ export const api = {
       handleTokenRefresh(() => PlayersService.removePlayerApiV1PlayersUsernameDelete(username)),
     getPlayerMetadataApiV1PlayersUsernameMetadataGet: (username: string) =>
       handleTokenRefresh(() => PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username)),
+    getPlayerSummaryApiV1PlayersUsernameSummaryGet: (username: string) =>
+      handleTokenRefresh(() => PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username)),
     triggerManualFetchApiV1PlayersUsernameFetchPost: (username: string) =>
       handleTokenRefresh(() => PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username)),
     deactivatePlayerApiV1PlayersUsernameDeactivatePost: (username: string) =>
@@ -114,8 +116,8 @@ export const api = {
       handleTokenRefresh(() => SystemService.getScheduledTasksApiV1SystemScheduledTasksGet()),
     triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost: (taskName: string) =>
       handleTokenRefresh(() => SystemService.triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost(taskName)),
-    getTaskExecutionsApiV1SystemTaskExecutionsGet: (taskName?: string | null, status?: string | null, scheduleId?: string | null, playerId?: number | null, limit?: number, offset?: number) =>
-      handleTokenRefresh(() => SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(taskName, status, scheduleId, playerId, limit, offset)),
+    getTaskExecutionsApiV1SystemTaskExecutionsGet: (search?: string | null, limit?: number, offset?: number) =>
+      handleTokenRefresh(() => SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(search, limit, offset)),
   },
   HistoryService: {
     ...HistoryService,

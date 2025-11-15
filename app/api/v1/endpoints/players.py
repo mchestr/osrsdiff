@@ -1,13 +1,13 @@
 import logging
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth_utils import require_auth
+from app.api.auth_utils import require_admin, require_auth
 from app.exceptions import (
     InvalidUsernameError,
     OSRSAPIError,
@@ -19,6 +19,7 @@ from app.exceptions import (
 from app.models.base import get_db_session
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.models.player_summary import PlayerSummary
 from app.services.osrs_api import (
     OSRSAPIClient,
     get_osrs_api_client,
@@ -913,3 +914,167 @@ async def verify_all_schedules(
         raise PlayerServiceError(
             f"Failed to perform schedule verification: {e}"
         )
+
+
+class PlayerSummaryResponse(BaseModel):
+    """Response model for a player summary."""
+
+    id: int = Field(description="Summary ID")
+    player_id: int = Field(description="Player ID")
+    period_start: str = Field(description="Start of the summary period")
+    period_end: str = Field(description="End of the summary period")
+    summary_text: str = Field(description="Generated summary text")
+    generated_at: str = Field(description="When the summary was generated")
+    model_used: Optional[str] = Field(
+        None, description="OpenAI model used for generation"
+    )
+
+    @classmethod
+    def from_summary(cls, summary: PlayerSummary) -> "PlayerSummaryResponse":
+        """Create response model from PlayerSummary entity."""
+        return cls(
+            id=summary.id,
+            player_id=summary.player_id,
+            period_start=summary.period_start.isoformat(),
+            period_end=summary.period_end.isoformat(),
+            summary_text=summary.summary_text,
+            generated_at=summary.generated_at.isoformat(),
+            model_used=summary.model_used,
+        )
+
+
+@router.get(
+    "/{username}/summary", response_model=Optional[PlayerSummaryResponse]
+)
+async def get_player_summary(
+    username: str,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> Optional[PlayerSummaryResponse]:
+    """
+    Get the most recent AI-generated summary for a player.
+
+    Returns the latest summary if available, or None if no summary exists.
+
+    Args:
+        username: OSRS player username
+        db_session: Database session dependency
+        current_user: Authenticated user information
+
+    Returns:
+        PlayerSummaryResponse: Most recent summary or None
+
+    Raises:
+        404 Not Found: Player not found in system
+        500 Internal Server Error: Database errors
+    """
+    try:
+        logger.info(f"Requesting summary for player: {username}")
+
+        # Get player
+        player_result = await db_session.execute(
+            select(Player).where(Player.username.ilike(username))
+        )
+        player = player_result.scalar_one_or_none()
+
+        if not player:
+            raise PlayerNotFoundError(username)
+
+        # Get most recent summary
+        summary_stmt = (
+            select(PlayerSummary)
+            .where(PlayerSummary.player_id == player.id)
+            .order_by(PlayerSummary.generated_at.desc())
+            .limit(1)
+        )
+        summary_result = await db_session.execute(summary_stmt)
+        summary = summary_result.scalar_one_or_none()
+
+        if not summary:
+            return None
+
+        return PlayerSummaryResponse.from_summary(summary)
+
+    except PlayerNotFoundError:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving summary for player {username}: {e}")
+        raise PlayerServiceError(f"Failed to retrieve player summary: {e}")
+
+
+class GeneratePlayerSummaryRequest(BaseModel):
+    """Request model for generating a player summary."""
+
+    force_regenerate: bool = Field(
+        False, description="Force regeneration even if recent summary exists"
+    )
+
+
+@router.post("/{username}/summary", response_model=PlayerSummaryResponse)
+async def generate_player_summary(
+    username: str,
+    request: GeneratePlayerSummaryRequest,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: Dict[str, Any] = Depends(require_admin),
+) -> PlayerSummaryResponse:
+    """
+    Generate an AI-powered progress summary for a specific player.
+
+    This endpoint generates a summary using OpenAI API that analyzes player progress
+    over the last day and week. Only admins can trigger summary generation.
+
+    Args:
+        username: OSRS player username
+        request: Summary generation request with force_regenerate option
+        db_session: Database session dependency
+        current_user: Authenticated admin user information
+
+    Returns:
+        PlayerSummaryResponse: Generated summary
+
+    Raises:
+        403 Forbidden: User is not an admin
+        404 Not Found: Player not found
+        500 Internal Server Error: Summary generation errors
+    """
+    try:
+        logger.info(
+            f"Admin {current_user.get('username')} generating summary for player: {username} "
+            f"(force={request.force_regenerate})"
+        )
+
+        # Get player
+        player_result = await db_session.execute(
+            select(Player).where(Player.username.ilike(username))
+        )
+        player = player_result.scalar_one_or_none()
+
+        if not player:
+            raise PlayerNotFoundError(username)
+
+        # Generate summary
+        from app.services.summary import SummaryService, get_summary_service
+
+        summary_service = get_summary_service(db_session)
+
+        try:
+            summary = await summary_service.generate_summary_for_player(
+                player.id, force_regenerate=request.force_regenerate
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to generate summary for player {username}: {e}"
+            )
+            raise PlayerServiceError(f"Failed to generate summary: {e}")
+
+        logger.info(f"Successfully generated summary for player {username}")
+        return PlayerSummaryResponse.from_summary(summary)
+
+    except (PlayerNotFoundError, PlayerServiceError):
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error generating summary for player {username}: {e}",
+            exc_info=True,
+        )
+        raise PlayerServiceError(f"Failed to generate summary: {e}")

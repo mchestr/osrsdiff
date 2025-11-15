@@ -183,6 +183,26 @@ class AdminSettings(BaseModel):
     )
 
 
+class OpenAISettings(BaseModel):
+    """OpenAI API configuration settings."""
+
+    api_key: Optional[str] = Field(
+        default=None, description="OpenAI API key for generating summaries"
+    )
+    model: str = Field(
+        default="gpt-4o-mini",
+        description="OpenAI model to use for summary generation",
+    )
+    max_tokens: int = Field(
+        default=1000,
+        description="Maximum tokens for summary generation",
+    )
+    temperature: float = Field(
+        default=0.7,
+        description="Temperature for summary generation (0.0-1.0)",
+    )
+
+
 class Settings(BaseSettings):
     """Application settings.
 
@@ -212,6 +232,7 @@ class Settings(BaseSettings):
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     taskiq: TaskIQSettings = Field(default_factory=TaskIQSettings)
     admin: AdminSettings = Field(default_factory=AdminSettings)
+    openai: OpenAISettings = Field(default_factory=OpenAISettings)
 
     @model_validator(mode="after")
     def set_debug_from_environment(self) -> "Settings":

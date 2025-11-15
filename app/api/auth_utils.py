@@ -127,3 +127,25 @@ def optional_auth(
         The authenticated user data if available, None otherwise
     """
     return user
+
+
+def require_admin(
+    user: Dict[str, Any] = Depends(require_auth),
+) -> Dict[str, Any]:
+    """
+    FastAPI dependency that requires admin privileges.
+
+    Args:
+        user: Current authenticated user from require_auth dependency
+
+    Returns:
+        The authenticated admin user data
+
+    Raises:
+        HTTPException: If user is not an admin
+    """
+    from app.exceptions import ForbiddenError
+
+    if not user.get("is_admin", False):
+        raise ForbiddenError("Admin privileges required")
+    return user

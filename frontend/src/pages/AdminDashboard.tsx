@@ -108,9 +108,6 @@ export const AdminDashboard: React.FC = () => {
       // Fetch recent executions for summary (last 1000 to get good stats)
       const response = await api.SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(
         null,
-        null,
-        null,
-        null,
         1000,
         0
       );

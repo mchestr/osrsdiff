@@ -4,10 +4,11 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import String, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
-from app.api.auth_utils import require_auth
+from app.api.auth_utils import require_admin, require_auth
 from app.exceptions import InternalServerError, NotFoundError
 from app.models.base import get_db_session
 from app.models.hiscore import HiscoreRecord
@@ -572,27 +573,21 @@ class TaskExecutionsListResponse(BaseModel):
 
 @router.get("/task-executions", response_model=TaskExecutionsListResponse)
 async def get_task_executions(
-    task_name: Optional[str] = None,
-    status: Optional[str] = None,
-    schedule_id: Optional[str] = None,
-    player_id: Optional[int] = None,
+    search: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
     db_session: AsyncSession = Depends(get_db_session),
     current_user: Dict[str, Any] = Depends(require_auth),
 ) -> TaskExecutionsListResponse:
     """
-    Get task execution history with filtering options.
+    Get task execution history with search functionality.
 
     This endpoint allows querying task execution history to debug why tasks
-    may not have executed at scheduled times. Supports filtering by task name,
-    status, schedule_id, and player_id.
+    may not have executed at scheduled times. Supports searching across task name,
+    status, schedule_id, and player_name.
 
     Args:
-        task_name: Filter by task name (e.g., 'fetch_player_hiscores_task')
-        status: Filter by status (e.g., 'failure', 'success', 'retry')
-        schedule_id: Filter by schedule ID
-        player_id: Filter by player ID
+        search: Search term that matches task name, status, schedule_id, or player_name (partial match)
         limit: Maximum number of results to return (default: 50, max: 200)
         offset: Number of results to skip for pagination
         db_session: Database session dependency
@@ -607,35 +602,47 @@ async def get_task_executions(
     try:
         logger.info(
             f"User {current_user.get('username')} querying task executions "
-            f"(task_name={task_name}, status={status}, schedule_id={schedule_id}, "
-            f"player_id={player_id}, limit={limit}, offset={offset})"
+            f"(search={search}, limit={limit}, offset={offset})"
         )
 
         # Validate and clamp limit
         limit = min(max(1, limit), 200)
 
-        # Build query
-        query = select(TaskExecution)
+        # Build query - always join with Player table to enable player name search
+        player_alias = aliased(Player)
+        query = select(TaskExecution).outerjoin(
+            player_alias, TaskExecution.player_id == player_alias.id
+        )
 
-        # Apply filters
-        if task_name:
-            query = query.where(TaskExecution.task_name == task_name)
-        if status:
-            try:
-                status_enum = TaskExecutionStatus(status)
-                query = query.where(TaskExecution.status == status_enum)
-            except ValueError:
-                # Invalid status, return empty results
-                return TaskExecutionsListResponse(
-                    total=0,
-                    limit=limit,
-                    offset=offset,
-                    executions=[],
-                )
-        if schedule_id:
-            query = query.where(TaskExecution.schedule_id == schedule_id)
-        if player_id:
-            query = query.where(TaskExecution.player_id == player_id)
+        # Apply search filter across all fields
+        if search:
+            search_term = search.strip()
+            if search_term:
+                # Try to match status exactly first (case-insensitive)
+                status_match = None
+                search_lower = search_term.lower()
+                for status_value in TaskExecutionStatus:
+                    if status_value.value.lower() == search_lower:
+                        status_match = TaskExecutionStatus(status_value.value)
+                        break
+
+                # Build OR conditions for partial matching
+                conditions = [
+                    TaskExecution.task_name.contains(search_term),
+                    TaskExecution.schedule_id.contains(search_term),
+                    player_alias.username.contains(search_term),
+                ]
+
+                # Add exact status match if found, otherwise try partial match
+                if status_match:
+                    conditions.append(TaskExecution.status == status_match)
+                else:
+                    # Partial match on status string representation
+                    conditions.append(
+                        TaskExecution.status.cast(String).contains(search_term)
+                    )
+
+                query = query.where(or_(*conditions))
 
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())
@@ -664,4 +671,134 @@ async def get_task_executions(
         logger.error(f"Error querying task executions: {e}", exc_info=True)
         raise InternalServerError(
             "Failed to query task executions", detail=str(e)
+        )
+
+
+class PlayerSummaryResponse(BaseModel):
+    """Response model for a player summary."""
+
+    id: int = Field(description="Summary ID")
+    player_id: int = Field(description="Player ID")
+    period_start: str = Field(description="Start of the summary period")
+    period_end: str = Field(description="End of the summary period")
+    summary_text: str = Field(description="Generated summary text")
+    generated_at: str = Field(description="When the summary was generated")
+    model_used: Optional[str] = Field(
+        None, description="OpenAI model used for generation"
+    )
+
+    @classmethod
+    def from_summary(cls, summary: Any) -> "PlayerSummaryResponse":
+        """Create response model from PlayerSummary entity."""
+        from app.models.player_summary import PlayerSummary
+
+        summary_obj: PlayerSummary = summary
+        return cls(
+            id=summary_obj.id,
+            player_id=summary_obj.player_id,
+            period_start=summary_obj.period_start.isoformat(),
+            period_end=summary_obj.period_end.isoformat(),
+            summary_text=summary_obj.summary_text,
+            generated_at=summary_obj.generated_at.isoformat(),
+            model_used=summary_obj.model_used,
+        )
+
+
+class GenerateSummaryRequest(BaseModel):
+    """Request model for generating summaries."""
+
+    player_id: Optional[int] = Field(
+        None,
+        description="Specific player ID to generate summary for (optional)",
+    )
+    force_regenerate: bool = Field(
+        False, description="Force regeneration even if recent summary exists"
+    )
+
+
+class GenerateSummaryResponse(BaseModel):
+    """Response model for summary generation."""
+
+    message: str = Field(description="Success message")
+    summaries_generated: int = Field(
+        description="Number of summaries generated"
+    )
+    summaries: List[PlayerSummaryResponse] = Field(
+        description="List of generated summaries"
+    )
+
+
+@router.post("/generate-summaries", response_model=GenerateSummaryResponse)
+async def generate_summaries(
+    request: GenerateSummaryRequest,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: Dict[str, Any] = Depends(require_admin),
+) -> GenerateSummaryResponse:
+    """
+    Generate AI-powered progress summaries for players.
+
+    This endpoint generates summaries using OpenAI API that analyze player progress
+    over the last day and week. Admins can trigger this for all players or a specific player.
+
+    Args:
+        request: Summary generation request with optional player_id
+        db_session: Database session dependency
+        current_user: Authenticated admin user information
+
+    Returns:
+        GenerateSummaryResponse: Generated summaries and count
+
+    Raises:
+        403 Forbidden: User is not an admin
+        404 Not Found: Player not found (if player_id specified)
+        500 Internal Server Error: Summary generation errors
+    """
+    try:
+        logger.info(
+            f"Admin {current_user.get('username')} generating summaries "
+            f"(player_id={request.player_id}, force={request.force_regenerate})"
+        )
+
+        from app.services.summary import SummaryService, get_summary_service
+
+        summary_service = get_summary_service(db_session)
+
+        if request.player_id:
+            # Generate for specific player
+            try:
+                summary = await summary_service.generate_summary_for_player(
+                    request.player_id,
+                    force_regenerate=request.force_regenerate,
+                )
+                summaries = [summary]
+            except Exception as e:
+                logger.error(
+                    f"Failed to generate summary for player {request.player_id}: {e}"
+                )
+                raise InternalServerError(
+                    f"Failed to generate summary: {e}", detail=str(e)
+                )
+        else:
+            # Generate for all active players
+            summaries = (
+                await summary_service.generate_summaries_for_all_players(
+                    force_regenerate=request.force_regenerate
+                )
+            )
+
+        response = GenerateSummaryResponse(
+            message=f"Successfully generated {len(summaries)} summaries",
+            summaries_generated=len(summaries),
+            summaries=[
+                PlayerSummaryResponse.from_summary(s) for s in summaries
+            ],
+        )
+
+        logger.info(f"Successfully generated {len(summaries)} summaries")
+        return response
+
+    except Exception as e:
+        logger.error(f"Error generating summaries: {e}", exc_info=True)
+        raise InternalServerError(
+            "Failed to generate summaries", detail=str(e)
         )

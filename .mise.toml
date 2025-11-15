@@ -1,4 +1,5 @@
 [tools]
+python = "3.11"
 uv = "latest"
 
 [tasks.help]
@@ -43,7 +44,7 @@ run = "uv sync --no-dev"
 
 [tasks.dev-install]
 description = "Install development dependencies"
-run = "uv sync"
+run = "uv sync --all-groups"
 
 [tasks.dev]
 description = "Start backend development server on port 8000"
@@ -59,11 +60,11 @@ run = "uv run taskiq worker app.workers.main:broker"
 
 [tasks.test]
 description = "Run tests"
-run = "uv run pytest"
+run = "uv run python -m pytest"
 
 [tasks."test:cov"]
 description = "Run tests with coverage"
-run = "uv run pytest --cov=app --cov-report=html --cov-report=term"
+run = "uv run python -m pytest --cov=app --cov-report=html --cov-report=term"
 
 [tasks.lint]
 description = "Run linting"

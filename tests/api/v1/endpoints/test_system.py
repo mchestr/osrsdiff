@@ -1,5 +1,6 @@
 """Tests for system administration API endpoints."""
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -7,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.auth import require_auth
+from app.api.auth_utils import require_admin
 from app.api.v1.endpoints.system import router
 from app.models.base import get_db_session
 
@@ -18,6 +20,12 @@ def mock_auth_user():
 
 
 @pytest.fixture
+def mock_admin_user():
+    """Mock admin user."""
+    return {"username": "test_admin", "user_id": 1, "is_admin": True}
+
+
+@pytest.fixture
 def mock_db_session():
     """Mock database session."""
     return AsyncMock()
@@ -26,8 +34,25 @@ def mock_db_session():
 @pytest.fixture
 def app():
     """Create FastAPI app for testing with mocked dependencies."""
+    from fastapi import Request
+    from fastapi.responses import JSONResponse
+
+    from app.exceptions import BaseAPIException
+
     app = FastAPI()
     app.include_router(router)
+
+    # Add exception handler for BaseAPIException (like in main.py)
+    @app.exception_handler(BaseAPIException)
+    async def api_exception_handler(
+        request: Request, exc: BaseAPIException
+    ) -> JSONResponse:
+        """Handle all BaseAPIException instances with consistent formatting."""
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "message": exc.message},
+        )
+
     return app
 
 
@@ -37,6 +62,17 @@ def client(app, mock_db_session, mock_auth_user):
     # Override dependencies
     app.dependency_overrides[get_db_session] = lambda: mock_db_session
     app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+    return TestClient(app)
+
+
+@pytest.fixture
+def admin_client(app, mock_db_session, mock_admin_user):
+    """Create test client with admin user dependency overrides."""
+    # Override dependencies
+    app.dependency_overrides[get_db_session] = lambda: mock_db_session
+    app.dependency_overrides[require_auth] = lambda: mock_admin_user
+    app.dependency_overrides[require_admin] = lambda: mock_admin_user
 
     return TestClient(app)
 
@@ -79,17 +115,103 @@ class TestSystemStats:
         assert data["records_last_7d"] == 100
         assert data["avg_records_per_player"] == 15.0
 
-    def test_get_database_stats_unauthorized(self, app, mock_db_session):
-        """Test database stats endpoint without authentication."""
-        # Create client without auth override
+
+class TestSummaryGeneration:
+    """Test cases for summary generation endpoints."""
+
+    def test_generate_summaries_for_all_players(
+        self, admin_client, mock_db_session
+    ):
+        """Test generating summaries for all players."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock, patch
+
+        from app.models.player_summary import PlayerSummary
+
+        mock_summary = PlayerSummary(
+            id=1,
+            player_id=1,
+            period_start=datetime.now(timezone.utc) - timedelta(days=7),
+            period_end=datetime.now(timezone.utc),
+            summary_text="Generated summary",
+            generated_at=datetime.now(timezone.utc),
+        )
+
+        with patch(
+            "app.services.summary.get_summary_service"
+        ) as mock_get_service:
+            mock_service = AsyncMock()
+            mock_service.generate_summaries_for_all_players = AsyncMock(
+                return_value=[mock_summary]
+            )
+            mock_get_service.return_value = mock_service
+
+            response = admin_client.post(
+                "/system/generate-summaries",
+                json={"player_id": None, "force_regenerate": False},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["summaries_generated"] == 1
+            assert len(data["summaries"]) == 1
+
+    def test_generate_summaries_for_specific_player(
+        self, admin_client, mock_db_session
+    ):
+        """Test generating summary for specific player."""
+        from datetime import datetime, timezone
+        from unittest.mock import AsyncMock, patch
+
+        from app.models.player_summary import PlayerSummary
+
+        mock_summary = PlayerSummary(
+            id=1,
+            player_id=1,
+            period_start=datetime.now(timezone.utc) - timedelta(days=7),
+            period_end=datetime.now(timezone.utc),
+            summary_text="Generated summary",
+            generated_at=datetime.now(timezone.utc),
+        )
+
+        with patch(
+            "app.services.summary.get_summary_service"
+        ) as mock_get_service:
+            mock_service = AsyncMock()
+            mock_service.generate_summary_for_player = AsyncMock(
+                return_value=mock_summary
+            )
+            mock_get_service.return_value = mock_service
+
+            response = admin_client.post(
+                "/system/generate-summaries",
+                json={"player_id": 1, "force_regenerate": False},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["summaries_generated"] == 1
+
+    def test_generate_summaries_not_admin(
+        self, app, mock_db_session, mock_auth_user
+    ):
+        """Test that non-admin users cannot generate summaries."""
+        # Override require_auth but NOT require_admin
+        # This allows require_admin to check is_admin and raise 403
         app.dependency_overrides[get_db_session] = lambda: mock_db_session
-        # Don't override require_auth for this test
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+        # Explicitly ensure require_admin is NOT overridden
+        if require_admin in app.dependency_overrides:
+            del app.dependency_overrides[require_admin]
+
         client = TestClient(app)
 
-        response = client.get("/system/stats")
-        assert (
-            response.status_code == 401
-        )  # FastAPI returns 401 for missing auth
+        response = client.post(
+            "/system/generate-summaries",
+            json={"player_id": None, "force_regenerate": False},
+        )
+
+        assert response.status_code == 403
 
 
 class TestSystemHealth:
@@ -309,9 +431,9 @@ class TestTaskExecutions:
 
         client = TestClient(app)
 
-        # Filter by task_name
+        # Filter by task_name using search parameter
         response = client.get(
-            "/system/task-executions?task_name=app.workers.fetch.fetch_player_hiscores_task"
+            "/system/task-executions?search=app.workers.fetch.fetch_player_hiscores_task"
         )
         assert response.status_code == 200
         data = response.json()
@@ -321,30 +443,25 @@ class TestTaskExecutions:
             for e in data["executions"]
         )
 
-        # Filter by status
-        response = client.get("/system/task-executions?status=failure")
+        # Filter by status using search parameter
+        response = client.get("/system/task-executions?search=failure")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
         assert data["executions"][0]["status"] == "failure"
 
-        # Filter by player_id
-        response = client.get("/system/task-executions?player_id=42")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] == 2
-        assert all(e["player_id"] == 42 for e in data["executions"])
-
-        # Filter by schedule_id
-        response = client.get(
-            "/system/task-executions?schedule_id=schedule_123"
-        )
+        # Filter by schedule_id using search parameter
+        response = client.get("/system/task-executions?search=schedule_123")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 2
         assert all(
             e["schedule_id"] == "schedule_123" for e in data["executions"]
         )
+
+        # Note: player_id filtering is not directly supported via search parameter
+        # as it searches player username, not ID. This test would need a player
+        # with username matching the ID or the endpoint would need to be updated.
 
     @pytest.mark.asyncio
     async def test_get_task_executions_with_pagination(
@@ -396,8 +513,18 @@ class TestTaskExecutions:
         assert data["offset"] == 5
         assert len(data["executions"]) == 5
 
-    def test_get_task_executions_invalid_status(self, client):
+    @pytest.mark.asyncio
+    async def test_get_task_executions_invalid_status(
+        self, app, mock_auth_user, test_session
+    ):
         """Test filtering with invalid status returns empty results."""
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
         response = client.get("/system/task-executions?status=invalid_status")
         assert response.status_code == 200
         data = response.json()

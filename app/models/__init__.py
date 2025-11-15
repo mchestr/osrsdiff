@@ -9,6 +9,7 @@ from .base import (
 )
 from .hiscore import HiscoreRecord
 from .player import Player
+from .player_summary import PlayerSummary
 from .task_execution import TaskExecution, TaskExecutionStatus
 from .user import User
 
@@ -21,6 +22,7 @@ __all__ = [
     "User",
     "Player",
     "HiscoreRecord",
+    "PlayerSummary",
     "TaskExecution",
     "TaskExecutionStatus",
 ]

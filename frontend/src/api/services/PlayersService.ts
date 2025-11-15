@@ -1,7 +1,7 @@
 /* generated using openapi-typescript-codegen -- do no edit */
 /* istanbul ignore file */
 /* tslint:disable */
- 
+
 import type { FetchTriggerResponse } from '../models/FetchTriggerResponse';
 import type { MessageResponse } from '../models/MessageResponse';
 import type { PlayerCreateRequest } from '../models/PlayerCreateRequest';
@@ -196,6 +196,42 @@ export class PlayersService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/players/{username}/metadata',
+            path: {
+                'username': username,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+
+    /**
+     * Get Player Summary
+     * Get the most recent AI-generated summary for a player.
+     *
+     * Returns the latest summary if available, or None if no summary exists.
+     *
+     * Args:
+     * username: OSRS player username
+     * db_session: Database session dependency
+     * current_user: Authenticated user information
+     *
+     * Returns:
+     * PlayerSummaryResponse: Most recent summary or None
+     *
+     * Raises:
+     * 404 Not Found: Player not found in system
+     * 500 Internal Server Error: Database errors
+     * @param username
+     * @returns PlayerSummaryResponse Successful Response
+     * @throws ApiError
+     */
+    public static getPlayerSummaryApiV1PlayersUsernameSummaryGet(
+        username: string,
+    ): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/players/{username}/summary',
             path: {
                 'username': username,
             },

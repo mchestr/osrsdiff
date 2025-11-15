@@ -100,4 +100,5 @@ async def client_shutdown_event(context: TaskiqState) -> None:
 # This must happen after broker is defined and before worker starts
 from app.workers import fetch  # noqa: F401, E402
 from app.workers import maintenance  # noqa: F401, E402
+from app.workers import summaries  # noqa: F401, E402
 from app.workers import tasks  # noqa: F401, E402

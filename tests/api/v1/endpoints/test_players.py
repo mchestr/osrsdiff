@@ -10,7 +10,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_auth
-from app.api.v1.endpoints.players import get_player_service, router
+from app.api.auth_utils import require_admin
+from app.api.v1.endpoints.players import (
+    get_db_session,
+    get_player_service,
+    router,
+)
 from app.exceptions import (
     BaseAPIException,
     OSRSPlayerNotFoundError,
@@ -647,3 +652,177 @@ class TestPlayerActivation:
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
+
+
+class TestPlayerSummary:
+    """Test cases for player summary endpoints."""
+
+    @pytest.fixture
+    def mock_admin_user(self):
+        """Mock admin user."""
+        return {"username": "admin", "user_id": 1, "is_admin": True}
+
+    @pytest.fixture
+    def client_with_admin(self, app, mock_player_service, mock_admin_user):
+        """Create test client with admin user."""
+        app.dependency_overrides[get_player_service] = (
+            lambda: mock_player_service
+        )
+        app.dependency_overrides[require_auth] = lambda: mock_admin_user
+        app.dependency_overrides[require_admin] = lambda: mock_admin_user
+        return TestClient(app)
+
+    @pytest.fixture
+    def mock_db_session(self):
+        """Mock database session for summary endpoints."""
+        return AsyncMock()
+
+    def test_get_player_summary_success(
+        self, app, mock_db_session, mock_auth_user
+    ):
+        """Test successful retrieval of player summary."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.models.player import Player
+        from app.models.player_summary import PlayerSummary
+
+        # Mock database queries
+        player = Player(id=1, username="testplayer")
+        summary = PlayerSummary(
+            id=1,
+            player_id=1,
+            period_start=datetime.now(timezone.utc) - timedelta(days=7),
+            period_end=datetime.now(timezone.utc),
+            summary_text="Test summary",
+            generated_at=datetime.now(timezone.utc),
+            model_used="gpt-4o-mini",
+        )
+
+        async def mock_execute(query):
+            if "players" in str(query).lower():
+                return AsyncMock(scalar_one_or_none=lambda: player)
+            elif "player_summaries" in str(query).lower():
+                return AsyncMock(scalar_one_or_none=lambda: summary)
+            return AsyncMock()
+
+        mock_db_session.execute = mock_execute
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+        response = client.get("/players/testplayer/summary")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["summary_text"] == "Test summary"
+        assert data["player_id"] == 1
+
+    def test_get_player_summary_not_found(
+        self, app, mock_db_session, mock_auth_user
+    ):
+        """Test getting summary for non-existent player."""
+        from app.models.player import Player
+
+        async def mock_execute(query):
+            if "players" in str(query).lower():
+                return AsyncMock(scalar_one_or_none=lambda: None)
+            return AsyncMock()
+
+        mock_db_session.execute = mock_execute
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+        response = client.get("/players/nonexistent/summary")
+
+        assert response.status_code == 404
+
+    def test_get_player_summary_no_summary(
+        self, app, mock_db_session, mock_auth_user
+    ):
+        """Test getting summary when player has no summary."""
+        from app.models.player import Player
+
+        player = Player(id=1, username="testplayer")
+
+        async def mock_execute(query):
+            if "players" in str(query).lower():
+                return AsyncMock(scalar_one_or_none=lambda: player)
+            elif "player_summaries" in str(query).lower():
+                return AsyncMock(scalar_one_or_none=lambda: None)
+            return AsyncMock()
+
+        mock_db_session.execute = mock_execute
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+        response = client.get("/players/testplayer/summary")
+
+        assert response.status_code == 200
+        assert response.json() is None
+
+    def test_generate_player_summary_success(
+        self, app, mock_db_session, mock_admin_user
+    ):
+        """Test successful summary generation."""
+        from datetime import datetime, timedelta, timezone
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from app.models.player import Player
+        from app.models.player_summary import PlayerSummary
+
+        player = Player(id=1, username="testplayer")
+
+        async def mock_execute(query):
+            if "players" in str(query).lower():
+                return AsyncMock(scalar_one_or_none=lambda: player)
+            return AsyncMock()
+
+        mock_db_session.execute = mock_execute
+        mock_db_session.commit = AsyncMock()
+        mock_db_session.refresh = AsyncMock()
+
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        app.dependency_overrides[require_auth] = lambda: mock_admin_user
+        app.dependency_overrides[require_admin] = lambda: mock_admin_user
+
+        # Patch get_summary_service at the module level where it's imported
+        with patch(
+            "app.services.summary.get_summary_service"
+        ) as mock_get_service:
+            mock_service = MagicMock()
+            mock_summary = PlayerSummary(
+                id=1,
+                player_id=1,
+                period_start=datetime.now(timezone.utc) - timedelta(days=7),
+                period_end=datetime.now(timezone.utc),
+                summary_text="Generated summary",
+                generated_at=datetime.now(timezone.utc),
+            )
+            mock_service.generate_summary_for_player = AsyncMock(
+                return_value=mock_summary
+            )
+            mock_get_service.return_value = mock_service
+
+            client = TestClient(app)
+            response = client.post(
+                "/players/testplayer/summary", json={"force_regenerate": False}
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["summary_text"] == "Generated summary"
+
+    def test_generate_player_summary_not_admin(self, app, mock_auth_user):
+        """Test that non-admin users cannot generate summaries."""
+        from app.api.v1.endpoints.players import get_db_session
+
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+        response = client.post(
+            "/players/testplayer/summary", json={"force_regenerate": False}
+        )
+
+        assert response.status_code == 403

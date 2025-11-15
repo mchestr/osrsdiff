@@ -44,9 +44,6 @@ export const TaskExecutionDetail: React.FC = () => {
         while (!found && offset < 10000) {
           const response = await api.SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(
             null,
-            null,
-            null,
-            null,
             batchSize,
             offset
           );
