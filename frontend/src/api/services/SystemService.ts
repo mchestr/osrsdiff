@@ -2,7 +2,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 
+import type { CostStatsResponse } from '../models/OpenAICostStatsResponse';
 import type { DatabaseStatsResponse } from '../models/DatabaseStatsResponse';
+import type { GenerateSummaryRequest } from '../models/GenerateSummaryRequest';
+import type { GenerateSummaryResponse } from '../models/GenerateSummaryResponse';
 import type { PlayerDistributionResponse } from '../models/PlayerDistributionResponse';
 import type { ScheduledTasksResponse } from '../models/ScheduledTasksResponse';
 import type { SystemHealthResponse } from '../models/SystemHealthResponse';
@@ -184,6 +187,69 @@ export class SystemService {
                 'limit': limit,
                 'offset': offset,
             },
+        });
+    }
+
+    /**
+     * Get Cost Stats
+     * Get API cost statistics based on summary generation usage.
+     *
+     * Calculates estimated costs from token usage stored in player summaries.
+     * Supports cost breakdown by model and time periods (24h, 7d, 30d).
+     * Works with any AI provider (OpenAI, Anthropic, etc.) based on model name.
+     *
+     * Args:
+     * db_session: Database session dependency
+     * current_user: Authenticated user information
+     *
+     * Returns:
+     * CostStatsResponse: Cost statistics
+     *
+     * Raises:
+     * 500 Internal Server Error: Database or calculation errors
+     * @returns CostStatsResponse Successful Response
+     * @throws ApiError
+     */
+    public static getCostsApiV1SystemCostsGet(): CancelablePromise<CostStatsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/system/costs',
+        });
+    }
+
+    /**
+     * Generate Summaries
+     * Trigger AI-powered progress summary generation for players.
+     *
+     * This endpoint triggers asynchronous background tasks to generate summaries
+     * using OpenAI API that analyze player progress over the last day and week.
+     * Admins can trigger this for all players or a specific player. The API returns
+     * immediately after enqueuing tasks without waiting for summary generation.
+     *
+     * Args:
+     * request: Summary generation request with optional player_id
+     * db_session: Database session dependency
+     * current_user: Authenticated admin user information
+     *
+     * Returns:
+     * GenerateSummaryResponse: Number of tasks triggered and their IDs
+     *
+     * Raises:
+     * 403 Forbidden: User is not an admin
+     * 404 Not Found: Player not found (if player_id specified)
+     * 500 Internal Server Error: Task enqueue errors
+     * @param requestBody
+     * @returns GenerateSummaryResponse Successful Response
+     * @throws ApiError
+     */
+    public static generateSummariesApiV1SystemGenerateSummariesPost(
+        requestBody: GenerateSummaryRequest,
+    ): CancelablePromise<GenerateSummaryResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/system/generate-summaries',
+            body: requestBody,
+            mediaType: 'application/json',
         });
     }
 

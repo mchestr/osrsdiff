@@ -605,3 +605,432 @@ class TestTaskExecutions:
 
         response = client.get("/system/task-executions")
         assert response.status_code == 401
+
+
+class TestCostStats:
+    """Test cost statistics endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_cost_stats_success(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test successful cost statistics retrieval."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.models.player import Player
+        from app.models.player_summary import PlayerSummary
+
+        # Create test player
+        player = Player(
+            id=1,
+            username="testplayer",
+            is_active=True,
+            fetch_interval_minutes=60,
+        )
+        test_session.add(player)
+        await test_session.commit()
+
+        # Create test summaries with different timestamps and models
+        now = datetime.now(timezone.utc)
+
+        # Summary from 2 hours ago (within 24h)
+        summary1 = PlayerSummary(
+            player_id=1,
+            period_start=now - timedelta(days=7),
+            period_end=now,
+            summary_text='{"points": ["Test summary 1"]}',
+            generated_at=now - timedelta(hours=2),
+            model_used="gpt-4o-mini",
+            prompt_tokens=1000,
+            completion_tokens=500,
+            total_tokens=1500,
+        )
+
+        # Summary from 3 days ago (within 7d, not 24h)
+        summary2 = PlayerSummary(
+            player_id=1,
+            period_start=now - timedelta(days=7),
+            period_end=now - timedelta(days=3),
+            summary_text='{"points": ["Test summary 2"]}',
+            generated_at=now - timedelta(days=3),
+            model_used="gpt-4o-mini",
+            prompt_tokens=2000,
+            completion_tokens=1000,
+            total_tokens=3000,
+        )
+
+        # Summary from 15 days ago (within 30d, not 7d)
+        summary3 = PlayerSummary(
+            player_id=1,
+            period_start=now - timedelta(days=21),
+            period_end=now - timedelta(days=15),
+            summary_text='{"points": ["Test summary 3"]}',
+            generated_at=now - timedelta(days=15),
+            model_used="gpt-4o",
+            prompt_tokens=3000,
+            completion_tokens=1500,
+            total_tokens=4500,
+        )
+
+        # Summary from 40 days ago (not in any recent period)
+        summary4 = PlayerSummary(
+            player_id=1,
+            period_start=now - timedelta(days=47),
+            period_end=now - timedelta(days=40),
+            summary_text='{"points": ["Test summary 4"]}',
+            generated_at=now - timedelta(days=40),
+            model_used="gpt-4o-mini",
+            prompt_tokens=1500,
+            completion_tokens=750,
+            total_tokens=2250,
+        )
+
+        test_session.add(summary1)
+        test_session.add(summary2)
+        test_session.add(summary3)
+        test_session.add(summary4)
+        await test_session.commit()
+
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        response = client.get("/system/costs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Check totals
+        assert data["total_summaries"] == 4
+        assert data["total_prompt_tokens"] == 7500  # 1000 + 2000 + 3000 + 1500
+        assert (
+            data["total_completion_tokens"] == 3750
+        )  # 500 + 1000 + 1500 + 750
+        assert data["total_tokens"] == 11250  # 1500 + 3000 + 4500 + 2250
+
+        # Check costs (gpt-4o-mini: $0.15/1M input, $0.60/1M output)
+        # Summary 1: (1000/1M * 0.15) + (500/1M * 0.60) = 0.00015 + 0.0003 = 0.00045
+        # Summary 2: (2000/1M * 0.15) + (1000/1M * 0.60) = 0.0003 + 0.0006 = 0.0009
+        # Summary 3: (3000/1M * 2.50) + (1500/1M * 10.00) = 0.0075 + 0.015 = 0.0225 (gpt-4o)
+        # Summary 4: (1500/1M * 0.15) + (750/1M * 0.60) = 0.000225 + 0.00045 = 0.000675
+        # Total: 0.00045 + 0.0009 + 0.0225 + 0.000675 = 0.024525
+
+        assert data["total_cost_usd"] > 0
+        assert data["cost_last_24h_usd"] > 0  # Summary 1
+        assert data["cost_last_7d_usd"] > 0  # Summary 1 + Summary 2
+        assert (
+            data["cost_last_30d_usd"] > 0
+        )  # Summary 1 + Summary 2 + Summary 3
+
+        # Check model breakdown
+        assert "by_model" in data
+        assert "gpt-4o-mini" in data["by_model"]
+        assert "gpt-4o" in data["by_model"]
+
+        # Check gpt-4o-mini breakdown (summaries 1, 2, 4)
+        gpt4o_mini = data["by_model"]["gpt-4o-mini"]
+        assert gpt4o_mini["count"] == 3
+        assert gpt4o_mini["prompt_tokens"] == 4500  # 1000 + 2000 + 1500
+        assert gpt4o_mini["completion_tokens"] == 2250  # 500 + 1000 + 750
+        assert gpt4o_mini["total_tokens"] == 6750  # 1500 + 3000 + 2250
+
+        # Check gpt-4o breakdown (summary 3)
+        gpt4o = data["by_model"]["gpt-4o"]
+        assert gpt4o["count"] == 1
+        assert gpt4o["prompt_tokens"] == 3000
+        assert gpt4o["completion_tokens"] == 1500
+        assert gpt4o["total_tokens"] == 4500
+
+    @pytest.mark.asyncio
+    async def test_get_cost_stats_no_summaries(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test cost statistics with no summaries."""
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        response = client.get("/system/costs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["total_summaries"] == 0
+        assert data["total_prompt_tokens"] == 0
+        assert data["total_completion_tokens"] == 0
+        assert data["total_tokens"] == 0
+        assert data["total_cost_usd"] == 0.0
+        assert data["cost_last_24h_usd"] == 0.0
+        assert data["cost_last_7d_usd"] == 0.0
+        assert data["cost_last_30d_usd"] == 0.0
+        assert data["by_model"] == {}
+
+    @pytest.mark.asyncio
+    async def test_get_cost_stats_with_missing_tokens(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test cost statistics with summaries missing token data."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.models.player import Player
+        from app.models.player_summary import PlayerSummary
+
+        # Create test player
+        player = Player(
+            id=1,
+            username="testplayer",
+            is_active=True,
+            fetch_interval_minutes=60,
+        )
+        test_session.add(player)
+        await test_session.commit()
+
+        # Create summary with token data
+        summary1 = PlayerSummary(
+            player_id=1,
+            period_start=datetime.now(timezone.utc) - timedelta(days=7),
+            period_end=datetime.now(timezone.utc),
+            summary_text='{"points": ["Test summary"]}',
+            generated_at=datetime.now(timezone.utc),
+            model_used="gpt-4o-mini",
+            prompt_tokens=1000,
+            completion_tokens=500,
+            total_tokens=1500,
+        )
+
+        # Create summary without token data (should be skipped)
+        summary2 = PlayerSummary(
+            player_id=1,
+            period_start=datetime.now(timezone.utc) - timedelta(days=7),
+            period_end=datetime.now(timezone.utc),
+            summary_text='{"points": ["Test summary 2"]}',
+            generated_at=datetime.now(timezone.utc),
+            model_used="gpt-4o-mini",
+            prompt_tokens=None,
+            completion_tokens=None,
+            total_tokens=None,
+        )
+
+        test_session.add(summary1)
+        test_session.add(summary2)
+        await test_session.commit()
+
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        response = client.get("/system/costs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should only count summary1 (with token data)
+        assert data["total_summaries"] == 1
+        assert data["total_prompt_tokens"] == 1000
+        assert data["total_completion_tokens"] == 500
+        assert data["total_tokens"] == 1500
+
+    @pytest.mark.asyncio
+    async def test_get_cost_stats_timezone_aware(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test cost statistics handles timezone-aware datetimes correctly."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.models.player import Player
+        from app.models.player_summary import PlayerSummary
+
+        # Create test player
+        player = Player(
+            id=1,
+            username="testplayer",
+            is_active=True,
+            fetch_interval_minutes=60,
+        )
+        test_session.add(player)
+        await test_session.commit()
+
+        # Create summary with timezone-aware datetime
+        now = datetime.now(timezone.utc)
+        summary = PlayerSummary(
+            player_id=1,
+            period_start=now - timedelta(days=7),
+            period_end=now,
+            summary_text='{"points": ["Test summary"]}',
+            generated_at=now - timedelta(hours=12),  # Within 24h
+            model_used="gpt-4o-mini",
+            prompt_tokens=1000,
+            completion_tokens=500,
+            total_tokens=1500,
+        )
+
+        test_session.add(summary)
+        await test_session.commit()
+
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        response = client.get("/system/costs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should be counted in 24h, 7d, and 30d costs
+        assert data["cost_last_24h_usd"] > 0
+        assert data["cost_last_7d_usd"] > 0
+        assert data["cost_last_30d_usd"] > 0
+
+    @pytest.mark.asyncio
+    async def test_get_cost_stats_different_models(
+        self, app, mock_auth_user, test_session
+    ):
+        """Test cost statistics with different AI models."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.models.player import Player
+        from app.models.player_summary import PlayerSummary
+
+        # Create test player
+        player = Player(
+            id=1,
+            username="testplayer",
+            is_active=True,
+            fetch_interval_minutes=60,
+        )
+        test_session.add(player)
+        await test_session.commit()
+
+        now = datetime.now(timezone.utc)
+
+        # Create summaries with different models
+        models = [
+            ("gpt-4o-mini", 1000, 500),
+            ("gpt-4o", 2000, 1000),
+            ("gpt-4-turbo", 3000, 1500),
+            ("gpt-3.5-turbo", 1500, 750),
+        ]
+
+        for i, (model, prompt_tokens, completion_tokens) in enumerate(models):
+            summary = PlayerSummary(
+                player_id=1,
+                period_start=now - timedelta(days=7),
+                period_end=now,
+                summary_text=f'{{"points": ["Test summary {i}"]}}',
+                generated_at=now - timedelta(hours=i),
+                model_used=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=prompt_tokens + completion_tokens,
+            )
+            test_session.add(summary)
+
+        await test_session.commit()
+
+        from app.api.auth import require_auth
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: test_session
+        app.dependency_overrides[require_auth] = lambda: mock_auth_user
+
+        client = TestClient(app)
+
+        response = client.get("/system/costs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should have breakdown for all models
+        assert len(data["by_model"]) == 4
+        assert "gpt-4o-mini" in data["by_model"]
+        assert "gpt-4o" in data["by_model"]
+        assert "gpt-4-turbo" in data["by_model"]
+        assert "gpt-3.5-turbo" in data["by_model"]
+
+        # Each model should have 1 summary
+        for model in models:
+            assert data["by_model"][model[0]]["count"] == 1
+
+    def test_get_cost_stats_unauthorized(self, app, mock_db_session):
+        """Test cost statistics endpoint without authentication."""
+        from app.models.base import get_db_session
+
+        app.dependency_overrides[get_db_session] = lambda: mock_db_session
+        # Don't override require_auth
+        client = TestClient(app)
+
+        response = client.get("/system/costs")
+        assert response.status_code == 401
+
+
+class TestCostCalculation:
+    """Test cost calculation utility function."""
+
+    def test_calculate_ai_cost_gpt4o_mini(self):
+        """Test cost calculation for gpt-4o-mini model."""
+        from app.api.v1.endpoints.system import calculate_ai_cost
+
+        # gpt-4o-mini: $0.15/1M input, $0.60/1M output
+        cost = calculate_ai_cost(1000000, 500000, "gpt-4o-mini")
+        expected = (1000000 / 1_000_000 * 0.15) + (500000 / 1_000_000 * 0.60)
+        assert abs(cost - expected) < 0.000001
+
+    def test_calculate_ai_cost_gpt4o(self):
+        """Test cost calculation for gpt-4o model."""
+        from app.api.v1.endpoints.system import calculate_ai_cost
+
+        # gpt-4o: $2.50/1M input, $10.00/1M output
+        cost = calculate_ai_cost(2000000, 1000000, "gpt-4o")
+        expected = (2000000 / 1_000_000 * 2.50) + (1000000 / 1_000_000 * 10.00)
+        assert abs(cost - expected) < 0.000001
+
+    def test_calculate_ai_cost_default_model(self):
+        """Test cost calculation with unknown model uses default pricing."""
+        from app.api.v1.endpoints.system import calculate_ai_cost
+
+        # Unknown model should use default (gpt-4o-mini rates)
+        cost = calculate_ai_cost(1000000, 500000, "unknown-model")
+        expected = (1000000 / 1_000_000 * 0.15) + (500000 / 1_000_000 * 0.60)
+        assert abs(cost - expected) < 0.000001
+
+    def test_calculate_ai_cost_none_tokens(self):
+        """Test cost calculation with None tokens returns 0."""
+        from app.api.v1.endpoints.system import calculate_ai_cost
+
+        assert calculate_ai_cost(None, 1000, "gpt-4o-mini") == 0.0
+        assert calculate_ai_cost(1000, None, "gpt-4o-mini") == 0.0
+        assert calculate_ai_cost(None, None, "gpt-4o-mini") == 0.0
+
+    def test_calculate_ai_cost_case_insensitive(self):
+        """Test cost calculation is case-insensitive for model names."""
+        from app.api.v1.endpoints.system import calculate_ai_cost
+
+        cost1 = calculate_ai_cost(1000000, 500000, "GPT-4O-MINI")
+        cost2 = calculate_ai_cost(1000000, 500000, "gpt-4o-mini")
+        cost3 = calculate_ai_cost(1000000, 500000, "Gpt-4O-Mini")
+
+        assert abs(cost1 - cost2) < 0.000001
+        assert abs(cost2 - cost3) < 0.000001
+
+    def test_calculate_ai_cost_zero_tokens(self):
+        """Test cost calculation with zero tokens."""
+        from app.api.v1.endpoints.system import calculate_ai_cost
+
+        cost = calculate_ai_cost(0, 0, "gpt-4o-mini")
+        assert cost == 0.0

@@ -8,6 +8,7 @@ import type { PlayerMetadataResponse } from '../api/models/PlayerMetadataRespons
 import type { PlayerStatsResponse } from '../api/models/PlayerStatsResponse';
 import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisResponse';
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
+import { Modal } from '../components/Modal';
 import { OverallXPGraph } from '../components/OverallXPGraph';
 import { SkillsGrid } from '../components/SkillsGrid';
 import { useAuth } from '../contexts/AuthContext';
@@ -164,7 +165,7 @@ const formatDuration = (days: number): string => {
 
 export const PlayerStats: React.FC = () => {
   const { username } = useParams<{ username: string }>();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
   const [stats, setStats] = useState<PlayerStatsResponse | null>(null);
   const [progressDay, setProgressDay] = useState<ProgressAnalysisResponse | null>(null);
   const [progressWeek, setProgressWeek] = useState<ProgressAnalysisResponse | null>(null);
@@ -181,6 +182,11 @@ export const PlayerStats: React.FC = () => {
   const [fetching, setFetching] = useState(false);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
   const [summary, setSummary] = useState<PlayerSummary | null>(null);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState<string | React.ReactNode>('');
+  const [modalType, setModalType] = useState<'info' | 'error' | 'success' | 'warning'>('info');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -303,6 +309,59 @@ export const PlayerStats: React.FC = () => {
     setBossProgress(null);
   };
 
+  const handleGenerateSummary = async () => {
+    if (!metadata || !metadata.id) {
+      setModalTitle('Error');
+      setModalMessage('Player ID not available');
+      setModalType('error');
+      setModalOpen(true);
+      return;
+    }
+
+    setGeneratingSummary(true);
+    try {
+      const response = await api.SystemService.generateSummariesApiV1SystemGenerateSummariesPost({
+        player_id: metadata.id,
+        force_regenerate: false,
+      });
+
+      setModalTitle('Success');
+      setModalMessage(
+        <div className="space-y-2">
+          <p>{response.message}</p>
+          <p className="text-sm osrs-text-secondary">
+            Summary generation task has been enqueued. The summary will appear here once generated.
+          </p>
+        </div>
+      );
+      setModalType('success');
+      setModalOpen(true);
+
+      // Refresh summary after a delay
+      setTimeout(async () => {
+        if (username) {
+          try {
+            const summaryRes = await api.PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username).catch(() => null);
+            if (summaryRes) {
+              setSummary(summaryRes as PlayerSummary);
+            }
+          } catch (err) {
+            console.error('Failed to refresh summary:', err);
+          }
+        }
+      }, 5000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate summary';
+      const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+      setModalTitle('Error');
+      setModalMessage(errorDetail || errorMessage);
+      setModalType('error');
+      setModalOpen(true);
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -380,6 +439,17 @@ export const PlayerStats: React.FC = () => {
               className="osrs-btn text-xs px-2 py-1"
             >
               {fetching ? '...' : 'Fetch'}
+            </button>
+          )}
+          {isAdmin && metadata && (
+            <button
+              onClick={handleGenerateSummary}
+              disabled={generatingSummary}
+              className="osrs-btn text-xs px-2 py-1"
+              style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}
+              title="Generate AI summary for this player"
+            >
+              {generatingSummary ? '...' : '✨ Summary'}
             </button>
           )}
         </div>
@@ -720,6 +790,16 @@ export const PlayerStats: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Modal */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={modalTitle}
+        type={modalType}
+      >
+        {modalMessage}
+      </Modal>
     </div>
   );
 };

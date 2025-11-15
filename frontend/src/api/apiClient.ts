@@ -118,6 +118,10 @@ export const api = {
       handleTokenRefresh(() => SystemService.triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost(taskName)),
     getTaskExecutionsApiV1SystemTaskExecutionsGet: (search?: string | null, limit?: number, offset?: number) =>
       handleTokenRefresh(() => SystemService.getTaskExecutionsApiV1SystemTaskExecutionsGet(search, limit, offset)),
+    getCostsApiV1SystemCostsGet: () =>
+      handleTokenRefresh(() => SystemService.getCostsApiV1SystemCostsGet()),
+    generateSummariesApiV1SystemGenerateSummariesPost: (requestBody: Parameters<typeof SystemService.generateSummariesApiV1SystemGenerateSummariesPost>[0]) =>
+      handleTokenRefresh(() => SystemService.generateSummariesApiV1SystemGenerateSummariesPost(requestBody)),
   },
   HistoryService: {
     ...HistoryService,

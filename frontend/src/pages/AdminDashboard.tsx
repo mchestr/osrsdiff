@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../api/apiClient';
+import type { CostStatsResponse } from '../api/models/OpenAICostStatsResponse';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
 import { Modal } from '../components/Modal';
 
@@ -70,6 +71,7 @@ export const AdminDashboard: React.FC = () => {
   const [intervalValue, setIntervalValue] = useState<string>('');
   const [verifyingSchedules, setVerifyingSchedules] = useState(false);
   const [fetchingAllPlayers, setFetchingAllPlayers] = useState(false);
+  const [generatingSummaries, setGeneratingSummaries] = useState(false);
 
 
   // Task execution summary state
@@ -89,6 +91,10 @@ export const AdminDashboard: React.FC = () => {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [executionsForGraph, setExecutionsForGraph] = useState<TaskExecutionResponse[]>([]);
 
+  // Cost stats state
+  const [costs, setCosts] = useState<CostStatsResponse | null>(null);
+  const [costsLoading, setCostsLoading] = useState(false);
+
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
@@ -100,7 +106,20 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     fetchData();
     fetchExecutionSummary();
+    fetchCosts();
   }, []);
+
+  const fetchCosts = async () => {
+    setCostsLoading(true);
+    try {
+      const response = await api.SystemService.getCostsApiV1SystemCostsGet();
+      setCosts(response);
+    } catch (error: unknown) {
+      console.error('Failed to fetch costs:', error);
+    } finally {
+      setCostsLoading(false);
+    }
+  };
 
   const fetchExecutionSummary = async () => {
     setSummaryLoading(true);
@@ -457,6 +476,45 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+  const handleGenerateSummaries = async () => {
+    const activePlayers = players.filter((p) => p.is_active);
+    if (activePlayers.length === 0) {
+      showModal('No Active Players', 'No active players to generate summaries for', 'info');
+      return;
+    }
+
+    showConfirmModal(
+      'Generate Summaries',
+      `Generate summaries for all ${activePlayers.length} active players? This will trigger AI-powered summary generation tasks.`,
+      async () => {
+        setGeneratingSummaries(true);
+        try {
+          const response = await api.SystemService.generateSummariesApiV1SystemGenerateSummariesPost({
+            player_id: null,
+            force_regenerate: false,
+          });
+
+          const message = (
+            <div className="space-y-2">
+              <p>{response.message}</p>
+              <div className="space-y-1 text-sm">
+                <p>Tasks triggered: <span className="font-bold" style={{ color: '#4caf50' }}>{response.tasks_triggered}</span></p>
+              </div>
+            </div>
+          );
+          showModal('Summaries Generated', message, 'success');
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to generate summaries';
+          const errorDetail = (error as { body?: { detail?: string } })?.body?.detail;
+          showModal('Error', errorDetail || errorMessage, 'error');
+        } finally {
+          setGeneratingSummaries(false);
+        }
+      },
+      'info'
+    );
+  };
+
 
   if (loading) {
     return (
@@ -535,6 +593,119 @@ export const AdminDashboard: React.FC = () => {
               </p>
             </div>
           </>
+        )}
+      </div>
+
+      {/* Cost Statistics */}
+      <div className="osrs-card">
+        <h2 className="osrs-card-title mb-4">Cost Statistics</h2>
+        {costsLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <div className="osrs-text-secondary">Loading cost statistics...</div>
+          </div>
+        ) : costs ? (
+          <div className="space-y-4">
+            {/* Cost Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+                <h3 className="osrs-stat-label mb-2">Total Cost</h3>
+                <p className="osrs-stat-value" style={{ color: '#ffd700', fontSize: '1.5rem' }}>
+                  ${costs.total_cost_usd.toFixed(4)}
+                </p>
+              </div>
+              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+                <h3 className="osrs-stat-label mb-2">Last 24 Hours</h3>
+                <p className="osrs-stat-value" style={{ color: '#4caf50', fontSize: '1.5rem' }}>
+                  ${costs.cost_last_24h_usd.toFixed(4)}
+                </p>
+              </div>
+              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+                <h3 className="osrs-stat-label mb-2">Last 7 Days</h3>
+                <p className="osrs-stat-value" style={{ color: '#4caf50', fontSize: '1.5rem' }}>
+                  ${costs.cost_last_7d_usd.toFixed(4)}
+                </p>
+              </div>
+              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+                <h3 className="osrs-stat-label mb-2">Last 30 Days</h3>
+                <p className="osrs-stat-value" style={{ color: '#4caf50', fontSize: '1.5rem' }}>
+                  ${costs.cost_last_30d_usd.toFixed(4)}
+                </p>
+              </div>
+            </div>
+
+            {/* Token Usage Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t" style={{ borderColor: '#8b7355' }}>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Total Summaries</h3>
+                <p className="osrs-stat-value">{costs.total_summaries.toLocaleString()}</p>
+              </div>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Total Tokens</h3>
+                <p className="osrs-stat-value">{formatNumber(costs.total_tokens)}</p>
+                <p className="text-xs osrs-text-secondary mt-1">
+                  {formatNumber(costs.total_prompt_tokens)} prompt + {formatNumber(costs.total_completion_tokens)} completion
+                </p>
+              </div>
+              <div>
+                <h3 className="osrs-stat-label mb-1">Avg Cost per Summary</h3>
+                <p className="osrs-stat-value">
+                  {costs.total_summaries > 0
+                    ? `$${(costs.total_cost_usd / costs.total_summaries).toFixed(6)}`
+                    : '$0.000000'}
+                </p>
+              </div>
+            </div>
+
+            {/* Model Breakdown */}
+            {Object.keys(costs.by_model).length > 0 && (
+              <div className="pt-2 border-t" style={{ borderColor: '#8b7355' }}>
+                <h3 className="osrs-stat-label mb-3">Cost Breakdown by Model</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {Object.entries(costs.by_model).map(([model, stats]) => (
+                    <div
+                      key={model}
+                      className="p-3 rounded"
+                      style={{
+                        backgroundColor: '#1a1510',
+                        border: '1px solid #8b7355',
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold osrs-text" style={{ color: '#ffd700' }}>
+                          {model}
+                        </span>
+                        <span className="text-sm osrs-text-secondary">
+                          {stats.count} summaries
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="osrs-text-secondary">Cost:</span>
+                          <span className="osrs-text" style={{ color: '#4caf50' }}>
+                            ${stats.cost_usd.toFixed(4)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="osrs-text-secondary">Tokens:</span>
+                          <span className="osrs-text">{formatNumber(stats.total_tokens)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="osrs-text-secondary">Avg per summary:</span>
+                          <span className="osrs-text-secondary">
+                            ${stats.count > 0 ? (stats.cost_usd / stats.count).toFixed(6) : '0.000000'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center py-4">
+            <div className="osrs-text-secondary">No cost data available</div>
+          </div>
         )}
       </div>
 
@@ -843,7 +1014,7 @@ export const AdminDashboard: React.FC = () => {
               <span style={{ color: '#ffd700' }}>⚙️</span>
               System Actions
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <button
                 onClick={handleVerifySchedules}
                 disabled={verifyingSchedules}
@@ -884,6 +1055,27 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <span className="text-xs osrs-text-secondary">
                   {fetchingAllPlayers ? 'Triggering fetches...' : 'Manually trigger fetch for all active players'}
+                </span>
+              </button>
+              <button
+                onClick={handleGenerateSummaries}
+                disabled={generatingSummaries}
+                className="osrs-btn text-left p-4 hover:opacity-90 transition-opacity"
+                style={{
+                  backgroundColor: '#3a3024',
+                  border: '1px solid #8b7355',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  minHeight: '80px'
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold osrs-text">Generate Summaries</span>
+                  <span style={{ color: '#ffd700', fontSize: '1.2rem' }}>✨</span>
+                </div>
+                <span className="text-xs osrs-text-secondary">
+                  {generatingSummaries ? 'Generating summaries...' : 'Generate AI summaries for all active players'}
                 </span>
               </button>
             </div>

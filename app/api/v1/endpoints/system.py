@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, status
@@ -763,6 +763,34 @@ class GenerateSummaryResponse(BaseModel):
     )
 
 
+class CostStatsResponse(BaseModel):
+    """Response model for cost statistics."""
+
+    total_summaries: int = Field(
+        description="Total number of summaries generated"
+    )
+    total_prompt_tokens: int = Field(description="Total prompt tokens used")
+    total_completion_tokens: int = Field(
+        description="Total completion tokens used"
+    )
+    total_tokens: int = Field(
+        description="Total tokens used (prompt + completion)"
+    )
+    total_cost_usd: float = Field(description="Total estimated cost in USD")
+    cost_last_24h_usd: float = Field(
+        description="Estimated cost in last 24 hours"
+    )
+    cost_last_7d_usd: float = Field(
+        description="Estimated cost in last 7 days"
+    )
+    cost_last_30d_usd: float = Field(
+        description="Estimated cost in last 30 days"
+    )
+    by_model: Dict[str, Dict[str, Any]] = Field(
+        description="Cost breakdown by model"
+    )
+
+
 @router.post("/generate-summaries", response_model=GenerateSummaryResponse)
 async def generate_summaries(
     request: GenerateSummaryRequest,
@@ -861,4 +889,189 @@ async def generate_summaries(
         )
         raise InternalServerError(
             "Failed to trigger summary generation tasks", detail=str(e)
+        )
+
+
+# AI model pricing per 1M tokens (as of 2024)
+# Prices are in USD per million tokens
+# Supports multiple providers (OpenAI, Anthropic, etc.)
+AI_MODEL_PRICING: Dict[str, Dict[str, float]] = {
+    # OpenAI models
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "gpt-4o": {"input": 2.50, "output": 10.00},
+    "gpt-4-turbo": {"input": 10.00, "output": 30.00},
+    "gpt-4": {"input": 30.00, "output": 60.00},
+    "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
+    # Anthropic models (if used in future)
+    "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
+    "claude-3-opus": {"input": 15.00, "output": 75.00},
+    # Default fallback pricing (gpt-4o-mini rates)
+    "default": {"input": 0.15, "output": 0.60},
+}
+
+
+def calculate_ai_cost(
+    prompt_tokens: Optional[int],
+    completion_tokens: Optional[int],
+    model: Optional[str],
+) -> float:
+    """
+    Calculate AI API cost based on token usage and model.
+
+    Supports multiple providers (OpenAI, Anthropic, etc.) based on model name.
+
+    Args:
+        prompt_tokens: Number of prompt tokens
+        completion_tokens: Number of completion tokens
+        model: Model name (e.g., 'gpt-4o-mini', 'claude-3-5-sonnet')
+
+    Returns:
+        float: Estimated cost in USD
+    """
+    if prompt_tokens is None or completion_tokens is None:
+        return 0.0
+
+    # Get pricing for the model, fallback to default if not found
+    model_key = model.lower() if model else "default"
+    pricing = AI_MODEL_PRICING.get(model_key, AI_MODEL_PRICING["default"])
+
+    # Calculate cost: (tokens / 1M) * price_per_1M
+    input_cost = (prompt_tokens / 1_000_000) * pricing["input"]
+    output_cost = (completion_tokens / 1_000_000) * pricing["output"]
+
+    return round(input_cost + output_cost, 6)
+
+
+@router.get("/costs", response_model=CostStatsResponse)
+async def get_cost_stats(
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: Dict[str, Any] = Depends(require_auth),
+) -> CostStatsResponse:
+    """
+    Get API cost statistics based on summary generation usage.
+
+    Calculates estimated costs from token usage stored in player summaries.
+    Supports cost breakdown by model and time periods (24h, 7d, 30d).
+    Works with any AI provider (OpenAI, Anthropic, etc.) based on model name.
+
+    Args:
+        db_session: Database session dependency
+        current_user: Authenticated user information
+
+    Returns:
+        CostStatsResponse: Cost statistics
+
+    Raises:
+        500 Internal Server Error: Database or calculation errors
+    """
+    try:
+        logger.info(
+            f"User {current_user.get('username')} requesting cost statistics"
+        )
+
+        # Get all summaries with token data
+        summaries_result = await db_session.execute(
+            select(PlayerSummary).where(
+                PlayerSummary.prompt_tokens.isnot(None),
+                PlayerSummary.completion_tokens.isnot(None),
+            )
+        )
+        all_summaries = summaries_result.scalars().all()
+
+        # Calculate time windows (use timezone-aware datetime)
+        now = datetime.now(timezone.utc)
+        last_24h = now - timedelta(hours=24)
+        last_7d = now - timedelta(days=7)
+        last_30d = now - timedelta(days=30)
+
+        # Initialize totals
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        total_tokens = 0
+        total_cost = 0.0
+
+        # Time period costs
+        cost_24h = 0.0
+        cost_7d = 0.0
+        cost_30d = 0.0
+
+        # Breakdown by model
+        by_model: Dict[str, Dict[str, Any]] = {}
+
+        for summary in all_summaries:
+            if (
+                summary.prompt_tokens is None
+                or summary.completion_tokens is None
+            ):
+                continue
+
+            prompt_tokens = summary.prompt_tokens
+            completion_tokens = summary.completion_tokens
+            tokens_sum = prompt_tokens + completion_tokens
+            model = summary.model_used or "default"
+
+            # Calculate cost for this summary
+            cost = calculate_ai_cost(prompt_tokens, completion_tokens, model)
+
+            # Update totals
+            total_prompt_tokens += prompt_tokens
+            total_completion_tokens += completion_tokens
+            total_tokens += tokens_sum
+            total_cost += cost
+
+            # Update time period costs (ensure timezone-aware comparison)
+            summary_time = summary.generated_at
+            if summary_time.tzinfo is None:
+                # If naive, assume UTC
+                summary_time = summary_time.replace(tzinfo=timezone.utc)
+
+            if summary_time >= last_24h:
+                cost_24h += cost
+            if summary_time >= last_7d:
+                cost_7d += cost
+            if summary_time >= last_30d:
+                cost_30d += cost
+
+            # Update model breakdown
+            if model not in by_model:
+                by_model[model] = {
+                    "count": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                    "cost_usd": 0.0,
+                }
+
+            by_model[model]["count"] += 1
+            by_model[model]["prompt_tokens"] += prompt_tokens
+            by_model[model]["completion_tokens"] += completion_tokens
+            by_model[model]["total_tokens"] += tokens_sum
+            by_model[model]["cost_usd"] += cost
+
+        # Round model costs
+        for model_data in by_model.values():
+            model_data["cost_usd"] = round(model_data["cost_usd"], 6)
+
+        response = CostStatsResponse(
+            total_summaries=len(all_summaries),
+            total_prompt_tokens=total_prompt_tokens,
+            total_completion_tokens=total_completion_tokens,
+            total_tokens=total_tokens,
+            total_cost_usd=round(total_cost, 6),
+            cost_last_24h_usd=round(cost_24h, 6),
+            cost_last_7d_usd=round(cost_7d, 6),
+            cost_last_30d_usd=round(cost_30d, 6),
+            by_model=by_model,
+        )
+
+        logger.info(
+            f"Successfully calculated costs: ${total_cost:.6f} total, "
+            f"${cost_24h:.6f} (24h), ${cost_7d:.6f} (7d), ${cost_30d:.6f} (30d)"
+        )
+        return response
+
+    except Exception as e:
+        logger.error(f"Error calculating costs: {e}", exc_info=True)
+        raise InternalServerError(
+            "Failed to calculate cost statistics", detail=str(e)
         )
