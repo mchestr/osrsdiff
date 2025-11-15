@@ -69,15 +69,24 @@ class TestSummaryService:
     ):
         """Test successful summary generation for a player."""
         with patch("openai.AsyncOpenAI") as mock_openai:
-            # Mock OpenAI response
+            # Mock OpenAI response with usage data
+            mock_usage = MagicMock()
+            mock_usage.prompt_tokens = 100
+            mock_usage.completion_tokens = 50
+            mock_usage.total_tokens = 150
+
             mock_response = MagicMock()
             mock_response.choices = [
                 MagicMock(
                     message=MagicMock(
-                        content="This player has made excellent progress!"
-                    )
+                        content='{"summary": "Test summary", "points": ["Point 1"]}'
+                    ),
+                    finish_reason="stop",
                 )
             ]
+            mock_response.usage = mock_usage
+            mock_response.id = "test-response-id"
+
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(
                 return_value=mock_response
@@ -98,12 +107,17 @@ class TestSummaryService:
                 assert summary is not None
                 assert summary.player_id == test_player_with_history.id
                 assert (
-                    summary.summary_text
-                    == "This player has made excellent progress!"
+                    "summary" in summary.summary_text
+                    or "points" in summary.summary_text
                 )
                 assert summary.model_used == "gpt-4o-mini"
                 assert summary.period_start is not None
                 assert summary.period_end is not None
+                assert summary.prompt_tokens == 100
+                assert summary.completion_tokens == 50
+                assert summary.total_tokens == 150
+                assert summary.finish_reason == "stop"
+                assert summary.response_id == "test-response-id"
 
     @pytest.mark.asyncio
     async def test_generate_summary_for_player_not_found(
@@ -175,6 +189,11 @@ class TestSummaryService:
             period_start=datetime.now(timezone.utc) - timedelta(days=7),
             period_end=datetime.now(timezone.utc),
             summary_text="Recent summary",
+            prompt_tokens=None,
+            completion_tokens=None,
+            total_tokens=None,
+            finish_reason=None,
+            response_id=None,
         )
         test_session.add(summary)
         await test_session.commit()
@@ -208,6 +227,11 @@ class TestSummaryService:
             period_start=datetime.now(timezone.utc) - timedelta(days=7),
             period_end=datetime.now(timezone.utc),
             summary_text="Recent summary",
+            prompt_tokens=None,
+            completion_tokens=None,
+            total_tokens=None,
+            finish_reason=None,
+            response_id=None,
         )
         test_session.add(summary)
         await test_session.commit()
@@ -231,15 +255,34 @@ class TestSummaryService:
             period_start=datetime.now(timezone.utc) - timedelta(days=14),
             period_end=datetime.now(timezone.utc) - timedelta(days=7),
             summary_text="Old summary",
+            prompt_tokens=None,
+            completion_tokens=None,
+            total_tokens=None,
+            finish_reason=None,
+            response_id=None,
         )
         test_session.add(old_summary)
         await test_session.commit()
 
         with patch("openai.AsyncOpenAI") as mock_openai:
+            # Mock OpenAI response with usage data
+            mock_usage = MagicMock()
+            mock_usage.prompt_tokens = 100
+            mock_usage.completion_tokens = 50
+            mock_usage.total_tokens = 150
+
             mock_response = MagicMock()
             mock_response.choices = [
-                MagicMock(message=MagicMock(content="New summary!"))
+                MagicMock(
+                    message=MagicMock(
+                        content='{"summary": "New summary!", "points": ["Point 1"]}'
+                    ),
+                    finish_reason="stop",
+                )
             ]
+            mock_response.usage = mock_usage
+            mock_response.id = "test-response-id"
+
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(
                 return_value=mock_response
@@ -258,8 +301,12 @@ class TestSummaryService:
                     )
                 )
 
+                assert new_summary is not None
                 assert new_summary.id != old_summary.id
-                assert new_summary.summary_text == "New summary!"
+                assert (
+                    "New summary!" in new_summary.summary_text
+                    or "points" in new_summary.summary_text
+                )
 
     @pytest.mark.asyncio
     async def test_generate_summaries_for_all_players(
@@ -273,10 +320,10 @@ class TestSummaryService:
             test_session.add(player)
             await test_session.flush()
 
-            # Add some records
-            record = HiscoreRecord(
+            # Add records with progress (one old, one new to show progress)
+            old_record = HiscoreRecord(
                 player_id=player.id,
-                fetched_at=datetime.now(timezone.utc),
+                fetched_at=datetime.now(timezone.utc) - timedelta(days=7),
                 overall_level=1500,
                 overall_experience=50000000,
                 skills_data={
@@ -287,16 +334,44 @@ class TestSummaryService:
                     }
                 },
             )
-            test_session.add(record)
+            new_record = HiscoreRecord(
+                player_id=player.id,
+                fetched_at=datetime.now(timezone.utc),
+                overall_level=1501,
+                overall_experience=51000000,
+                skills_data={
+                    "attack": {
+                        "rank": 499,
+                        "level": 99,
+                        "experience": 13134431,
+                    }
+                },
+            )
+            test_session.add(old_record)
+            test_session.add(new_record)
             players.append(player)
 
         await test_session.commit()
 
         with patch("openai.AsyncOpenAI") as mock_openai:
+            # Mock OpenAI response with usage data
+            mock_usage = MagicMock()
+            mock_usage.prompt_tokens = 100
+            mock_usage.completion_tokens = 50
+            mock_usage.total_tokens = 150
+
             mock_response = MagicMock()
             mock_response.choices = [
-                MagicMock(message=MagicMock(content="Summary text"))
+                MagicMock(
+                    message=MagicMock(
+                        content='{"summary": "Summary text", "points": ["Point 1"]}'
+                    ),
+                    finish_reason="stop",
+                )
             ]
+            mock_response.usage = mock_usage
+            mock_response.id = "test-response-id"
+
             mock_client = AsyncMock()
             mock_client.chat.completions.create = AsyncMock(
                 return_value=mock_response
@@ -314,11 +389,35 @@ class TestSummaryService:
                 )
 
                 assert len(summaries) == 3
-                assert all(s.summary_text == "Summary text" for s in summaries)
+                assert all(s is not None for s in summaries)
+                assert all(
+                    "Summary text" in s.summary_text
+                    or "points" in s.summary_text
+                    for s in summaries
+                )
+
+    def test_load_system_prompt(self, summary_service):
+        """Test loading system prompt from template."""
+        prompt = summary_service._load_system_prompt()
+
+        assert isinstance(prompt, str)
+        assert len(prompt) > 0
+        assert "OSRS" in prompt or "RuneScape" in prompt
+        assert "analyst" in prompt.lower()
+
+    def test_load_system_prompt_fallback(self, summary_service):
+        """Test system prompt raises error when template fails."""
+        with patch("app.services.summary.render_template") as mock_render:
+            mock_render.side_effect = Exception("Template not found")
+
+            with pytest.raises(SummaryGenerationError) as exc_info:
+                summary_service._load_system_prompt()
+
+            assert "Cannot load system prompt template" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_create_summary_prompt(self, summary_service):
-        """Test prompt creation."""
+        """Test prompt creation with template."""
         day_data = {
             "progress": {
                 "experience_gained": {
@@ -351,3 +450,110 @@ class TestSummaryService:
         assert "500,000" in prompt or "500000" in prompt
         assert "Attack" in prompt or "attack" in prompt
         assert "Defence" in prompt or "defence" in prompt
+        assert "Last 24 hours" in prompt or "24 hours" in prompt
+        assert "Last 7 days" in prompt or "7 days" in prompt
+
+    def test_create_summary_prompt_fallback(self, summary_service):
+        """Test prompt creation raises error when template fails."""
+        day_data = {
+            "progress": {
+                "experience_gained": {
+                    "overall": 100000,
+                    "attack": 50000,
+                    "defence": 30000,
+                },
+                "levels_gained": {"attack": 0, "defence": 1},
+                "boss_kills_gained": {"zulrah": 10},
+            }
+        }
+        week_data = {
+            "progress": {
+                "experience_gained": {
+                    "overall": 500000,
+                    "attack": 200000,
+                    "defence": 150000,
+                },
+                "levels_gained": {"attack": 0, "defence": 2},
+                "boss_kills_gained": {"zulrah": 50},
+            }
+        }
+
+        with patch("app.services.summary.render_template") as mock_render:
+            mock_render.side_effect = Exception("Template not found")
+
+            with pytest.raises(SummaryGenerationError) as exc_info:
+                summary_service._create_summary_prompt(
+                    "testplayer", day_data, week_data
+                )
+
+            assert "Cannot load user prompt template" in str(exc_info.value)
+
+    def test_create_summary_prompt_no_top_skills(self, summary_service):
+        """Test prompt creation when no top skills."""
+        day_data = {
+            "progress": {
+                "experience_gained": {"overall": 0},
+                "levels_gained": {},
+                "boss_kills_gained": {},
+            }
+        }
+        week_data = {
+            "progress": {
+                "experience_gained": {"overall": 0},
+                "levels_gained": {},
+                "boss_kills_gained": {},
+            }
+        }
+
+        prompt = summary_service._create_summary_prompt(
+            "testplayer", day_data, week_data
+        )
+
+        assert "testplayer" in prompt
+        assert "None" in prompt or "0" in prompt
+
+    def test_create_summary_prompt_formatting(self, summary_service):
+        """Test that prompt formatting matches expected format."""
+        day_data = {
+            "progress": {
+                "experience_gained": {
+                    "overall": 1234567,
+                    "attack": 500000,
+                    "strength": 300000,
+                    "defence": 200000,
+                },
+                "levels_gained": {"attack": 1, "defence": 1},
+                "boss_kills_gained": {"zulrah": 25, "vorkath": 10},
+            }
+        }
+        week_data = {
+            "progress": {
+                "experience_gained": {
+                    "overall": 5000000,
+                    "attack": 2000000,
+                    "strength": 1500000,
+                    "defence": 1000000,
+                },
+                "levels_gained": {"attack": 2, "defence": 2},
+                "boss_kills_gained": {"zulrah": 100, "vorkath": 50},
+            }
+        }
+
+        prompt = summary_service._create_summary_prompt(
+            "TestPlayer123", day_data, week_data
+        )
+
+        # Check XP formatting with commas
+        assert "1,234,567" in prompt or "1234567" in prompt
+        assert "5,000,000" in prompt or "5000000" in prompt
+
+        # Check skill formatting
+        assert "Attack" in prompt or "attack" in prompt
+        assert "Strength" in prompt or "strength" in prompt
+
+        # Check totals
+        assert "2" in prompt  # levels gained
+        # Check boss kills (formatted as "Zulrah (25 KC), Vorkath (10 KC)")
+        assert "Zulrah" in prompt or "zulrah" in prompt
+        assert "Vorkath" in prompt or "vorkath" in prompt
+        assert "25" in prompt or "100" in prompt  # boss kill counts

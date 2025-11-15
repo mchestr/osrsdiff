@@ -50,6 +50,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy application code
 COPY ./app /app/app
 COPY ./migrations /app/migrations
+COPY ./templates /app/templates
 
 # Copy built frontend static files from frontend-builder stage
 COPY --from=frontend-builder /app/frontend/dist /app/static

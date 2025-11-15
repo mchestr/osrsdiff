@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -14,6 +15,7 @@ from app.exceptions import (
 from app.models.player import Player
 from app.models.player_summary import PlayerSummary
 from app.services.history import HistoryService
+from app.utils.template_loader import render_template
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,78 @@ class SummaryGenerationError(Exception):
     """Base exception for summary generation errors."""
 
     pass
+
+
+def parse_summary_text(summary_text: str) -> Dict[str, Any]:
+    """
+    Parse summary text into structured format.
+
+    Handles both JSON format (new) and plain text format (legacy).
+
+    Args:
+        summary_text: Summary text from database (may be JSON or plain text)
+
+    Returns:
+        Dict with "summary" (optional), "points" array, and "format" indicator
+    """
+    try:
+        # Try to parse as JSON first
+        data = json.loads(summary_text)
+        if isinstance(data, dict):
+            result: Dict[str, Any] = {
+                "format": "structured",
+            }
+            # Extract summary if present
+            if "summary" in data and isinstance(data["summary"], str):
+                result["summary"] = data["summary"]
+            # Extract points (required)
+            if "points" in data and isinstance(data["points"], list):
+                result["points"] = data["points"]
+            else:
+                # If no points but has summary, use summary as single point
+                if "summary" in result:
+                    result["points"] = [result["summary"]]
+                else:
+                    result["points"] = []
+            return result
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Fallback: treat as plain text (legacy format)
+    # Split by common separators or treat as single point
+    if "\n" in summary_text:
+        # Try to split by bullet points or newlines
+        lines = [
+            line.strip()
+            for line in summary_text.split("\n")
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        # Filter out common prefixes
+        cleaned_lines = []
+        for line in lines:
+            # Remove bullet points, dashes, etc.
+            cleaned = line.lstrip("•-* ").strip()
+            if cleaned:
+                cleaned_lines.append(cleaned)
+        if cleaned_lines:
+            # Use first line as summary if multiple lines, rest as points
+            if len(cleaned_lines) > 1:
+                return {
+                    "summary": cleaned_lines[0],
+                    "points": cleaned_lines[1:],
+                    "format": "legacy",
+                }
+            else:
+                return {
+                    "points": cleaned_lines,
+                    "format": "legacy",
+                }
+
+    # Single point fallback
+    return {
+        "points": [summary_text.strip()],
+        "format": "legacy",
+    }
 
 
 class SummaryService:
@@ -37,9 +111,39 @@ class SummaryService:
         self.db_session = db_session
         self.history_service = HistoryService(db_session)
 
+    def _has_progress(self, progress: Any) -> bool:
+        """
+        Check if there's been any meaningful progress.
+
+        Args:
+            progress: ProgressAnalysis object
+
+        Returns:
+            bool: True if there's been any XP, levels, or boss kills gained
+        """
+        if not progress.start_record or not progress.end_record:
+            return False
+
+        # Check for any XP gained
+        exp_gained = progress.experience_gained
+        if exp_gained.get("overall", 0) > 0:
+            return True
+
+        # Check for any levels gained
+        levels_gained = progress.levels_gained
+        if any(levels_gained.values()):
+            return True
+
+        # Check for any boss kills gained
+        boss_kills = progress.boss_kills_gained
+        if any(boss_kills.values()):
+            return True
+
+        return False
+
     async def generate_summary_for_player(
         self, player_id: int, force_regenerate: bool = False
-    ) -> PlayerSummary:
+    ) -> Optional[PlayerSummary]:
         """
         Generate a summary for a specific player covering the last day and week.
 
@@ -48,7 +152,7 @@ class SummaryService:
             force_regenerate: If True, generate even if a recent summary exists
 
         Returns:
-            PlayerSummary: The generated summary
+            Optional[PlayerSummary]: The generated summary, or None if no progress
 
         Raises:
             PlayerNotFoundError: If player doesn't exist
@@ -94,8 +198,15 @@ class SummaryService:
                 f"Insufficient data to generate summary for {player.username}: {e}"
             ) from e
 
+        # Check if there's been any progress in the last 7 days
+        if not self._has_progress(week_progress):
+            logger.info(
+                f"No progress detected for player {player.username} in last 7 days, skipping summary generation"
+            )
+            return None
+
         # Generate summary using OpenAI
-        summary_text = await self._generate_summary_text(
+        summary_text, openai_metadata = await self._generate_summary_text(
             player.username, day_progress, week_progress
         )
 
@@ -106,6 +217,11 @@ class SummaryService:
             period_end=now,
             summary_text=summary_text,
             model_used=settings.openai.model,
+            prompt_tokens=openai_metadata.get("prompt_tokens"),
+            completion_tokens=openai_metadata.get("completion_tokens"),
+            total_tokens=openai_metadata.get("total_tokens"),
+            finish_reason=openai_metadata.get("finish_reason"),
+            response_id=openai_metadata.get("response_id"),
         )
 
         self.db_session.add(summary)
@@ -142,7 +258,8 @@ class SummaryService:
                 summary = await self.generate_summary_for_player(
                     player.id, force_regenerate=force_regenerate
                 )
-                summaries.append(summary)
+                if summary is not None:
+                    summaries.append(summary)
             except (InsufficientDataError, SummaryGenerationError) as e:
                 logger.warning(
                     f"Failed to generate summary for player {player.username}: {e}"
@@ -191,7 +308,7 @@ class SummaryService:
         username: str,
         day_progress: Any,
         week_progress: Any,
-    ) -> str:
+    ) -> tuple[str, Dict[str, Any]]:
         """
         Generate summary text using OpenAI API.
 
@@ -201,7 +318,7 @@ class SummaryService:
             week_progress: ProgressAnalysis for the last week
 
         Returns:
-            str: Generated summary text
+            tuple[str, Dict[str, Any]]: Generated summary text and OpenAI response metadata
 
         Raises:
             SummaryGenerationError: If generation fails
@@ -221,31 +338,129 @@ class SummaryService:
             day_data = day_progress.to_dict()
             week_data = week_progress.to_dict()
 
-            # Create prompt
-            prompt = self._create_summary_prompt(username, day_data, week_data)
-
-            # Call OpenAI API
-            response = await client.chat.completions.create(
-                model=settings.openai.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert Old School RuneScape (OSRS) analyst. "
-                        "You analyze player progress data and provide insightful, engaging summaries "
-                        "of their achievements and gameplay patterns. Keep summaries concise but informative, "
-                        "highlighting notable achievements, skill gains, and activity patterns.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=settings.openai.max_tokens,
-                temperature=settings.openai.temperature,
+            # Create prompts from templates
+            system_prompt = self._load_system_prompt()
+            user_prompt = self._create_summary_prompt(
+                username, day_data, week_data
             )
+
+            # Call OpenAI API with JSON response format
+            # Use response_format if supported by the model (gpt-4o-mini and newer)
+            create_kwargs: Dict[str, Any] = {
+                "model": settings.openai.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "max_tokens": settings.openai.max_tokens,
+                "temperature": settings.openai.temperature,
+            }
+
+            # Try to use JSON mode if available (gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo, etc.)
+            # JSON mode is supported by most modern OpenAI models
+            try:
+                # Enable JSON mode for structured output
+                # This ensures the model returns valid JSON
+                create_kwargs["response_format"] = {"type": "json_object"}
+            except Exception:
+                # If response_format not supported, continue without it
+                # The model should still follow JSON format instructions
+                pass
+
+            response = await client.chat.completions.create(**create_kwargs)
 
             summary_text = response.choices[0].message.content
             if not summary_text:
                 raise SummaryGenerationError("OpenAI returned empty summary")
 
-            return summary_text.strip()
+            # Extract metadata from response
+            usage = response.usage
+            metadata = {
+                "prompt_tokens": usage.prompt_tokens if usage else None,
+                "completion_tokens": (
+                    usage.completion_tokens if usage else None
+                ),
+                "total_tokens": usage.total_tokens if usage else None,
+                "finish_reason": (
+                    response.choices[0].finish_reason
+                    if response.choices
+                    else None
+                ),
+                "response_id": response.id,
+            }
+
+            # Parse JSON response
+            try:
+                summary_data = json.loads(summary_text.strip())
+                if not isinstance(summary_data, dict):
+                    raise ValueError(
+                        "Invalid JSON structure: must be an object"
+                    )
+
+                # Validate structure
+                if "points" not in summary_data:
+                    raise ValueError(
+                        "Invalid JSON structure: missing 'points' key"
+                    )
+                if not isinstance(summary_data["points"], list):
+                    raise ValueError(
+                        "Invalid JSON structure: 'points' must be an array"
+                    )
+
+                # Summary is optional but should be a string if present
+                if "summary" in summary_data and not isinstance(
+                    summary_data["summary"], str
+                ):
+                    raise ValueError(
+                        "Invalid JSON structure: 'summary' must be a string"
+                    )
+
+                # Format as structured JSON string for storage
+                formatted_summary = json.dumps(
+                    summary_data, ensure_ascii=False
+                )
+                return formatted_summary, metadata
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"Failed to parse JSON response, attempting to extract JSON: {e}"
+                )
+                # Try to extract JSON from markdown code blocks or plain text
+                cleaned_text = summary_text.strip()
+                # Remove markdown code blocks if present
+                if cleaned_text.startswith("```"):
+                    lines = cleaned_text.split("\n")
+                    cleaned_text = "\n".join(
+                        line
+                        for line in lines
+                        if not line.strip().startswith("```")
+                    )
+
+                try:
+                    summary_data = json.loads(cleaned_text)
+                    if (
+                        not isinstance(summary_data, dict)
+                        or "points" not in summary_data
+                    ):
+                        raise ValueError("Invalid JSON structure")
+                    # Ensure summary is a string if present
+                    if "summary" in summary_data and not isinstance(
+                        summary_data["summary"], str
+                    ):
+                        summary_data["summary"] = str(summary_data["summary"])
+                    formatted_summary = json.dumps(
+                        summary_data, ensure_ascii=False
+                    )
+                    return formatted_summary, metadata
+                except Exception:
+                    # Fallback: wrap the text in a points array
+                    logger.warning(
+                        "Could not parse JSON, wrapping response as single point"
+                    )
+                    fallback_data = {"points": [summary_text.strip()]}
+                    formatted_summary = json.dumps(
+                        fallback_data, ensure_ascii=False
+                    )
+                    return formatted_summary, metadata
 
         except ImportError:
             raise SummaryGenerationError(
@@ -259,6 +474,26 @@ class SummaryService:
                 f"Failed to generate summary: {e}"
             ) from e
 
+    def _load_system_prompt(self) -> str:
+        """
+        Load the system prompt from template.
+
+        Returns:
+            str: System prompt content
+
+        Raises:
+            SummaryGenerationError: If template cannot be loaded
+        """
+        try:
+            return render_template("summary/system_prompt.j2", {})
+        except Exception as e:
+            logger.error(
+                f"Failed to load system prompt template: {e}", exc_info=True
+            )
+            raise SummaryGenerationError(
+                f"Cannot load system prompt template: {e}"
+            ) from e
+
     def _create_summary_prompt(
         self,
         username: str,
@@ -266,7 +501,7 @@ class SummaryService:
         week_data: Dict[str, Any],
     ) -> str:
         """
-        Create the prompt for OpenAI based on progress data.
+        Create the prompt for OpenAI based on progress data using template.
 
         Args:
             username: Player username
@@ -275,6 +510,9 @@ class SummaryService:
 
         Returns:
             str: Formatted prompt
+
+        Raises:
+            SummaryGenerationError: If template cannot be loaded
         """
         # Format experience gains
         day_exp = day_data.get("progress", {}).get("experience_gained", {})
@@ -295,29 +533,87 @@ class SummaryService:
         day_top_skills = get_top_skills(day_exp)
         week_top_skills = get_top_skills(week_exp)
 
-        prompt = f"""Analyze the progress of OSRS player "{username}" and provide a concise summary.
+        # Format top skills as strings
+        def format_top_skills(skills: List[tuple]) -> str:
+            """Format top skills list as comma-separated string."""
+            if not skills:
+                return "None"
+            return ", ".join(
+                [f"{skill.title()} ({exp:,} XP)" for skill, exp in skills]
+            )
 
-LAST 24 HOURS:
-- Overall XP gained: {day_exp.get('overall', 0):,}
-- Top skills by XP: {', '.join([f'{skill.title()} ({exp:,} XP)' for skill, exp in day_top_skills]) if day_top_skills else 'None'}
-- Levels gained: {sum(day_data.get('progress', {}).get('levels_gained', {}).values())}
-- Boss kills: {sum(day_data.get('progress', {}).get('boss_kills_gained', {}).values())}
+        day_top_skills_formatted = format_top_skills(day_top_skills)
+        week_top_skills_formatted = format_top_skills(week_top_skills)
 
-LAST 7 DAYS:
-- Overall XP gained: {week_exp.get('overall', 0):,}
-- Top skills by XP: {', '.join([f'{skill.title()} ({exp:,} XP)' for skill, exp in week_top_skills]) if week_top_skills else 'None'}
-- Levels gained: {sum(week_data.get('progress', {}).get('levels_gained', {}).values())}
-- Boss kills: {sum(week_data.get('progress', {}).get('boss_kills_gained', {}).values())}
+        # Get boss kills data
+        day_boss_kills_data = day_data.get("progress", {}).get(
+            "boss_kills_gained", {}
+        )
+        week_boss_kills_data = week_data.get("progress", {}).get(
+            "boss_kills_gained", {}
+        )
 
-Provide a brief, engaging summary (2-4 sentences) highlighting:
-1. Notable achievements or milestones
-2. Most active skills or activities
-3. Overall activity level and progress pace
-4. Any interesting patterns or trends
+        # Format boss kills (similar to top skills)
+        def format_boss_kills(boss_kills: Dict[str, int]) -> str:
+            """Format boss kills as comma-separated string."""
+            if not boss_kills:
+                return "None"
+            # Filter out bosses with 0 kills and sort by kills descending
+            active_bosses = [
+                (boss, kills)
+                for boss, kills in boss_kills.items()
+                if kills > 0
+            ]
+            if not active_bosses:
+                return "None"
+            sorted_bosses = sorted(
+                active_bosses, key=lambda x: x[1], reverse=True
+            )
+            return ", ".join(
+                [
+                    f"{boss.title()} ({kills:,} KC)"
+                    for boss, kills in sorted_bosses
+                ]
+            )
 
-Keep it concise and player-friendly."""
+        day_boss_kills_formatted = format_boss_kills(day_boss_kills_data)
+        week_boss_kills_formatted = format_boss_kills(week_boss_kills_data)
 
-        return prompt
+        # Calculate totals
+        day_levels_gained = sum(
+            day_data.get("progress", {}).get("levels_gained", {}).values()
+        )
+        day_boss_kills_total = sum(day_boss_kills_data.values())
+        week_levels_gained = sum(
+            week_data.get("progress", {}).get("levels_gained", {}).values()
+        )
+        week_boss_kills_total = sum(week_boss_kills_data.values())
+
+        # Render template
+        try:
+            return render_template(
+                "summary/user_prompt.j2",
+                {
+                    "username": username,
+                    "day_overall_xp": f"{day_exp.get('overall', 0):,}",
+                    "day_top_skills_formatted": day_top_skills_formatted,
+                    "day_levels_gained": day_levels_gained,
+                    "day_boss_kills_formatted": day_boss_kills_formatted,
+                    "day_boss_kills_total": day_boss_kills_total,
+                    "week_overall_xp": f"{week_exp.get('overall', 0):,}",
+                    "week_top_skills_formatted": week_top_skills_formatted,
+                    "week_levels_gained": week_levels_gained,
+                    "week_boss_kills_formatted": week_boss_kills_formatted,
+                    "week_boss_kills_total": week_boss_kills_total,
+                },
+            )
+        except Exception as e:
+            logger.error(
+                f"Failed to load user prompt template: {e}", exc_info=True
+            )
+            raise SummaryGenerationError(
+                f"Cannot load user prompt template: {e}"
+            ) from e
 
 
 def get_summary_service(db_session: AsyncSession) -> SummaryService:

@@ -171,7 +171,14 @@ export const PlayerStats: React.FC = () => {
   const [bossProgressLoading, setBossProgressLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [metadataExpanded, setMetadataExpanded] = useState(false);
-  const [summary, setSummary] = useState<{ summary_text: string; generated_at: string; period_start: string; period_end: string } | null>(null);
+  const [summary, setSummary] = useState<{
+    summary_text: string;
+    summary?: string;
+    summary_points?: string[];
+    generated_at: string;
+    period_start: string;
+    period_end: string
+  } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -383,50 +390,78 @@ export const PlayerStats: React.FC = () => {
         </div>
       )}
 
-      {/* AI Summary Highlight */}
+      {/* Progress Analysis - Subtle */}
       {summary && (
         <div className="mb-1.5">
           <div className="osrs-card" style={{
-            background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(212, 175, 55, 0.05) 100%)',
-            border: '2px solid rgba(255, 215, 0, 0.3)',
+            background: 'rgba(0, 0, 0, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '4px',
-            padding: '16px',
-            position: 'relative',
-            overflow: 'hidden',
+            padding: '12px',
           }}>
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '100px',
-              height: '100px',
-              background: 'radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%)',
-              pointerEvents: 'none',
-            }} />
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2">
               <div style={{
-                fontSize: '24px',
+                fontSize: '14px',
                 lineHeight: '1',
                 flexShrink: 0,
+                opacity: 0.6,
+                marginTop: '2px',
               }}>✨</div>
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="osrs-card-title text-sm" style={{ margin: 0 }}>
-                    AI Progress Summary
+                <div className="flex items-center justify-between mb-1.5">
+                  <h3 className="osrs-card-title text-xs" style={{ margin: 0, opacity: 0.7 }}>
+                    Progress Analysis
                   </h3>
-                  <span className="osrs-text-secondary text-xs">
-                    {format(new Date(summary.generated_at), 'MMM d, yyyy')}
+                  <span className="osrs-text-secondary text-xs" style={{ opacity: 0.5 }}>
+                    {format(new Date(summary.generated_at), 'MMM d')}
                   </span>
                 </div>
-                <p className="osrs-text text-sm leading-relaxed" style={{
-                  lineHeight: '1.6',
-                  color: '#ffd700',
-                }}>
-                  {summary.summary_text}
-                </p>
-                <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(255, 215, 0, 0.2)' }}>
-                  <p className="osrs-text-secondary text-xs">
-                    Period: {format(new Date(summary.period_start), 'MMM d')} - {format(new Date(summary.period_end), 'MMM d, yyyy')}
+
+                {/* Summary overview (if available) */}
+                {summary.summary && (
+                  <p className="osrs-text text-xs leading-relaxed mb-2" style={{
+                    lineHeight: '1.5',
+                    opacity: 0.9,
+                  }}>
+                    {summary.summary}
+                  </p>
+                )}
+
+                {/* Bullet points (structured format) */}
+                {summary.summary_points && summary.summary_points.length > 0 ? (
+                  <ul className="list-none pl-0 mb-2" style={{ margin: 0, padding: 0 }}>
+                    {summary.summary_points.map((point, index) => (
+                      <li key={index} className="osrs-text text-xs leading-relaxed mb-1.5 flex items-start" style={{
+                        lineHeight: '1.5',
+                        opacity: 0.85,
+                      }}>
+                        <span style={{
+                          display: 'inline-block',
+                          width: '4px',
+                          height: '4px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                          marginRight: '8px',
+                          marginTop: '5px',
+                          flexShrink: 0,
+                        }} />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  /* Fallback to plain text for legacy summaries */
+                  <p className="osrs-text text-xs leading-relaxed mb-2" style={{
+                    lineHeight: '1.5',
+                    opacity: 0.9,
+                  }}>
+                    {summary.summary_text}
+                  </p>
+                )}
+
+                <div className="mt-1.5 pt-1.5 border-t" style={{ borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                  <p className="osrs-text-secondary text-xs" style={{ opacity: 0.5 }}>
+                    {format(new Date(summary.period_start), 'MMM d')} - {format(new Date(summary.period_end), 'MMM d, yyyy')}
                   </p>
                 </div>
               </div>

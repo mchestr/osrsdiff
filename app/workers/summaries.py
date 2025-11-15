@@ -114,6 +114,19 @@ async def generate_player_summary_task(
 
             duration = (datetime.now(UTC) - start_time).total_seconds()
 
+            if summary is None:
+                result = {
+                    "status": "skipped",
+                    "player_id": player_id,
+                    "reason": "no_progress",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "duration_seconds": duration,
+                }
+                logger.info(
+                    f"Summary generation skipped for player {player_id} (no progress in last 7 days)"
+                )
+                return result
+
             result = {
                 "status": "success",
                 "player_id": player_id,

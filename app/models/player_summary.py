@@ -71,6 +71,33 @@ class PlayerSummary(Base):
         doc="OpenAI model used for generation (e.g., 'gpt-4', 'gpt-3.5-turbo')",
     )
 
+    # OpenAI API response metadata
+    prompt_tokens: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        doc="Number of tokens used in the prompt",
+    )
+    completion_tokens: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        doc="Number of tokens used in the completion",
+    )
+    total_tokens: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        doc="Total number of tokens used (prompt + completion)",
+    )
+    finish_reason: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        doc="Reason the completion finished (e.g., 'stop', 'length', 'content_filter')",
+    )
+    response_id: Mapped[str | None] = mapped_column(
+        String(200),
+        nullable=True,
+        doc="OpenAI API response ID for tracking",
+    )
+
     # Relationships
     player: Mapped[Player] = relationship(
         "Player",

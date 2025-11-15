@@ -1,0 +1,34 @@
+Analyze {{ username }}'s progress data and write a factual summary.
+
+DATA:
+Last 24 hours:
+- Overall XP: {{ day_overall_xp }}
+- Top skills: {{ day_top_skills_formatted }}
+- Levels gained: {{ day_levels_gained }}
+- Boss kills: {{ day_boss_kills_formatted }}
+
+Last 7 days:
+- Overall XP: {{ week_overall_xp }}
+- Top skills: {{ week_top_skills_formatted }}
+- Levels gained: {{ week_levels_gained }}
+- Boss kills: {{ week_boss_kills_formatted }}
+
+OUTPUT FORMAT:
+Respond with valid JSON only: {"summary": "...", "points": ["...", "...", "..."]}
+
+CONTENT REQUIREMENTS:
+1. Summary (1-2 sentences): Lead with the highest numbers/metrics. Use format: "{{ username }} gained X XP and Y levels..."
+2. Points (2-3 bullets): Each point must include specific numbers
+   - Point 1: Focus on top skill(s) with exact XP amounts
+   - Point 2: Boss kills with specific counts and boss names
+   - Point 3: Activity patterns (compare day vs week if different, or highlight consistency)
+
+WRITING RULES:
+- Start sentences with numbers: "Gained 2.9M XP" not "Made significant progress with 2.9M XP"
+- Use exact values: "1.27M XP" not "over a million XP"
+- Include comparisons: "100 Zulrah kills" not "many boss kills"
+- Avoid weasel words: NO "significant", "impressive", "notable", "substantial", "considerable", "robust", "strong", "excellent", "great"
+- Use third person with {{ username }}
+- If day activity is 0 but week has activity, state: "No activity in last 24 hours"
+- Be factual and direct - let the numbers speak
+

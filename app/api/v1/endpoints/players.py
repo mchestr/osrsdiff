@@ -923,23 +923,58 @@ class PlayerSummaryResponse(BaseModel):
     player_id: int = Field(description="Player ID")
     period_start: str = Field(description="Start of the summary period")
     period_end: str = Field(description="End of the summary period")
-    summary_text: str = Field(description="Generated summary text")
+    summary_text: str = Field(
+        description="Generated summary text (JSON or plain text)"
+    )
+    summary: Optional[str] = Field(
+        None,
+        description="Concise summary overview (structured format)",
+    )
+    summary_points: List[str] = Field(
+        default_factory=list,
+        description="Parsed summary points (structured format)",
+    )
     generated_at: str = Field(description="When the summary was generated")
     model_used: Optional[str] = Field(
         None, description="OpenAI model used for generation"
+    )
+    prompt_tokens: Optional[int] = Field(
+        None, description="Number of tokens used in the prompt"
+    )
+    completion_tokens: Optional[int] = Field(
+        None, description="Number of tokens used in the completion"
+    )
+    total_tokens: Optional[int] = Field(
+        None, description="Total number of tokens used (prompt + completion)"
+    )
+    finish_reason: Optional[str] = Field(
+        None, description="Reason the completion finished"
+    )
+    response_id: Optional[str] = Field(
+        None, description="OpenAI API response ID"
     )
 
     @classmethod
     def from_summary(cls, summary: PlayerSummary) -> "PlayerSummaryResponse":
         """Create response model from PlayerSummary entity."""
+        from app.services.summary import parse_summary_text
+
+        parsed = parse_summary_text(summary.summary_text)
         return cls(
             id=summary.id,
             player_id=summary.player_id,
             period_start=summary.period_start.isoformat(),
             period_end=summary.period_end.isoformat(),
             summary_text=summary.summary_text,
+            summary=parsed.get("summary"),
+            summary_points=parsed.get("points", []),
             generated_at=summary.generated_at.isoformat(),
             model_used=summary.model_used,
+            prompt_tokens=summary.prompt_tokens,
+            completion_tokens=summary.completion_tokens,
+            total_tokens=summary.total_tokens,
+            finish_reason=summary.finish_reason,
+            response_id=summary.response_id,
         )
 
 
@@ -1061,6 +1096,10 @@ async def generate_player_summary(
             summary = await summary_service.generate_summary_for_player(
                 player.id, force_regenerate=request.force_regenerate
             )
+            if summary is None:
+                raise PlayerServiceError(
+                    "Failed to generate summary: returned None"
+                )
         except Exception as e:
             logger.error(
                 f"Failed to generate summary for player {username}: {e}"

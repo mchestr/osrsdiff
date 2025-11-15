@@ -13,6 +13,7 @@ from app.exceptions import InternalServerError, NotFoundError
 from app.models.base import get_db_session
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.models.player_summary import PlayerSummary
 from app.models.task_execution import TaskExecution, TaskExecutionStatus
 
 logger = logging.getLogger(__name__)
@@ -681,26 +682,60 @@ class PlayerSummaryResponse(BaseModel):
     player_id: int = Field(description="Player ID")
     period_start: str = Field(description="Start of the summary period")
     period_end: str = Field(description="End of the summary period")
-    summary_text: str = Field(description="Generated summary text")
+    summary_text: str = Field(
+        description="Generated summary text (JSON or plain text)"
+    )
+    summary: Optional[str] = Field(
+        None,
+        description="Concise summary overview (structured format)",
+    )
+    summary_points: List[str] = Field(
+        default_factory=list,
+        description="Parsed summary points (structured format)",
+    )
     generated_at: str = Field(description="When the summary was generated")
     model_used: Optional[str] = Field(
         None, description="OpenAI model used for generation"
+    )
+    prompt_tokens: Optional[int] = Field(
+        None, description="Number of tokens used in the prompt"
+    )
+    completion_tokens: Optional[int] = Field(
+        None, description="Number of tokens used in the completion"
+    )
+    total_tokens: Optional[int] = Field(
+        None, description="Total number of tokens used (prompt + completion)"
+    )
+    finish_reason: Optional[str] = Field(
+        None, description="Reason the completion finished"
+    )
+    response_id: Optional[str] = Field(
+        None, description="OpenAI API response ID"
     )
 
     @classmethod
     def from_summary(cls, summary: Any) -> "PlayerSummaryResponse":
         """Create response model from PlayerSummary entity."""
         from app.models.player_summary import PlayerSummary
+        from app.services.summary import parse_summary_text
 
         summary_obj: PlayerSummary = summary
+        parsed = parse_summary_text(summary_obj.summary_text)
         return cls(
             id=summary_obj.id,
             player_id=summary_obj.player_id,
             period_start=summary_obj.period_start.isoformat(),
             period_end=summary_obj.period_end.isoformat(),
             summary_text=summary_obj.summary_text,
+            summary=parsed.get("summary"),
+            summary_points=parsed.get("points", []),
             generated_at=summary_obj.generated_at.isoformat(),
             model_used=summary_obj.model_used,
+            prompt_tokens=summary_obj.prompt_tokens,
+            completion_tokens=summary_obj.completion_tokens,
+            total_tokens=summary_obj.total_tokens,
+            finish_reason=summary_obj.finish_reason,
+            response_id=summary_obj.response_id,
         )
 
 
@@ -770,7 +805,11 @@ async def generate_summaries(
                     request.player_id,
                     force_regenerate=request.force_regenerate,
                 )
-                summaries = [summary]
+                if summary is None:
+                    raise InternalServerError(
+                        "Failed to generate summary: returned None"
+                    )
+                summaries: List[PlayerSummary] = [summary]
             except Exception as e:
                 logger.error(
                     f"Failed to generate summary for player {request.player_id}: {e}"
