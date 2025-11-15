@@ -27,7 +27,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#1d1611' }}>
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#1a1510' }}>
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-extrabold osrs-card-title mb-2">
@@ -39,8 +39,8 @@ export const Login: React.FC = () => {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="osrs-card" style={{ borderColor: '#d32f2f', backgroundColor: 'rgba(211, 47, 47, 0.1)' }}>
-              <p className="osrs-text" style={{ color: '#d32f2f' }}>{error}</p>
+            <div className="osrs-card" style={{ borderColor: '#d32f2f', backgroundColor: 'rgba(211, 47, 47, 0.15)' }}>
+              <p className="osrs-text" style={{ color: '#ff6b6b' }}>{error}</p>
             </div>
           )}
           <div className="space-y-2">
@@ -54,7 +54,6 @@ export const Login: React.FC = () => {
                 type="text"
                 required
                 className="osrs-btn w-full"
-                style={{ backgroundColor: '#3a3024', color: '#ffd700' }}
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -70,7 +69,6 @@ export const Login: React.FC = () => {
                 type="password"
                 required
                 className="osrs-btn w-full"
-                style={{ backgroundColor: '#3a3024', color: '#ffd700' }}
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

@@ -23,7 +23,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#1d1611' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#1a1510' }}>
       <nav className="osrs-nav-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
@@ -87,7 +87,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" style={{ backgroundColor: '#1d1611', minHeight: 'calc(100vh - 80px)' }}>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-80px)]" style={{ backgroundColor: '#1a1510' }}>
         {children}
       </main>
     </div>

@@ -68,7 +68,6 @@ export const Home: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1 osrs-btn"
-              style={{ backgroundColor: '#3a3024', color: '#ffd700', fontSize: '1rem', padding: '0.75rem 1rem' }}
             />
             <button
               type="submit"
@@ -128,16 +127,16 @@ export const Home: React.FC = () => {
               <table className="min-w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
                 <thead>
                   <tr style={{ backgroundColor: '#1a1510' }}>
-                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
+                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #a68b5b' }}>
                       Username
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
+                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #a68b5b' }}>
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
+                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #a68b5b' }}>
                       Last Updated
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #8b7355' }}>
+                    <th className="px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase" style={{ borderBottom: '2px solid #a68b5b' }}>
                       Actions
                     </th>
                   </tr>
@@ -147,7 +146,7 @@ export const Home: React.FC = () => {
                     <tr
                       key={player.id}
                       style={{ borderBottom: '1px solid #8b7355' }}
-                      className="hover:opacity-80 cursor-pointer"
+                      className="hover:opacity-80 cursor-pointer transition-all"
                       onClick={() => navigate(`/players/${player.username}`)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap font-medium">
@@ -155,11 +154,11 @@ export const Home: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className="px-2 inline-flex text-xs leading-5 font-semibold"
+                          className="px-2 inline-flex text-xs leading-5 font-semibold rounded-md"
                           style={{
                             backgroundColor: player.is_active ? 'rgba(255, 215, 0, 0.2)' : 'rgba(139, 115, 85, 0.2)',
                             border: `1px solid ${player.is_active ? '#ffd700' : '#8b7355'}`,
-                            color: player.is_active ? '#ffd700' : '#8b7355'
+                            color: player.is_active ? '#ffd700' : '#a68b5b'
                           }}
                         >
                           {player.is_active ? 'Active' : 'Inactive'}

@@ -14,7 +14,7 @@ const AppRoutes = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#1d1611' }}>
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#1a1510' }}>
         <div className="osrs-text text-xl">Loading...</div>
       </div>
     );

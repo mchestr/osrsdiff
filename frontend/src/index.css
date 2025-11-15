@@ -1,78 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    background-color: #1d1611;
-    color: #d4af37;
-    font-family: 'Courier New', 'Courier', monospace;
+    background-color: #1a1510;
+    color: #e8d5a3;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800 shadow-sm hover:shadow-md;
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 active:bg-gray-400;
+    @apply bg-neutral-100 text-neutral-700 hover:bg-neutral-200 active:bg-neutral-300 border border-neutral-300;
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+    @apply bg-red-500 text-white hover:bg-red-600 active:bg-red-700 shadow-sm hover:shadow-md;
   }
 
   .input {
-    @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-neutral-900 transition-all duration-200;
   }
 
-  /* OSRS-themed input styling */
+  /* Enhanced OSRS input styling */
   input.osrs-btn {
-    @apply px-4 py-2 font-bold transition-colors duration-200;
-    background-color: #3a3024;
-    border: 2px solid #8b7355;
-    border-radius: 0;
+    @apply px-4 py-2.5 font-medium transition-all duration-200;
+    background-color: #2d2418;
+    border: 2px solid #a68b5b;
+    border-radius: 8px;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.1),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
   }
 
   input.osrs-btn:focus {
     outline: none;
-    border-color: #9b8365;
-    background-color: #4a4034;
+    border-color: #d4af37;
+    background-color: #3a3024;
+    box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 
   input.osrs-btn::placeholder {
-    color: #8b7355;
+    color: #a68b5b;
     opacity: 0.7;
   }
 
-  /* OSRS-themed select styling */
+  /* Enhanced OSRS select styling */
   select.osrs-btn {
-    @apply px-4 py-2 font-bold transition-colors duration-200;
-    background-color: #3a3024;
-    border: 2px solid #8b7355;
-    border-radius: 0;
+    @apply px-4 py-2.5 font-medium transition-all duration-200;
+    background-color: #2d2418;
+    border: 2px solid #a68b5b;
+    border-radius: 8px;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.1),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
     cursor: pointer;
   }
 
   select.osrs-btn:focus {
     outline: none;
-    border-color: #9b8365;
-    background-color: #4a4034;
+    border-color: #d4af37;
+    background-color: #3a3024;
+    box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 
   select.osrs-btn option {
@@ -81,86 +81,39 @@
   }
 
   .card {
-    @apply bg-white rounded-lg shadow-md p-6;
+    @apply bg-white rounded-xl shadow-sm p-6 border border-neutral-200;
   }
 
-  /* OSRS Skills Panel Styles - Matching in-game aesthetic */
+  /* Enhanced OSRS Skills Panel Styles */
   .osrs-skills-panel {
-    @apply p-3;
+    @apply p-4;
     max-width: 400px;
-    background-color: #2d2418;
-    border: 4px solid #1a1510;
-    border-radius: 0;
-    box-shadow:
-      inset 0 0 0 2px #3a3024,
-      0 4px 8px rgba(0, 0, 0, 0.5);
-    /* Rustic wood/stone texture effect */
-    background-image:
-      /* Wood grain pattern */
-      repeating-linear-gradient(
-        0deg,
-        rgba(45, 36, 24, 0.8) 0%,
-        rgba(40, 32, 22, 0.9) 1px,
-        rgba(45, 36, 24, 0.8) 2px,
-        rgba(50, 40, 28, 0.7) 3px,
-        rgba(45, 36, 24, 0.8) 4px
-      ),
-      /* Cross-grain texture */
-      repeating-linear-gradient(
-        90deg,
-        rgba(35, 28, 20, 0.6) 0%,
-        rgba(45, 36, 24, 0.4) 1px,
-        rgba(40, 32, 22, 0.5) 2px,
-        rgba(45, 36, 24, 0.4) 3px,
-        rgba(35, 28, 20, 0.6) 4px
-      ),
-      /* Aged/worn spots */
-      radial-gradient(
-        circle at 20% 30%,
-        rgba(40, 32, 22, 0.3) 0%,
-        transparent 50%
-      ),
-      radial-gradient(
-        circle at 80% 70%,
-        rgba(35, 28, 20, 0.3) 0%,
-        transparent 50%
-      ),
-      /* Base brown-grey */
-      linear-gradient(
-        135deg,
-        #2d2418 0%,
-        #2a2116 50%,
-        #2d2418 100%
-      );
+    background: linear-gradient(135deg, #2d2418 0%, #251e15 100%);
+    border: 3px solid #a68b5b;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 215, 0, 0.1);
   }
 
   .osrs-skills-grid {
-    @apply grid grid-cols-3 gap-1 mb-3;
+    @apply grid grid-cols-3 gap-2 mb-3;
   }
 
   .osrs-skill-cell {
-    @apply relative flex items-center px-1.5 py-1;
-    background-color: #3a3a3a;
+    @apply relative flex items-center px-2 py-2;
+    background: linear-gradient(135deg, #3a3024 0%, #352a1f 100%);
     border: 2px solid #8b7355;
-    border-radius: 2px;
-    min-height: 48px;
-    gap: 4px;
-    /* Subtle texture */
-    background-image:
-      repeating-linear-gradient(
-        0deg,
-        rgba(58, 58, 58, 0.95) 0%,
-        rgba(55, 55, 55, 0.9) 1px,
-        rgba(58, 58, 58, 0.95) 2px
-      );
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.1),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    min-height: 56px;
+    gap: 6px;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.3);
   }
 
   .osrs-skill-cell:hover {
-    border-color: #9b8365;
-    background-color: #404040;
+    border-color: #d4af37;
+    background: linear-gradient(135deg, #4a4034 0%, #3f3528 100%);
+    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
   }
 
   .osrs-skill-icon {
@@ -188,206 +141,132 @@
   }
 
   .osrs-skill-level {
-    @apply font-bold text-lg;
+    @apply font-bold text-base;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    text-shadow:
-      2px 2px 0px rgba(0, 0, 0, 1),
-      -1px -1px 0px rgba(0, 0, 0, 1),
-      1px -1px 0px rgba(0, 0, 0, 1),
-      -1px 1px 0px rgba(0, 0, 0, 1);
-    letter-spacing: 0;
     white-space: nowrap;
     margin-left: auto;
-    /* Pixelated font rendering */
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
   .osrs-total-level {
-    @apply px-4 py-2 text-center;
-    background-color: #1a1510;
-    border: 2px solid #0f0c08;
-    border-radius: 0;
+    @apply px-4 py-3 text-center;
+    background: linear-gradient(135deg, #1a1510 0%, #1f1812 100%);
+    border: 2px solid #a68b5b;
+    border-radius: 8px;
     @apply font-bold text-base;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    text-shadow:
-      2px 2px 0px rgba(0, 0, 0, 1),
-      -1px -1px 0px rgba(0, 0, 0, 1),
-      1px -1px 0px rgba(0, 0, 0, 1),
-      -1px 1px 0px rgba(0, 0, 0, 1);
-    /* Rustic texture for total level bar */
-    background-image:
-      repeating-linear-gradient(
-        0deg,
-        rgba(26, 21, 16, 0.9) 0%,
-        rgba(20, 16, 12, 0.8) 1px,
-        rgba(26, 21, 16, 0.9) 2px
-      ),
-      linear-gradient(
-        90deg,
-        #1a1510 0%,
-        #1f1812 50%,
-        #1a1510 100%
-      );
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.08),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.4);
-    letter-spacing: 1px;
-    /* Pixelated font rendering */
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 215, 0, 0.1);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
-  /* OSRS-themed card styling */
+  /* Enhanced OSRS card styling */
   .osrs-card {
-    @apply p-4;
-    background-color: #2d2418;
-    border: 3px solid #1a1510;
-    border-radius: 0;
-    box-shadow:
-      inset 0 0 0 1px #3a3024,
-      0 4px 8px rgba(0, 0, 0, 0.5);
-    background-image:
-      repeating-linear-gradient(
-        0deg,
-        rgba(45, 36, 24, 0.8) 0%,
-        rgba(40, 32, 22, 0.9) 1px,
-        rgba(45, 36, 24, 0.8) 2px,
-        rgba(50, 40, 28, 0.7) 3px,
-        rgba(45, 36, 24, 0.8) 4px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        rgba(35, 28, 20, 0.6) 0%,
-        rgba(45, 36, 24, 0.4) 1px,
-        rgba(40, 32, 22, 0.5) 2px,
-        rgba(45, 36, 24, 0.4) 3px,
-        rgba(35, 28, 20, 0.6) 4px
-      ),
-      linear-gradient(
-        135deg,
-        #2d2418 0%,
-        #2a2116 50%,
-        #2d2418 100%
-      );
+    @apply p-6;
+    background: linear-gradient(135deg, #2d2418 0%, #251e15 100%);
+    border: 3px solid #a68b5b;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 215, 0, 0.1);
+    transition: all 0.2s ease;
+  }
+
+  .osrs-card:hover {
+    box-shadow: 0 6px 16px rgba(255, 215, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.5);
+    border-color: #d4af37;
+    transform: translateY(-2px);
   }
 
   .osrs-card-title {
     @apply font-bold mb-3;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    text-shadow:
-      2px 2px 0px rgba(0, 0, 0, 1),
-      -1px -1px 0px rgba(0, 0, 0, 1),
-      1px -1px 0px rgba(0, 0, 0, 1),
-      -1px 1px 0px rgba(0, 0, 0, 1);
-    letter-spacing: 1px;
-    font-size: 1.1rem;
+    font-size: 1.125rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 0.5px;
   }
 
   .osrs-stat-label {
-    @apply text-xs uppercase tracking-wide mb-1;
-    color: #8b7355;
-    font-family: 'Courier New', 'Courier', monospace;
+    @apply text-xs uppercase tracking-wider mb-1;
+    color: #a68b5b;
     font-weight: 600;
   }
 
   .osrs-stat-value {
     @apply font-bold;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    text-shadow:
-      1px 1px 0px rgba(0, 0, 0, 1),
-      -1px -1px 0px rgba(0, 0, 0, 1),
-      1px -1px 0px rgba(0, 0, 0, 1),
-      -1px 1px 0px rgba(0, 0, 0, 1);
     font-size: 1.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   }
 
   .osrs-text {
-    color: #d4af37;
-    font-family: 'Courier New', 'Courier', monospace;
+    color: #e8d5a3;
   }
 
   .osrs-text-secondary {
-    color: #8b7355;
-    font-family: 'Courier New', 'Courier', monospace;
+    color: #a68b5b;
   }
 
-  /* OSRS-themed button */
+  /* Enhanced OSRS button */
   .osrs-btn {
-    @apply px-4 py-2 font-bold transition-colors duration-200;
-    background-color: #3a3024;
-    border: 2px solid #8b7355;
-    border-radius: 0;
+    @apply px-4 py-2.5 font-bold transition-all duration-200;
+    background: linear-gradient(135deg, #3a3024 0%, #2d2418 100%);
+    border: 2px solid #a68b5b;
+    border-radius: 8px;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    text-shadow:
-      1px 1px 0px rgba(0, 0, 0, 1),
-      -1px -1px 0px rgba(0, 0, 0, 1);
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.1),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
   .osrs-btn:hover {
-    background-color: #4a4034;
-    border-color: #9b8365;
+    background: linear-gradient(135deg, #4a4034 0%, #3a3024 100%);
+    border-color: #d4af37;
+    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    color: #ffed4e;
   }
 
   .osrs-btn:active {
-    background-color: #2a2014;
-    box-shadow:
-      inset 0 2px 2px rgba(0, 0, 0, 0.3),
-      inset 0 -1px 1px rgba(255, 255, 255, 0.05);
+    background: linear-gradient(135deg, #2d2418 0%, #251e15 100%);
+    transform: translateY(0);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
   }
 
   .osrs-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
   }
 
-  /* Modern Navigation Header */
+  /* Enhanced OSRS Navigation Header */
   .osrs-nav-header {
     background: linear-gradient(180deg, #2d2418 0%, #251e15 100%);
-    border-bottom: 2px solid #1a1510;
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-bottom: 3px solid #a68b5b;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 215, 0, 0.1);
     position: sticky;
     top: 0;
     z-index: 50;
   }
 
   .osrs-nav-logo {
-    @apply text-2xl font-bold;
+    @apply text-xl font-bold;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    text-shadow:
-      1px 1px 0px rgba(0, 0, 0, 0.8);
-    letter-spacing: 1px;
     transition: all 0.2s ease;
     text-decoration: none;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 0.5px;
   }
 
   .osrs-nav-logo:hover {
     color: #ffed4e;
     transform: translateY(-1px);
+    text-shadow: 0 2px 6px rgba(255, 215, 0, 0.5);
   }
 
   .osrs-nav-link {
     @apply px-4 py-2 text-sm font-semibold;
-    color: #d4af37;
-    font-family: 'Courier New', 'Courier', monospace;
+    color: #e8d5a3;
     text-decoration: none;
     position: relative;
     transition: all 0.2s ease;
-    border-radius: 4px;
-    letter-spacing: 0.5px;
+    border-radius: 6px;
   }
 
   .osrs-nav-link::before {
@@ -404,7 +283,7 @@
 
   .osrs-nav-link:hover {
     color: #ffd700;
-    background: rgba(255, 215, 0, 0.08);
+    background: rgba(255, 215, 0, 0.1);
   }
 
   .osrs-nav-link:hover::before {
@@ -413,7 +292,7 @@
 
   .osrs-nav-link-active {
     color: #ffd700;
-    background: rgba(255, 215, 0, 0.12);
+    background: rgba(255, 215, 0, 0.15);
   }
 
   .osrs-nav-link-active::before {
@@ -423,55 +302,42 @@
 
   .osrs-nav-user {
     @apply text-sm font-medium;
-    color: #d4af37;
-    font-family: 'Courier New', 'Courier', monospace;
-    letter-spacing: 0.5px;
+    color: #e8d5a3;
   }
 
   .osrs-nav-badge {
     @apply px-2.5 py-1 text-xs font-bold;
-    background: linear-gradient(135deg, rgba(255, 215, 0, 0.25), rgba(255, 215, 0, 0.15));
-    border: 1px solid #ffd700;
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.2));
+    border: 2px solid #ffd700;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.1);
-    letter-spacing: 0.5px;
-    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
   .osrs-nav-logout {
     @apply px-4 py-2 text-sm font-semibold;
-    background: linear-gradient(135deg, #3a3024, #2d2418);
-    border: 1.5px solid #8b7355;
+    background: linear-gradient(135deg, #3a3024 0%, #2d2418 100%);
+    border: 2px solid #a68b5b;
     color: #ffd700;
-    font-family: 'Courier New', 'Courier', monospace;
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.08),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.3),
-      0 2px 4px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
     transition: all 0.2s ease;
     cursor: pointer;
-    letter-spacing: 0.5px;
-    border-radius: 4px;
+    border-radius: 6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   }
 
   .osrs-nav-logout:hover {
-    background: linear-gradient(135deg, #4a4034, #3a3024);
-    border-color: #9b8365;
+    background: linear-gradient(135deg, #4a4034 0%, #3a3024 100%);
+    border-color: #d4af37;
     color: #ffed4e;
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.12),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.3),
-      0 3px 6px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 8px rgba(255, 215, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.4);
     transform: translateY(-1px);
   }
 
   .osrs-nav-logout:active {
     transform: translateY(0);
-    box-shadow:
-      inset 0 2px 3px rgba(0, 0, 0, 0.4),
-      inset 0 -1px 1px rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
   }
 }
 

@@ -532,9 +532,9 @@ export const AdminDashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-6">
         {health && (
           <>
-            <div className="osrs-card">
-              <h3 className="osrs-stat-label mb-2">System Status</h3>
-              <div className="flex items-center justify-center">
+            <div className="osrs-card flex flex-col">
+              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>System Status</h3>
+              <div className="flex items-center justify-center flex-1">
                 <span
                   className="text-4xl"
                   style={{ color: health.status === 'healthy' ? '#4caf50' : '#d32f2f' }}
@@ -544,9 +544,9 @@ export const AdminDashboard: React.FC = () => {
                 </span>
               </div>
             </div>
-            <div className="osrs-card">
-              <h3 className="osrs-stat-label mb-2">Database</h3>
-              <div className="flex items-center justify-center">
+            <div className="osrs-card flex flex-col">
+              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Database</h3>
+              <div className="flex items-center justify-center flex-1">
                 <span
                   className="text-4xl"
                   style={{ color: health.database_connected ? '#4caf50' : '#d32f2f' }}
@@ -557,9 +557,9 @@ export const AdminDashboard: React.FC = () => {
               </div>
             </div>
             {health.total_storage_mb && (
-              <div className="osrs-card">
-                <h3 className="osrs-stat-label mb-2">Storage</h3>
-                <p className="osrs-stat-value" title={`${health.total_storage_mb.toFixed(2)} MB`}>
+              <div className="osrs-card flex flex-col">
+                <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Storage</h3>
+                <p className="osrs-stat-value flex-1 flex items-center" title={`${health.total_storage_mb.toFixed(2)} MB`}>
                   {formatNumber(Math.round(health.total_storage_mb))} MB
                 </p>
               </div>
@@ -568,27 +568,27 @@ export const AdminDashboard: React.FC = () => {
         )}
         {stats && (
           <>
-            <div className="osrs-card">
-              <h3 className="osrs-stat-label mb-2">Total Players</h3>
-              <p className="osrs-stat-value" title={stats.total_players.toString()}>
+            <div className="osrs-card flex flex-col">
+              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Total Players</h3>
+              <p className="osrs-stat-value flex-1 flex items-center" title={stats.total_players.toString()}>
                 {formatNumber(stats.total_players)}
               </p>
             </div>
-            <div className="osrs-card">
-              <h3 className="osrs-stat-label mb-2">Active Players</h3>
-              <p className="osrs-stat-value" style={{ color: '#ffd700' }} title={stats.active_players.toString()}>
+            <div className="osrs-card flex flex-col">
+              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Active Players</h3>
+              <p className="osrs-stat-value flex-1 flex items-center" style={{ color: '#ffd700' }} title={stats.active_players.toString()}>
                 {formatNumber(stats.active_players)}
               </p>
             </div>
-            <div className="osrs-card">
-              <h3 className="osrs-stat-label mb-2">Total Records</h3>
-              <p className="osrs-stat-value" title={stats.total_hiscore_records.toLocaleString()}>
+            <div className="osrs-card flex flex-col">
+              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Total Records</h3>
+              <p className="osrs-stat-value flex-1 flex items-center" title={stats.total_hiscore_records.toLocaleString()}>
                 {formatNumber(stats.total_hiscore_records)}
               </p>
             </div>
-            <div className="osrs-card">
-              <h3 className="osrs-stat-label mb-2">Records (24h)</h3>
-              <p className="osrs-stat-value" title={stats.records_last_24h.toString()}>
+            <div className="osrs-card flex flex-col">
+              <h3 className="osrs-stat-label mb-2" style={{ minHeight: '2.5rem' }}>Records (24h)</h3>
+              <p className="osrs-stat-value flex-1 flex items-center" title={stats.records_last_24h.toString()}>
                 {formatNumber(stats.records_last_24h)}
               </p>
             </div>
@@ -607,27 +607,27 @@ export const AdminDashboard: React.FC = () => {
           <div className="space-y-4">
             {/* Cost Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+              <div className="osrs-card">
                 <h3 className="osrs-stat-label mb-2">Total Cost</h3>
-                <p className="osrs-stat-value" style={{ color: '#ffd700', fontSize: '1.5rem' }}>
+                <p className="osrs-stat-value" style={{ fontSize: '1.5rem' }}>
                   ${costs.total_cost_usd.toFixed(4)}
                 </p>
               </div>
-              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+              <div className="osrs-card">
                 <h3 className="osrs-stat-label mb-2">Last 24 Hours</h3>
-                <p className="osrs-stat-value" style={{ color: '#4caf50', fontSize: '1.5rem' }}>
+                <p className="osrs-stat-value" style={{ fontSize: '1.5rem', color: '#4caf50' }}>
                   ${costs.cost_last_24h_usd.toFixed(4)}
                 </p>
               </div>
-              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+              <div className="osrs-card">
                 <h3 className="osrs-stat-label mb-2">Last 7 Days</h3>
-                <p className="osrs-stat-value" style={{ color: '#4caf50', fontSize: '1.5rem' }}>
+                <p className="osrs-stat-value" style={{ fontSize: '1.5rem', color: '#4caf50' }}>
                   ${costs.cost_last_7d_usd.toFixed(4)}
                 </p>
               </div>
-              <div className="osrs-card" style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}>
+              <div className="osrs-card">
                 <h3 className="osrs-stat-label mb-2">Last 30 Days</h3>
-                <p className="osrs-stat-value" style={{ color: '#4caf50', fontSize: '1.5rem' }}>
+                <p className="osrs-stat-value" style={{ fontSize: '1.5rem', color: '#4caf50' }}>
                   ${costs.cost_last_30d_usd.toFixed(4)}
                 </p>
               </div>
@@ -731,7 +731,7 @@ export const AdminDashboard: React.FC = () => {
             {executionsForGraph.length > 0 && timeSeriesData.length > 0 && (
               <div className="pb-4 border-b" style={{ borderColor: '#8b7355' }}>
                 <h3 className="osrs-stat-label mb-4">Task Executions Over Time</h3>
-                <div className="h-96" style={{ backgroundColor: '#1d1611' }}>
+                <div className="h-96 rounded-lg p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={timeSeriesData} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
@@ -740,30 +740,28 @@ export const AdminDashboard: React.FC = () => {
                         angle={-45}
                         textAnchor="end"
                         height={60}
-                        tick={{ fontSize: 9, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                        tick={{ fontSize: 9, fill: '#ffd700' }}
                         stroke="#8b7355"
                         interval="preserveStartEnd"
                       />
                       <YAxis
-                        tick={{ fontSize: 12, fill: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                        tick={{ fontSize: 12, fill: '#ffd700' }}
                         stroke="#8b7355"
                       />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#2d2418',
-                          border: '2px solid #8b7355',
-                          borderRadius: '0',
-                          color: '#ffd700',
-                          fontFamily: 'Courier New, Courier, monospace'
+                          border: '2px solid #a68b5b',
+                          borderRadius: '8px',
+                          color: '#ffd700'
                         }}
-                        labelStyle={{ color: '#ffd700', fontFamily: 'Courier New, Courier, monospace' }}
+                        labelStyle={{ color: '#ffd700' }}
                       />
                       <Legend
                         wrapperStyle={{
                           paddingTop: '5px',
                           paddingBottom: '5px',
                           color: '#ffd700',
-                          fontFamily: 'Courier New, Courier, monospace',
                           fontSize: '11px'
                         }}
                         iconSize={12}
@@ -807,8 +805,8 @@ export const AdminDashboard: React.FC = () => {
             )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              <div>
-                <h3 className="osrs-stat-label mb-1">Total Executions</h3>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Total Executions</h3>
                 <Link
                   to="/task-executions"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
@@ -817,8 +815,8 @@ export const AdminDashboard: React.FC = () => {
                   {executionSummary.total.toLocaleString()}
                 </Link>
               </div>
-              <div>
-                <h3 className="osrs-stat-label mb-1">Success Rate</h3>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Success Rate</h3>
                 <Link
                   to="/task-executions?status=success"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
@@ -830,8 +828,8 @@ export const AdminDashboard: React.FC = () => {
                   {executionSummary.successRate.toFixed(1)}%
                 </Link>
               </div>
-              <div>
-                <h3 className="osrs-stat-label mb-1">Failure Rate</h3>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failure Rate</h3>
                 <Link
                   to="/task-executions?status=failure"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
@@ -843,16 +841,16 @@ export const AdminDashboard: React.FC = () => {
                   {executionSummary.failureRate.toFixed(1)}%
                 </Link>
               </div>
-              <div>
-                <h3 className="osrs-stat-label mb-1">Avg Duration</h3>
-                <p className="osrs-stat-value">
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Avg Duration</h3>
+                <p className="osrs-stat-value block">
                   {executionSummary.avgDuration > 0
                     ? `${executionSummary.avgDuration.toFixed(2)}s`
                     : '-'}
                 </p>
               </div>
-              <div>
-                <h3 className="osrs-stat-label mb-1">Failures (24h)</h3>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failures (24h)</h3>
                 <Link
                   to="/task-executions?status=failure"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
@@ -864,8 +862,8 @@ export const AdminDashboard: React.FC = () => {
                   {executionSummary.recentFailures24h}
                 </Link>
               </div>
-              <div>
-                <h3 className="osrs-stat-label mb-1">Failures (7d)</h3>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failures (7d)</h3>
                 <Link
                   to="/task-executions?status=failure"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
@@ -918,8 +916,8 @@ export const AdminDashboard: React.FC = () => {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t" style={{ borderColor: '#8b7355' }}>
-              <div>
-                <h4 className="osrs-stat-label mb-1">Successes</h4>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Successes</h3>
                 <Link
                   to="/task-executions?status=success"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
@@ -928,8 +926,8 @@ export const AdminDashboard: React.FC = () => {
                   {executionSummary.successCount.toLocaleString()}
                 </Link>
               </div>
-              <div>
-                <h4 className="osrs-stat-label mb-1">Failures</h4>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Failures</h3>
                 <Link
                   to="/task-executions?status=failure"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"
@@ -938,8 +936,8 @@ export const AdminDashboard: React.FC = () => {
                   {executionSummary.failureCount.toLocaleString()}
                 </Link>
               </div>
-              <div>
-                <h4 className="osrs-stat-label mb-1">Retries</h4>
+              <div className="flex flex-col">
+                <h3 className="osrs-stat-label mb-1" style={{ minHeight: '2.5rem' }}>Retries</h3>
                 <Link
                   to="/task-executions?status=retry"
                   className="osrs-stat-value hover:opacity-80 transition-opacity cursor-pointer block"

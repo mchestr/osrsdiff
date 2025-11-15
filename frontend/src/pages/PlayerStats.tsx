@@ -373,7 +373,7 @@ export const PlayerStats: React.FC = () => {
   if (error || !stats) {
     return (
       <div className="osrs-card">
-        <div className="osrs-text" style={{ color: '#d32f2f' }}>{error || 'Player not found'}</div>
+        <div className="osrs-text" style={{ color: '#ff6b6b' }}>{error || 'Player not found'}</div>
       </div>
     );
   }
@@ -446,7 +446,6 @@ export const PlayerStats: React.FC = () => {
               onClick={handleGenerateSummary}
               disabled={generatingSummary}
               className="osrs-btn text-xs px-2 py-1"
-              style={{ backgroundColor: '#2d2418', border: '1px solid #8b7355' }}
               title="Generate AI summary for this player"
             >
               {generatingSummary ? '...' : '✨ Summary'}
@@ -1042,7 +1041,7 @@ const BossProgressSummary: React.FC<BossProgressSummaryProps> = ({
                 <div
                   className="font-bold text-base"
                   style={{
-                    color: '#ffd700',
+                    color: '#243b53',
                     fontFamily: 'Courier New, Courier, monospace',
                     textShadow: '2px 2px 0px rgba(0, 0, 0, 1), -1px -1px 0px rgba(0, 0, 0, 1), 1px -1px 0px rgba(0, 0, 0, 1), -1px 1px 0px rgba(0, 0, 0, 1)',
                     textAlign: 'center',
@@ -1366,7 +1365,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
       {timelineData.length > 0 && (
         <div className="osrs-card">
           <h3 className="osrs-card-title mb-4">Experience History</h3>
-          <div className="h-80" style={{ backgroundColor: '#1d1611' }}>
+          <div className="h-80 rounded-lg p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={timelineData} margin={{ top: 20, right: 60, left: 100 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
@@ -1412,12 +1411,12 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#2d2418',
-                    border: '2px solid #8b7355',
-                    borderRadius: '0',
+                    border: '2px solid #a68b5b',
+                    borderRadius: '8px',
                     fontSize: '14px',
                     fontWeight: 500,
                     padding: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)',
                     color: '#ffd700'
                   }}
                   labelStyle={{
@@ -1562,7 +1561,7 @@ const BossDetailModal: React.FC<BossDetailModalProps> = ({
       {timelineData.length > 0 && (
         <div className="osrs-card">
           <h3 className="osrs-card-title mb-4">Kill Count History</h3>
-          <div className="h-80" style={{ backgroundColor: '#1d1611' }}>
+          <div className="h-80 rounded-lg p-4" style={{ backgroundColor: '#1a1510', border: '2px solid #a68b5b' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={timelineData} margin={{ top: 20, right: 60, left: 100 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#8b7355" opacity={0.3} />
@@ -1594,12 +1593,12 @@ const BossDetailModal: React.FC<BossDetailModalProps> = ({
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#2d2418',
-                    border: '2px solid #8b7355',
-                    borderRadius: '0',
+                    border: '2px solid #a68b5b',
+                    borderRadius: '8px',
                     fontSize: '14px',
                     fontWeight: 500,
                     padding: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)',
                     color: '#ffd700'
                   }}
                   labelStyle={{
