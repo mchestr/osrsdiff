@@ -21,6 +21,7 @@ from app.services.player import (
     PlayerService,
     get_player_service,
 )
+from app.utils.common import parse_iso_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -226,9 +227,7 @@ async def get_player_history(
 
         if end_date:
             try:
-                parsed_end_date = datetime.fromisoformat(
-                    end_date.replace("Z", "+00:00")
-                )
+                parsed_end_date = parse_iso_datetime(end_date)
             except ValueError:
                 raise BadRequestError(
                     "Invalid end_date format. Use ISO format like '2024-01-31T23:59:59Z'"
@@ -241,9 +240,7 @@ async def get_player_history(
             parsed_start_date = parsed_end_date - timedelta(days=days)
         elif start_date:
             try:
-                parsed_start_date = datetime.fromisoformat(
-                    start_date.replace("Z", "+00:00")
-                )
+                parsed_start_date = parse_iso_datetime(start_date)
             except ValueError:
                 raise BadRequestError(
                     "Invalid start_date format. Use ISO format like '2024-01-01T00:00:00Z'"

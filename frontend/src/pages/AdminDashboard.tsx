@@ -13,6 +13,7 @@ import {
   type DatabaseStats,
   type SystemHealth,
 } from '../components/admin';
+import { useNotificationContext } from '../contexts/NotificationContext';
 import { useModal } from '../hooks';
 import { extractErrorMessage } from '../utils/errorHandler';
 
@@ -36,8 +37,9 @@ export const AdminDashboard: React.FC = () => {
   const [costs, setCosts] = useState<CostStatsResponse | null>(null);
   const [costsLoading, setCostsLoading] = useState(false);
 
-  // Modal state
-  const { modalState, showModal, showConfirmModal, closeModal, handleConfirm } = useModal();
+  // Modal state (for confirmations only)
+  const { modalState, showConfirmModal, closeModal, handleConfirm } = useModal();
+  const { showNotification } = useNotificationContext();
 
   useEffect(() => {
     fetchData();
@@ -53,7 +55,7 @@ export const AdminDashboard: React.FC = () => {
       setCosts(response);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to fetch costs');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setCostsLoading(false);
     }
@@ -73,7 +75,7 @@ export const AdminDashboard: React.FC = () => {
       setExecutionTotal(response.total);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to fetch execution summary');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setSummaryLoading(false);
     }
@@ -92,7 +94,7 @@ export const AdminDashboard: React.FC = () => {
       setHealth(healthRes);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to fetch dashboard data');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -103,8 +105,9 @@ export const AdminDashboard: React.FC = () => {
     setVerifyingSchedules(true);
     try {
       const response = await api.PlayersService.verifyAllSchedulesApiV1PlayersSchedulesVerifyPost();
+      const hasIssues = response.invalid_schedules.length > 0 || response.orphaned_schedules.length > 0;
       const message = (
-        <div className="space-y-2">
+        <div className="space-y-1">
           <p>Schedule verification completed.</p>
           <div className="space-y-1 text-sm">
             <p>Total schedules: <span className="font-bold">{response.total_schedules}</span></p>
@@ -115,10 +118,10 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       );
-      showModal('Schedule Verification', message, response.invalid_schedules.length > 0 || response.orphaned_schedules.length > 0 ? 'warning' : 'success');
+      showNotification(message, hasIssues ? 'warning' : 'success');
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to verify schedules');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setVerifyingSchedules(false);
     }
@@ -137,17 +140,17 @@ export const AdminDashboard: React.FC = () => {
           });
 
           const message = (
-            <div className="space-y-2">
+            <div className="space-y-1">
               <p>{response.message}</p>
               <div className="space-y-1 text-sm">
                 <p>Tasks triggered: <span className="font-bold text-green-600 dark:text-green-400">{response.tasks_triggered}</span></p>
               </div>
             </div>
           );
-          showModal('Summaries Generated', message, 'success');
+          showNotification(message, 'success');
         } catch (error: unknown) {
           const errorMessage = extractErrorMessage(error, 'Failed to generate summaries');
-          showModal('Error', errorMessage, 'error');
+          showNotification(errorMessage, 'error');
         } finally {
           setGeneratingSummaries(false);
         }
@@ -186,7 +189,7 @@ export const AdminDashboard: React.FC = () => {
         generatingSummaries={generatingSummaries}
       />
 
-      {/* Modal */}
+      {/* Confirmation Modal */}
       <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}

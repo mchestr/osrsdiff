@@ -4,27 +4,25 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Modal } from '../components/Modal';
 import type { PlayerResponse } from '../api/models/PlayerResponse';
 import {
-  AddPlayerForm,
-  PlayerSearchBar,
+  NewPlayersChart,
   PlayerTable,
 } from '../components/admin';
 import { useModal } from '../hooks';
+import { useNotificationContext } from '../contexts/NotificationContext';
 import { extractErrorMessage } from '../utils/errorHandler';
 
 export const AdminPlayerList: React.FC = () => {
   const [players, setPlayers] = useState<PlayerResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [showInactive, setShowInactive] = useState(true);
-  const [newPlayerUsername, setNewPlayerUsername] = useState('');
-  const [addingPlayer, setAddingPlayer] = useState(false);
   const [editingInterval, setEditingInterval] = useState<number | null>(null);
   const [intervalValue, setIntervalValue] = useState<string>('');
   const [deletingPlayer, setDeletingPlayer] = useState<string | null>(null);
   const [activatingPlayer, setActivatingPlayer] = useState<string | null>(null);
 
-  // Modal state
-  const { modalState, showModal, showConfirmModal, closeModal, handleConfirm } = useModal();
+  // Modal state (for confirmations only)
+  const { modalState, showConfirmModal, closeModal, handleConfirm } = useModal();
+  const { showNotification } = useNotificationContext();
 
   useEffect(() => {
     fetchPlayers();
@@ -38,32 +36,9 @@ export const AdminPlayerList: React.FC = () => {
       setPlayers(response.players);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to fetch players');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAddPlayer = async () => {
-    if (!newPlayerUsername.trim()) {
-      showModal('Error', 'Please enter a username', 'error');
-      return;
-    }
-
-    const username = newPlayerUsername.trim();
-    setAddingPlayer(true);
-    try {
-      await api.PlayersService.addPlayerApiV1PlayersPost({
-        username,
-      });
-      setNewPlayerUsername('');
-      await fetchPlayers();
-      showModal('Success', `Player '${username}' added successfully`, 'success');
-    } catch (error: unknown) {
-      const errorMessage = extractErrorMessage(error, 'Failed to add player');
-      showModal('Error', errorMessage, 'error');
-    } finally {
-      setAddingPlayer(false);
     }
   };
 
@@ -72,10 +47,10 @@ export const AdminPlayerList: React.FC = () => {
     try {
       await api.PlayersService.removePlayerApiV1PlayersUsernameDelete(username);
       await fetchPlayers();
-      showModal('Success', `Player '${username}' deleted successfully`, 'success');
+      showNotification(`Player '${username}' deleted successfully`, 'success');
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to delete player');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setDeletingPlayer(null);
     }
@@ -86,10 +61,10 @@ export const AdminPlayerList: React.FC = () => {
     try {
       await api.PlayersService.deactivatePlayerApiV1PlayersUsernameDeactivatePost(username);
       await fetchPlayers();
-      showModal('Success', `Player '${username}' deactivated successfully`, 'success');
+      showNotification(`Player '${username}' deactivated successfully`, 'success');
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to deactivate player');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setActivatingPlayer(null);
     }
@@ -100,10 +75,10 @@ export const AdminPlayerList: React.FC = () => {
     try {
       await api.PlayersService.reactivatePlayerApiV1PlayersUsernameReactivatePost(username);
       await fetchPlayers();
-      showModal('Success', `Player '${username}' reactivated successfully`, 'success');
+      showNotification(`Player '${username}' reactivated successfully`, 'success');
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to reactivate player');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setActivatingPlayer(null);
     }
@@ -118,20 +93,20 @@ export const AdminPlayerList: React.FC = () => {
       await fetchPlayers();
       setEditingInterval(null);
       setIntervalValue('');
-      showModal('Success', `Fetch interval updated for '${username}'`, 'success');
+      showNotification(`Fetch interval updated for '${username}'`, 'success');
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to update interval');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     }
   };
 
   const handleTriggerFetch = async (username: string) => {
     try {
       await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
-      showModal('Success', `Manual fetch triggered for '${username}'`, 'success');
+      showNotification(`Manual fetch triggered for '${username}'`, 'success');
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to trigger fetch');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     }
   };
 
@@ -144,9 +119,8 @@ export const AdminPlayerList: React.FC = () => {
     );
   };
 
-  const filteredPlayers = players.filter((player) =>
-    player.username.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Note: Filtering is now handled by DataTable's built-in search
+  const filteredPlayers = players;
 
   const handleStartEditInterval = (playerId: number, currentInterval: number) => {
     setEditingInterval(playerId);
@@ -185,46 +159,27 @@ export const AdminPlayerList: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Player Section */}
-      <AddPlayerForm
-        username={newPlayerUsername}
-        onUsernameChange={setNewPlayerUsername}
-        onAdd={handleAddPlayer}
-        adding={addingPlayer}
-      />
-
-      {/* Search */}
-      <PlayerSearchBar
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-      />
+      {/* New Players Chart */}
+      <NewPlayersChart players={players} />
 
       {/* Players Table */}
-      {filteredPlayers.length === 0 ? (
-        <div className="osrs-card text-center py-12">
-          <p className="osrs-text-secondary">
-            {searchTerm ? 'No players match your search.' : 'No players found.'}
-          </p>
-        </div>
-      ) : (
-        <PlayerTable
-          players={filteredPlayers}
-          editingInterval={editingInterval}
-          intervalValue={intervalValue}
-          onIntervalValueChange={setIntervalValue}
-          onStartEditInterval={handleStartEditInterval}
-          onSaveInterval={handleSaveInterval}
-          onCancelEditInterval={handleCancelEditInterval}
-          onTriggerFetch={handleTriggerFetch}
-          onDeactivate={handleDeactivatePlayer}
-          onReactivate={handleReactivatePlayer}
-          onDelete={confirmDelete}
-          activatingPlayer={activatingPlayer}
-          deletingPlayer={deletingPlayer}
-        />
-      )}
+      <PlayerTable
+        players={filteredPlayers}
+        editingInterval={editingInterval}
+        intervalValue={intervalValue}
+        onIntervalValueChange={setIntervalValue}
+        onStartEditInterval={handleStartEditInterval}
+        onSaveInterval={handleSaveInterval}
+        onCancelEditInterval={handleCancelEditInterval}
+        onTriggerFetch={handleTriggerFetch}
+        onDeactivate={handleDeactivatePlayer}
+        onReactivate={handleReactivatePlayer}
+        onDelete={confirmDelete}
+        activatingPlayer={activatingPlayer}
+        deletingPlayer={deletingPlayer}
+      />
 
-      {/* Modal */}
+      {/* Confirmation Modal */}
       <Modal
         isOpen={modalState.isOpen}
         onClose={closeModal}

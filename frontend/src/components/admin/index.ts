@@ -8,6 +8,7 @@ export { useExecutionSummary } from './useExecutionSummary';
 export { AddPlayerForm } from './AddPlayerForm';
 export { PlayerSearchBar } from './PlayerSearchBar';
 export { PlayerTable } from './PlayerTable';
+export { NewPlayersChart } from './NewPlayersChart';
 export { PlayerTableRow } from './PlayerTableRow';
 export { PlayerActions } from './PlayerActions';
 export { PlayerStatusBadge } from './PlayerStatusBadge';

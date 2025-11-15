@@ -84,9 +84,9 @@ class Player(Base):
     summaries: Mapped[List["PlayerSummary"]] = relationship(
         "PlayerSummary",
         back_populates="player",
-        cascade="all, delete-orphan",
+        cascade="save-update, merge",
         order_by="PlayerSummary.generated_at.desc()",
-        doc="AI-generated progress summaries for this player",
+        doc="AI-generated progress summaries for this player (preserved when player is deleted)",
     )
 
     def __init__(self, **kwargs: Any) -> None:

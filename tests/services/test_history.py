@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import InvalidUsernameError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.history import (
@@ -29,7 +30,7 @@ class TestHistoryService:
     @pytest.fixture
     async def test_player_with_history(self, test_session):
         """Create a test player with multiple hiscore records for progress analysis."""
-        player = Player(username="progressPlayer")
+        player = Player(username="progressPlay")
         test_session.add(player)
         await test_session.flush()
 
@@ -120,11 +121,11 @@ class TestHistoryService:
         end_date = base_date + timedelta(days=4, hours=1)  # After last record
 
         result = await history_service.get_progress_between_dates(
-            "progressPlayer", start_date, end_date
+            "progressPlay", start_date, end_date
         )
 
         assert isinstance(result, ProgressAnalysis)
-        assert result.username == "progressPlayer"
+        assert result.username == "progressPlay"
         assert result.start_date == start_date
         assert result.end_date == end_date
         assert result.days_elapsed == 4
@@ -160,7 +161,7 @@ class TestHistoryService:
     ):
         """Test boss kills gained calculation with 'kc' field (OSRS API format)."""
         # Create a test player
-        player = Player(username="kcTestPlayer")
+        player = Player(username="kcTestPlay")
         test_session.add(player)
         await test_session.commit()
         await test_session.refresh(player)
@@ -189,7 +190,7 @@ class TestHistoryService:
         end_date = base_date + timedelta(days=2, hours=1)
 
         result = await history_service.get_progress_between_dates(
-            "kcTestPlayer", start_date, end_date
+            "kcTestPlay", start_date, end_date
         )
 
         # Verify boss kills gained works with 'kc' field
@@ -224,7 +225,7 @@ class TestHistoryService:
             HistoryServiceError, match="Start date must be before end date"
         ):
             await history_service.get_progress_between_dates(
-                "progressPlayer", start_date, end_date
+                "progressPlay", start_date, end_date
             )
 
     @pytest.mark.asyncio
@@ -241,7 +242,7 @@ class TestHistoryService:
             match="No data available",
         ):
             await history_service.get_progress_between_dates(
-                "progressPlayer", start_date, end_date
+                "progressPlay", start_date, end_date
             )
 
     @pytest.mark.asyncio
@@ -250,11 +251,11 @@ class TestHistoryService:
     ):
         """Test getting skill-specific progress."""
         result = await history_service.get_skill_progress(
-            "progressPlayer", "attack", 7
+            "progressPlay", "attack", 7
         )
 
         assert isinstance(result, SkillProgress)
-        assert result.username == "progressPlayer"
+        assert result.username == "progressPlay"
         assert result.skill_name == "attack"
         assert (
             result.days == 4
@@ -276,7 +277,7 @@ class TestHistoryService:
     ):
         """Test skill progress with actual level gains."""
         result = await history_service.get_skill_progress(
-            "progressPlayer", "defence", 7
+            "progressPlay", "defence", 7
         )
 
         assert result.skill_name == "defence"
@@ -305,12 +306,12 @@ class TestHistoryService:
         with pytest.raises(
             HistoryServiceError, match="Skill name cannot be empty"
         ):
-            await history_service.get_skill_progress("progressPlayer", "", 7)
+            await history_service.get_skill_progress("progressPlay", "", 7)
 
         # Invalid days
         with pytest.raises(HistoryServiceError, match="Days must be positive"):
             await history_service.get_skill_progress(
-                "progressPlayer", "attack", 0
+                "progressPlay", "attack", 0
             )
 
     @pytest.mark.asyncio
@@ -319,11 +320,11 @@ class TestHistoryService:
     ):
         """Test getting boss-specific progress."""
         result = await history_service.get_boss_progress(
-            "progressPlayer", "zulrah", 7
+            "progressPlay", "zulrah", 7
         )
 
         assert isinstance(result, BossProgress)
-        assert result.username == "progressPlayer"
+        assert result.username == "progressPlay"
         assert result.boss_name == "zulrah"
         assert (
             result.days == 4
@@ -351,12 +352,12 @@ class TestHistoryService:
         with pytest.raises(
             HistoryServiceError, match="Boss name cannot be empty"
         ):
-            await history_service.get_boss_progress("progressPlayer", "", 7)
+            await history_service.get_boss_progress("progressPlay", "", 7)
 
         # Invalid days
         with pytest.raises(HistoryServiceError, match="Days must be positive"):
             await history_service.get_boss_progress(
-                "progressPlayer", "zulrah", -1
+                "progressPlay", "zulrah", -1
             )
 
     @pytest.mark.asyncio
@@ -369,12 +370,12 @@ class TestHistoryService:
         end_date = base_date + timedelta(days=2, hours=1)
 
         result = await history_service.get_progress_between_dates(
-            "progressPlayer", start_date, end_date
+            "progressPlay", start_date, end_date
         )
 
         data = result.to_dict()
 
-        assert data["username"] == "progressPlayer"
+        assert data["username"] == "progressPlay"
         assert "period" in data
         assert "records" in data
         assert "progress" in data
@@ -403,11 +404,11 @@ class TestHistoryService:
     ):
         """Test converting skill progress to dictionary."""
         result = await history_service.get_skill_progress(
-            "progressPlayer", "attack", 7
+            "progressPlay", "attack", 7
         )
         data = result.to_dict()
 
-        assert data["username"] == "progressPlayer"
+        assert data["username"] == "progressPlay"
         assert data["skill"] == "attack"
         assert data["period_days"] == 4  # Actual period available
         assert data["total_records"] == 5
@@ -431,11 +432,11 @@ class TestHistoryService:
     ):
         """Test converting boss progress to dictionary."""
         result = await history_service.get_boss_progress(
-            "progressPlayer", "vorkath", 7
+            "progressPlay", "vorkath", 7
         )
         data = result.to_dict()
 
-        assert data["username"] == "progressPlayer"
+        assert data["username"] == "progressPlay"
         assert data["boss"] == "vorkath"
         assert data["period_days"] == 4  # Actual period available
         assert data["total_records"] == 5
@@ -462,9 +463,9 @@ class TestHistoryService:
 
         # Test with spaces around username
         result = await history_service.get_progress_between_dates(
-            "  progressPlayer  ", start_date, end_date
+            "  progressPlay  ", start_date, end_date
         )
-        assert result.username == "progressPlayer"
+        assert result.username == "progressPlay"
 
     @pytest.mark.asyncio
     async def test_case_insensitive_skill_and_boss_names(
@@ -473,13 +474,13 @@ class TestHistoryService:
         """Test that skill and boss names are case insensitive."""
         # Test skill with different cases
         result1 = await history_service.get_skill_progress(
-            "progressPlayer", "ATTACK", 7
+            "progressPlay", "ATTACK", 7
         )
         result2 = await history_service.get_skill_progress(
-            "progressPlayer", "Attack", 7
+            "progressPlay", "Attack", 7
         )
         result3 = await history_service.get_skill_progress(
-            "progressPlayer", "attack", 7
+            "progressPlay", "attack", 7
         )
 
         assert result1.skill_name == "attack"
@@ -488,13 +489,13 @@ class TestHistoryService:
 
         # Test boss with different cases
         boss1 = await history_service.get_boss_progress(
-            "progressPlayer", "ZULRAH", 7
+            "progressPlay", "ZULRAH", 7
         )
         boss2 = await history_service.get_boss_progress(
-            "progressPlayer", "Zulrah", 7
+            "progressPlay", "Zulrah", 7
         )
         boss3 = await history_service.get_boss_progress(
-            "progressPlayer", "zulrah", 7
+            "progressPlay", "zulrah", 7
         )
 
         assert boss1.boss_name == "zulrah"
@@ -507,15 +508,21 @@ class TestHistoryService:
         start_date = datetime(2024, 1, 1, tzinfo=timezone.utc)
         end_date = datetime(2024, 1, 2, tzinfo=timezone.utc)
 
-        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
+        with pytest.raises(
+            InvalidUsernameError, match="Username cannot be empty"
+        ):
             await history_service.get_progress_between_dates(
                 "", start_date, end_date
             )
 
-        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
+        with pytest.raises(
+            InvalidUsernameError, match="Username cannot be empty"
+        ):
             await history_service.get_skill_progress("", "attack", 7)
 
-        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
+        with pytest.raises(
+            InvalidUsernameError, match="Username cannot be empty"
+        ):
             await history_service.get_boss_progress("", "zulrah", 7)
 
     @pytest.mark.asyncio
@@ -530,7 +537,7 @@ class TestHistoryService:
         end_date = base_date + timedelta(hours=12, seconds=1)  # 1 second later
 
         result = await history_service.get_progress_between_dates(
-            "progressPlayer", start_date, end_date
+            "progressPlay", start_date, end_date
         )
 
         assert isinstance(result, ProgressAnalysis)
@@ -547,7 +554,7 @@ class TestHistoryService:
     ):
         """Test skill progress with no skill-specific data (returns empty result)."""
         # Create player with records that don't have the requested skill
-        player = Player(username="limitedPlayer")
+        player = Player(username="limitedPlay")
         test_session.add(player)
         await test_session.flush()
 
@@ -573,11 +580,11 @@ class TestHistoryService:
 
         # Should return result with zero records and zero progress
         result = await history_service.get_skill_progress(
-            "limitedPlayer", "cooking", 7
+            "limitedPlay", "cooking", 7
         )
 
         assert isinstance(result, SkillProgress)
-        assert result.username == "limitedPlayer"
+        assert result.username == "limitedPlay"
         assert result.skill_name == "cooking"
         assert len(result.records) == 0
         assert result.total_experience_gained == 0
@@ -589,7 +596,7 @@ class TestHistoryService:
     ):
         """Test boss progress with no boss-specific data (returns empty result)."""
         # Create player with records that don't have the requested boss
-        player = Player(username="limitedBossPlayer")
+        player = Player(username="limitedBoss")
         test_session.add(player)
         await test_session.flush()
 
@@ -611,11 +618,11 @@ class TestHistoryService:
 
         # Should return result with zero records and zero progress
         result = await history_service.get_boss_progress(
-            "limitedBossPlayer", "bandos", 7
+            "limitedBoss", "bandos", 7
         )
 
         assert isinstance(result, BossProgress)
-        assert result.username == "limitedBossPlayer"
+        assert result.username == "limitedBoss"
         assert result.boss_name == "bandos"
         assert len(result.records) == 0
         assert result.total_kills_gained == 0
@@ -633,7 +640,7 @@ class TestHistoryService:
         )  # After second record
 
         result = await history_service.get_progress_between_dates(
-            "progressPlayer", start_date, end_date
+            "progressPlay", start_date, end_date
         )
 
         assert isinstance(result, ProgressAnalysis)
@@ -657,7 +664,7 @@ class TestHistoryService:
         end_date = base_date + timedelta(days=4, hours=1)  # After last record
 
         result = await history_service.get_progress_between_dates(
-            "progressPlayer", start_date, end_date
+            "progressPlay", start_date, end_date
         )
 
         assert isinstance(result, ProgressAnalysis)
@@ -679,7 +686,7 @@ class TestHistoryService:
         self, history_service, test_session
     ):
         """Test skill progress with partial data (requesting 7 days but only having 3)."""
-        player = Player(username="partialPlayer")
+        player = Player(username="partialPlay")
         test_session.add(player)
         await test_session.flush()
 
@@ -704,11 +711,11 @@ class TestHistoryService:
 
         # Request 7 days but only have 3
         result = await history_service.get_skill_progress(
-            "partialPlayer", "attack", 7
+            "partialPlay", "attack", 7
         )
 
         assert isinstance(result, SkillProgress)
-        assert result.username == "partialPlayer"
+        assert result.username == "partialPlay"
         assert result.skill_name == "attack"
         assert len(result.records) == 3
         # days should reflect actual data available (2 days between first and last)
@@ -722,7 +729,7 @@ class TestHistoryService:
         self, history_service, test_session
     ):
         """Test boss progress with partial data (requesting 7 days but only having 3)."""
-        player = Player(username="partialBossPlayer")
+        player = Player(username="partialBoss")
         test_session.add(player)
         await test_session.flush()
 
@@ -746,11 +753,11 @@ class TestHistoryService:
 
         # Request 7 days but only have 3
         result = await history_service.get_boss_progress(
-            "partialBossPlayer", "zulrah", 7
+            "partialBoss", "zulrah", 7
         )
 
         assert isinstance(result, BossProgress)
-        assert result.username == "partialBossPlayer"
+        assert result.username == "partialBoss"
         assert result.boss_name == "zulrah"
         assert len(result.records) == 3
         # days should reflect actual data available (2 days between first and last)
@@ -762,7 +769,7 @@ class TestHistoryService:
         self, history_service, test_session
     ):
         """Test skill progress with only one record available."""
-        player = Player(username="singleRecordPlayer")
+        player = Player(username="singleRecord")
         test_session.add(player)
         await test_session.flush()
 
@@ -778,7 +785,7 @@ class TestHistoryService:
         await test_session.commit()
 
         result = await history_service.get_skill_progress(
-            "singleRecordPlayer", "attack", 7
+            "singleRecord", "attack", 7
         )
 
         assert isinstance(result, SkillProgress)
@@ -793,7 +800,7 @@ class TestHistoryService:
         self, history_service, test_session
     ):
         """Test boss progress with only one record available."""
-        player = Player(username="singleBossRecordPlayer")
+        player = Player(username="singleBoss")
         test_session.add(player)
         await test_session.flush()
 
@@ -807,7 +814,7 @@ class TestHistoryService:
         await test_session.commit()
 
         result = await history_service.get_boss_progress(
-            "singleBossRecordPlayer", "zulrah", 7
+            "singleBoss", "zulrah", 7
         )
 
         assert isinstance(result, BossProgress)

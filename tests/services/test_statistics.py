@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.exceptions import InvalidUsernameError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.services.statistics import (
@@ -35,7 +36,7 @@ class TestStatisticsService:
     @pytest.fixture
     async def test_player_with_stats(self, test_session):
         """Create a test player with hiscore records."""
-        player = Player(username="playerWithStats")
+        player = Player(username="playerWithSt")
         test_session.add(player)
         await test_session.flush()
 
@@ -100,11 +101,11 @@ class TestStatisticsService:
         self, statistics_service, test_player_with_stats
     ):
         """Test successfully getting current stats for a player."""
-        result = await statistics_service.get_current_stats("playerWithStats")
+        result = await statistics_service.get_current_stats("playerWithSt")
 
         assert result is not None
         assert isinstance(result, HiscoreRecord)
-        assert result.player.username == "playerWithStats"
+        assert result.player.username == "playerWithSt"
         # Should return the most recent record (2024-01-02)
         assert result.fetched_at.day == 2
         assert result.overall_rank == 950
@@ -123,7 +124,9 @@ class TestStatisticsService:
     @pytest.mark.asyncio
     async def test_get_current_stats_empty_username(self, statistics_service):
         """Test getting stats with empty username."""
-        with pytest.raises(PlayerNotFoundError, match="Player '' not found"):
+        with pytest.raises(
+            InvalidUsernameError, match="Username cannot be empty"
+        ):
             await statistics_service.get_current_stats("")
 
     @pytest.mark.asyncio
@@ -139,9 +142,9 @@ class TestStatisticsService:
         self, statistics_service, test_player_with_stats
     ):
         """Test getting stats with different case."""
-        result = await statistics_service.get_current_stats("PLAYERWITHSTATS")
+        result = await statistics_service.get_current_stats("PLAYERWITHST")
         assert result is not None
-        assert result.player.username == "playerWithStats"
+        assert result.player.username == "playerWithSt"
 
     @pytest.mark.asyncio
     async def test_get_stats_at_date_success(
@@ -151,7 +154,7 @@ class TestStatisticsService:
         # Get stats at 2024-01-01 15:00 (should return first record)
         target_date = datetime(2024, 1, 1, 15, 0, 0, tzinfo=timezone.utc)
         result = await statistics_service.get_stats_at_date(
-            "playerWithStats", target_date
+            "playerWithSt", target_date
         )
 
         assert result is not None
@@ -161,7 +164,7 @@ class TestStatisticsService:
         # Get stats at 2024-01-02 15:00 (should return second record)
         target_date = datetime(2024, 1, 2, 15, 0, 0, tzinfo=timezone.utc)
         result = await statistics_service.get_stats_at_date(
-            "playerWithStats", target_date
+            "playerWithSt", target_date
         )
 
         assert result is not None
@@ -175,7 +178,7 @@ class TestStatisticsService:
         """Test getting stats at date before any records exist."""
         target_date = datetime(2023, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
         result = await statistics_service.get_stats_at_date(
-            "playerWithStats", target_date
+            "playerWithSt", target_date
         )
         assert result is None
 
@@ -197,13 +200,13 @@ class TestStatisticsService:
         self, statistics_service, test_player_with_stats
     ):
         """Test formatting a stats response."""
-        record = await statistics_service.get_current_stats("playerWithStats")
+        record = await statistics_service.get_current_stats("playerWithSt")
         result = await statistics_service.format_stats_response(
-            record, "playerWithStats"
+            record, "playerWithSt"
         )
 
         assert "username" in result
-        assert result["username"] == "playerWithStats"
+        assert result["username"] == "playerWithSt"
         assert "fetched_at" in result
         assert "overall" in result
         assert "combat_level" in result
@@ -251,21 +254,21 @@ class TestStatisticsService:
         self, statistics_service, test_player_with_stats
     ):
         """Test that usernames are properly normalized (trimmed)."""
-        username_with_spaces = "  playerWithStats  "
+        username_with_spaces = "  playerWithSt  "
         result = await statistics_service.get_current_stats(
             username_with_spaces
         )
         assert result is not None
-        assert result.player.username == "playerWithStats"
+        assert result.player.username == "playerWithSt"
 
     @pytest.mark.asyncio
     async def test_get_current_stats_with_relationship_loading(
         self, statistics_service, test_player_with_stats
     ):
         """Test that player relationship is properly loaded."""
-        result = await statistics_service.get_current_stats("playerWithStats")
+        result = await statistics_service.get_current_stats("playerWithSt")
         assert result is not None
         assert result.player is not None
-        assert result.player.username == "playerWithStats"
+        assert result.player.username == "playerWithSt"
         # Should be able to access player attributes without additional queries
         assert result.player.is_active is True

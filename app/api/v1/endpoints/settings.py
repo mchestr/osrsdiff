@@ -73,6 +73,22 @@ class SettingResponse(BaseModel):
     updated_at: str = Field(description="Last update timestamp")
 
 
+def _setting_to_response(setting: Any) -> SettingResponse:
+    """Convert a Setting model to SettingResponse."""
+    return SettingResponse(
+        id=setting.id,
+        key=setting.key,
+        value=setting.value,
+        display_name=setting.display_name,
+        description=setting.description,
+        setting_type=setting.setting_type or "string",
+        allowed_values=_parse_allowed_values(setting.allowed_values),
+        is_secret=setting.is_secret,
+        created_at=setting.created_at.isoformat(),
+        updated_at=setting.updated_at.isoformat(),
+    )
+
+
 class SettingListResponse(BaseModel):
     """Response model for list of settings."""
 
@@ -134,21 +150,7 @@ async def get_all_settings(
     """
     settings = await setting_service.get_all_settings(db_session)
     return SettingListResponse(
-        settings=[
-            SettingResponse(
-                id=setting.id,
-                key=setting.key,
-                value=setting.value,
-                display_name=setting.display_name,
-                description=setting.description,
-                setting_type=setting.setting_type or "string",
-                allowed_values=_parse_allowed_values(setting.allowed_values),
-                is_secret=setting.is_secret,
-                created_at=setting.created_at.isoformat(),
-                updated_at=setting.updated_at.isoformat(),
-            )
-            for setting in settings
-        ]
+        settings=[_setting_to_response(setting) for setting in settings]
     )
 
 
@@ -203,18 +205,7 @@ async def get_setting(
     if not setting:
         raise NotFoundError(f"Setting '{key}' not found")
 
-    return SettingResponse(
-        id=setting.id,
-        key=setting.key,
-        value=setting.value,
-        display_name=setting.display_name,
-        description=setting.description,
-        setting_type=setting.setting_type or "string",
-        allowed_values=_parse_allowed_values(setting.allowed_values),
-        is_secret=setting.is_secret,
-        created_at=setting.created_at.isoformat(),
-        updated_at=setting.updated_at.isoformat(),
-    )
+    return _setting_to_response(setting)
 
 
 @router.put("/{key}", response_model=SettingResponse)
@@ -266,18 +257,7 @@ async def update_setting(
     # Refresh settings cache and dependent services
     await _refresh_settings_and_services()
 
-    return SettingResponse(
-        id=setting.id,
-        key=setting.key,
-        value=setting.value,
-        display_name=setting.display_name,
-        description=setting.description,
-        setting_type=setting.setting_type or "string",
-        allowed_values=_parse_allowed_values(setting.allowed_values),
-        is_secret=setting.is_secret,
-        created_at=setting.created_at.isoformat(),
-        updated_at=setting.updated_at.isoformat(),
-    )
+    return _setting_to_response(setting)
 
 
 @router.post("/{key}/reset", response_model=SettingResponse)
@@ -312,15 +292,4 @@ async def reset_setting(
     # Refresh settings cache and dependent services
     await _refresh_settings_and_services()
 
-    return SettingResponse(
-        id=setting.id,
-        key=setting.key,
-        value=setting.value,
-        display_name=setting.display_name,
-        description=setting.description,
-        setting_type=setting.setting_type or "string",
-        allowed_values=_parse_allowed_values(setting.allowed_values),
-        is_secret=setting.is_secret,
-        created_at=setting.created_at.isoformat(),
-        updated_at=setting.updated_at.isoformat(),
-    )
+    return _setting_to_response(setting)

@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.exceptions import PlayerNotFoundError, StatisticsServiceError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.utils.common import normalize_username
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,7 @@ class StatisticsService:
             PlayerNotFoundError: If player doesn't exist in the system
             StatisticsServiceError: For database or other service errors
         """
-        if not username:
-            raise PlayerNotFoundError("", detail="Username cannot be empty")
-
-        username = username.strip()
+        username = normalize_username(username)
 
         try:
             logger.debug(f"Getting current stats for player: {username}")
@@ -112,10 +110,7 @@ class StatisticsService:
             PlayerNotFoundError: If player doesn't exist in the system
             StatisticsServiceError: For database or other service errors
         """
-        if not username:
-            raise PlayerNotFoundError("", detail="Username cannot be empty")
-
-        username = username.strip()
+        username = normalize_username(username)
 
         try:
             logger.debug(

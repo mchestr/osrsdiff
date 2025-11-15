@@ -1,5 +1,4 @@
 import logging
-import sys
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, status
@@ -305,7 +304,8 @@ async def remove_player(
     Remove a player from the tracking system.
 
     This endpoint removes the player and all associated hiscore records
-    from the database. This action cannot be undone.
+    from the database. Player summaries are preserved (player_id set to NULL)
+    for cost analysis purposes. This action cannot be undone.
 
     Args:
         username: OSRS player username to remove
@@ -919,7 +919,9 @@ class PlayerSummaryResponse(BaseModel):
     """Response model for a player summary."""
 
     id: int = Field(description="Summary ID")
-    player_id: int = Field(description="Player ID")
+    player_id: int | None = Field(
+        description="Player ID (null if player was deleted)"
+    )
     period_start: str = Field(description="Start of the summary period")
     period_end: str = Field(description="End of the summary period")
     summary_text: str = Field(

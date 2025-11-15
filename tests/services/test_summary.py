@@ -24,7 +24,7 @@ class TestSummaryService:
     @pytest.fixture
     async def test_player_with_history(self, test_session):
         """Create a test player with hiscore records."""
-        player = Player(username="summaryPlayer")
+        player = Player(username="summaryPlay")
         test_session.add(player)
         await test_session.flush()
 

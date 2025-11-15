@@ -1,5 +1,10 @@
+import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
 import type { PlayerResponse } from '../../api/models/PlayerResponse';
-import { PlayerTableRow } from './PlayerTableRow';
+import { DataTable, type Column } from '../common';
+import { IntervalEditor } from './IntervalEditor';
+import { PlayerActions } from './PlayerActions';
+import { PlayerStatusBadge } from './PlayerStatusBadge';
 
 interface PlayerTableProps {
   players: PlayerResponse[];
@@ -32,70 +37,141 @@ export const PlayerTable: React.FC<PlayerTableProps> = ({
   activatingPlayer,
   deletingPlayer,
 }) => {
-  if (players.length === 0) {
-    return (
-      <div className="osrs-card text-center py-12">
-        <p className="osrs-text-secondary">No players found.</p>
-      </div>
-    );
-  }
+  const columns: Column<PlayerResponse>[] = [
+    {
+      key: 'username',
+      label: 'Username',
+      sortable: true,
+      render: (player) => (
+        <Link
+          to={`/players/${player.username}`}
+          className="font-medium hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {player.username}
+        </Link>
+      ),
+      className: 'whitespace-nowrap font-medium',
+    },
+    {
+      key: 'is_active',
+      label: 'Status',
+      sortable: true,
+      render: (player) => <PlayerStatusBadge isActive={player.is_active} />,
+      className: 'whitespace-nowrap',
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      sortable: true,
+      sortFn: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      render: (player) => (
+        <span className="hidden sm:table-cell">
+          {format(new Date(player.created_at), 'MMM d, yyyy')}
+        </span>
+      ),
+      className: 'hidden sm:table-cell whitespace-nowrap',
+      headerClassName: 'hidden sm:table-cell',
+    },
+    {
+      key: 'last_fetched',
+      label: 'Last Fetched',
+      sortable: true,
+      sortFn: (a, b) => {
+        if (!a.last_fetched) return 1;
+        if (!b.last_fetched) return -1;
+        return new Date(a.last_fetched).getTime() - new Date(b.last_fetched).getTime();
+      },
+      render: (player) => (
+        <span className="hidden md:table-cell">
+          {player.last_fetched
+            ? format(new Date(player.last_fetched), 'MMM d, HH:mm')
+            : 'Never'}
+        </span>
+      ),
+      className: 'hidden md:table-cell whitespace-nowrap',
+      headerClassName: 'hidden md:table-cell',
+    },
+    {
+      key: 'fetch_interval_minutes',
+      label: 'Interval',
+      sortable: true,
+      render: (player) => {
+        const isEditing = editingInterval === player.id;
+        if (isEditing) {
+          return (
+            <IntervalEditor
+              value={intervalValue}
+              onValueChange={onIntervalValueChange}
+              onSave={() => {
+                const interval = parseInt(intervalValue);
+                if (interval >= 1 && interval <= 10080) {
+                  onSaveInterval(player.username, interval);
+                }
+              }}
+              onCancel={onCancelEditInterval}
+            />
+          );
+        }
+        return (
+          <span
+            className="cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartEditInterval(player.id, player.fetch_interval_minutes);
+            }}
+            title="Click to edit"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#ffd700';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '';
+            }}
+          >
+            {player.fetch_interval_minutes} min
+          </span>
+        );
+      },
+      className: 'whitespace-nowrap',
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (player) => (
+        <PlayerActions
+          player={player}
+          onTriggerFetch={onTriggerFetch}
+          onDeactivate={onDeactivate}
+          onReactivate={onReactivate}
+          onDelete={onDelete}
+          activatingPlayer={activatingPlayer}
+          deletingPlayer={deletingPlayer}
+        />
+      ),
+      className: 'whitespace-nowrap',
+    },
+  ];
 
   return (
-    <div className="osrs-card">
-      <div className="overflow-x-auto -mx-3 sm:mx-0">
-        <div className="inline-block min-w-full align-middle">
-          <div className="overflow-x-auto">
-            <table className="min-w-full" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
-              <thead>
-                <tr className="bg-secondary-200 dark:bg-secondary-800">
-                  <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase whitespace-nowrap border-b-2 border-secondary-700 dark:border-secondary-600">
-                    Username
-                  </th>
-                  <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase whitespace-nowrap border-b-2 border-secondary-700 dark:border-secondary-600">
-                    Status
-                  </th>
-                  <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase whitespace-nowrap hidden sm:table-cell border-b-2 border-secondary-700 dark:border-secondary-600">
-                    Created
-                  </th>
-                  <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase whitespace-nowrap hidden md:table-cell border-b-2 border-secondary-700 dark:border-secondary-600">
-                    Last Fetched
-                  </th>
-                  <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase whitespace-nowrap border-b-2 border-secondary-700 dark:border-secondary-600">
-                    Interval
-                  </th>
-                  <th className="px-3 sm:px-4 md:px-6 py-3 text-left text-xs font-medium osrs-text-secondary uppercase whitespace-nowrap border-b-2 border-secondary-700 dark:border-secondary-600">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {players.map((player) => (
-                  <PlayerTableRow
-                    key={player.id}
-                    player={player}
-                    editingInterval={editingInterval}
-                    intervalValue={intervalValue}
-                    onIntervalValueChange={onIntervalValueChange}
-                    onStartEditInterval={onStartEditInterval}
-                    onSaveInterval={onSaveInterval}
-                    onCancelEditInterval={onCancelEditInterval}
-                    onTriggerFetch={onTriggerFetch}
-                    onDeactivate={onDeactivate}
-                    onReactivate={onReactivate}
-                    onDelete={onDelete}
-                    activatingPlayer={activatingPlayer}
-                    deletingPlayer={deletingPlayer}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div className="mt-4 text-sm osrs-text-secondary text-center">
-        Showing {players.length} player{players.length !== 1 ? 's' : ''}
-      </div>
-    </div>
+    <DataTable
+      data={players}
+      columns={columns}
+      keyExtractor={(player) => player.id}
+      emptyMessage="No players found"
+      searchable={{
+        placeholder: 'Search players...',
+        searchKeys: ['username'],
+        showClearButton: true,
+      }}
+      limitConfig={{
+        value: 50,
+        onChange: () => {
+          // Limit selector for visual consistency - could be made functional later
+        },
+        options: [25, 50, 100, 200],
+      }}
+    />
   );
 };
 

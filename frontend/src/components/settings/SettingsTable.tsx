@@ -19,7 +19,7 @@ export const SettingsTable: React.FC<SettingsTableProps> = ({
   disabled = false,
 }) => {
   return (
-    <div className="osrs-card p-0 overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03] p-0">
       {sections.map((section, sectionIndex) => (
         <div key={section.title}>
           <SettingSectionHeader

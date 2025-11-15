@@ -3,15 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/apiClient';
 import type { TaskExecutionResponse } from '../api/models/TaskExecutionResponse';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Modal } from '../components/Modal';
 import {
-  TaskExecutionPagination,
-  TaskExecutionSearchBar,
   TaskExecutionTable,
   useDebounce,
   useUrlSync,
 } from '../components/admin';
-import { useModal } from '../hooks';
+import { useNotificationContext } from '../contexts/NotificationContext';
 import { extractErrorMessage } from '../utils/errorHandler';
 
 // Constants
@@ -42,8 +39,7 @@ export const TaskExecutions: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
 
-  // Modal state
-  const { modalState, showModal, closeModal } = useModal();
+  const { showNotification } = useNotificationContext();
 
   // Refs
   const isInitialMountRef = useRef(true);
@@ -85,7 +81,7 @@ export const TaskExecutions: React.FC = () => {
       setTotal(response.total);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to fetch task executions');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setIsLoading(false);
       setIsFiltering(false);
@@ -137,42 +133,25 @@ export const TaskExecutions: React.FC = () => {
         <h1 className="osrs-card-title text-3xl">Task Executions</h1>
       </div>
 
-      {/* Search */}
-      <TaskExecutionSearchBar
+      {/* Executions Table with Integrated Search and Pagination */}
+      <TaskExecutionTable
+        executions={executions}
         searchInput={searchInput}
         onSearchChange={handleSearchChange}
         onResetSearch={handleResetSearch}
         limit={limit}
         onLimitChange={handleLimitChange}
         isFiltering={isFiltering}
+        pagination={{
+          currentPage,
+          totalPages,
+          hasPreviousPage,
+          hasNextPage,
+          onPageChange: handlePageChange,
+          offset,
+          limit,
+        }}
       />
-
-      {/* Pagination */}
-      <TaskExecutionPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        hasPreviousPage={hasPreviousPage}
-        hasNextPage={hasNextPage}
-        onPageChange={handlePageChange}
-        offset={offset}
-        limit={limit}
-      />
-
-      {/* Executions Table */}
-      <TaskExecutionTable
-        executions={executions}
-      />
-
-      {/* Modal */}
-      <Modal
-        isOpen={modalState.isOpen}
-        onClose={closeModal}
-        title={modalState.title}
-        type={modalState.type}
-        showConfirm={false}
-      >
-        {modalState.message}
-      </Modal>
     </div>
   );
 };

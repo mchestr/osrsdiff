@@ -15,6 +15,7 @@ from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.models.player_summary import PlayerSummary
 from app.models.task_execution import TaskExecution, TaskExecutionStatus
+from app.utils.common import ensure_timezone_aware
 
 logger = logging.getLogger(__name__)
 
@@ -676,7 +677,9 @@ class PlayerSummaryResponse(BaseModel):
     """Response model for a player summary."""
 
     id: int = Field(description="Summary ID")
-    player_id: int = Field(description="Player ID")
+    player_id: int | None = Field(
+        description="Player ID (null if player was deleted)"
+    )
     period_start: str = Field(description="Start of the summary period")
     period_end: str = Field(description="End of the summary period")
     summary_text: str = Field(
@@ -1017,10 +1020,7 @@ async def get_cost_stats(
             total_cost += cost
 
             # Update time period costs (ensure timezone-aware comparison)
-            summary_time = summary.generated_at
-            if summary_time.tzinfo is None:
-                # If naive, assume UTC
-                summary_time = summary_time.replace(tzinfo=timezone.utc)
+            summary_time = ensure_timezone_aware(summary.generated_at)
 
             if summary_time >= last_24h:
                 cost_24h += cost

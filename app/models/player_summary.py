@@ -25,12 +25,12 @@ class PlayerSummary(Base):
     # Primary key
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    # Foreign key to player
-    player_id: Mapped[int] = mapped_column(
-        ForeignKey("players.id", ondelete="CASCADE"),
-        nullable=False,
+    # Foreign key to player (nullable to preserve summaries when player is deleted)
+    player_id: Mapped[int | None] = mapped_column(
+        ForeignKey("players.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
-        doc="Reference to the player this summary belongs to",
+        doc="Reference to the player this summary belongs to (null if player was deleted)",
     )
 
     # Summary period
@@ -99,10 +99,10 @@ class PlayerSummary(Base):
     )
 
     # Relationships
-    player: Mapped[Player] = relationship(
+    player: Mapped[Player | None] = relationship(
         "Player",
         back_populates="summaries",
-        doc="The player this summary belongs to",
+        doc="The player this summary belongs to (null if player was deleted)",
     )
 
     def __repr__(self) -> str:

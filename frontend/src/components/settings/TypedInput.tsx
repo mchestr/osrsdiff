@@ -1,5 +1,5 @@
 import React from 'react';
-import { SelectDropdown } from './SelectDropdown';
+import { Input, Select } from '../ui';
 import type { Setting } from './types';
 
 interface TypedInputProps {
@@ -14,12 +14,10 @@ export const TypedInput: React.FC<TypedInputProps> = ({ setting, value, onChange
     onChange(e.target.value);
   };
 
-  const inputClasses = "input w-full py-1 text-xs";
-
   switch (setting.setting_type) {
     case 'boolean':
       return (
-        <SelectDropdown
+        <Select
           value={value}
           options={[
             { value: 'true', label: 'True' },
@@ -27,18 +25,16 @@ export const TypedInput: React.FC<TypedInputProps> = ({ setting, value, onChange
           ]}
           onChange={onChange}
           disabled={disabled}
-          className="py-1 text-xs"
         />
       );
 
     case 'number':
       return (
-        <input
+        <Input
           type="number"
           value={value}
           onChange={handleChange}
           disabled={disabled}
-          className={inputClasses}
           step={setting.key.includes('temperature') ? '0.1' : '1'}
         />
       );
@@ -46,7 +42,7 @@ export const TypedInput: React.FC<TypedInputProps> = ({ setting, value, onChange
     case 'enum':
       if (setting.allowed_values && setting.allowed_values.length > 0) {
         return (
-          <SelectDropdown
+          <Select
             value={value}
             options={setting.allowed_values.map((val) => ({
               value: val,
@@ -54,18 +50,16 @@ export const TypedInput: React.FC<TypedInputProps> = ({ setting, value, onChange
             }))}
             onChange={onChange}
             disabled={disabled}
-            className="py-1 text-xs"
           />
         );
       }
       // Fallback to text input if enum but no allowed values
       return (
-        <input
+        <Input
           type="text"
           value={value}
           onChange={handleChange}
           disabled={disabled}
-          className={inputClasses}
         />
       );
 
@@ -73,12 +67,11 @@ export const TypedInput: React.FC<TypedInputProps> = ({ setting, value, onChange
     default:
       // Use password type for secret settings
       return (
-        <input
+        <Input
           type={setting.is_secret ? 'password' : 'text'}
           value={value}
           onChange={handleChange}
           disabled={disabled}
-          className={inputClasses}
         />
       );
   }

@@ -12,6 +12,7 @@ from app.exceptions import (
 )
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.utils.common import ensure_timezone_aware, normalize_username
 
 logger = logging.getLogger(__name__)
 
@@ -169,13 +170,9 @@ class SkillProgress:
         self.skill_name = skill_name
 
         # Ensure all fetched_at are timezone-aware for sorting
-        def get_fetched_at(record: HiscoreRecord) -> datetime:
-            dt = record.fetched_at
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=timezone.utc)
-            return dt
-
-        self.records = sorted(records, key=lambda r: get_fetched_at(r))
+        self.records = sorted(
+            records, key=lambda r: ensure_timezone_aware(r.fetched_at)
+        )
         self.days = days
 
     @property
@@ -240,13 +237,9 @@ class BossProgress:
         self.boss_name = boss_name
 
         # Ensure all fetched_at are timezone-aware for sorting
-        def get_fetched_at(record: HiscoreRecord) -> datetime:
-            dt = record.fetched_at
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=timezone.utc)
-            return dt
-
-        self.records = sorted(records, key=lambda r: get_fetched_at(r))
+        self.records = sorted(
+            records, key=lambda r: ensure_timezone_aware(r.fetched_at)
+        )
         self.days = days
 
     @property
@@ -320,13 +313,10 @@ class HistoryService:
             InsufficientDataError: If no data available at all
             HistoryServiceError: For other service errors
         """
-        if not username:
-            raise PlayerNotFoundError("", detail="Username cannot be empty")
+        username = normalize_username(username)
 
         if start_date >= end_date:
             raise HistoryServiceError("Start date must be before end date")
-
-        username = username.strip()
 
         try:
             logger.debug(
@@ -362,34 +352,27 @@ class HistoryService:
                 if oldest_record:
                     start_record = oldest_record
                     # Ensure timezone consistency
-                    oldest_dt = oldest_record.fetched_at
-                    if oldest_dt.tzinfo is None:
-                        oldest_dt = oldest_dt.replace(tzinfo=timezone.utc)
-                    start_date = oldest_dt
+                    start_date = ensure_timezone_aware(
+                        oldest_record.fetched_at
+                    )
                 else:
                     # Fallback to end_record if no oldest record found
                     start_record = end_record
                     if end_record:
-                        end_dt = end_record.fetched_at
-                        if end_dt.tzinfo is None:
-                            end_dt = end_dt.replace(tzinfo=timezone.utc)
-                        start_date = end_dt
+                        start_date = ensure_timezone_aware(
+                            end_record.fetched_at
+                        )
             elif not end_record:
                 end_record = start_record
                 if start_record:
-                    start_dt = start_record.fetched_at
-                    if start_dt.tzinfo is None:
-                        start_dt = start_dt.replace(tzinfo=timezone.utc)
-                    end_date = start_dt
+                    end_date = ensure_timezone_aware(start_record.fetched_at)
 
             # If records are the same, still return the data (just no progress)
             # At this point, both start_record and end_record are guaranteed to be not None
             assert start_record is not None and end_record is not None
             if start_record.id == end_record.id:
                 # Use the actual fetched_at date for both
-                actual_date = start_record.fetched_at
-                if actual_date.tzinfo is None:
-                    actual_date = actual_date.replace(tzinfo=timezone.utc)
+                actual_date = ensure_timezone_aware(start_record.fetched_at)
                 start_date = actual_date
                 end_date = actual_date
 
@@ -435,8 +418,7 @@ class HistoryService:
             PlayerNotFoundError: If player doesn't exist
             HistoryServiceError: For other service errors
         """
-        if not username:
-            raise PlayerNotFoundError("", detail="Username cannot be empty")
+        username = normalize_username(username)
 
         if not skill:
             raise HistoryServiceError("Skill name cannot be empty")
@@ -444,7 +426,6 @@ class HistoryService:
         if days <= 0:
             raise HistoryServiceError("Days must be positive")
 
-        username = username.strip()
         skill = skill.lower().strip()
 
         try:
@@ -491,36 +472,26 @@ class HistoryService:
                 # If we found records, calculate actual days based on oldest record
                 if skill_records:
 
-                    def get_fetched_at(record: HiscoreRecord) -> datetime:
-                        dt = record.fetched_at
-                        if dt.tzinfo is None:
-                            return dt.replace(tzinfo=timezone.utc)
-                        return dt
-
                     oldest_record = min(
-                        skill_records, key=lambda r: get_fetched_at(r)
+                        skill_records,
+                        key=lambda r: ensure_timezone_aware(r.fetched_at),
                     )
-                    oldest_dt = get_fetched_at(oldest_record)
+                    oldest_dt = ensure_timezone_aware(oldest_record.fetched_at)
                     actual_days = (datetime.now(timezone.utc) - oldest_dt).days
                     days = max(1, actual_days)
 
             # Calculate actual period based on available data
             if len(skill_records) > 0:
-                # Ensure all fetched_at are timezone-aware for comparison
-                def get_fetched_at(record: HiscoreRecord) -> datetime:
-                    dt = record.fetched_at
-                    if dt.tzinfo is None:
-                        return dt.replace(tzinfo=timezone.utc)
-                    return dt
-
                 oldest_record = min(
-                    skill_records, key=lambda r: get_fetched_at(r)
+                    skill_records,
+                    key=lambda r: ensure_timezone_aware(r.fetched_at),
                 )
                 newest_record = max(
-                    skill_records, key=lambda r: get_fetched_at(r)
+                    skill_records,
+                    key=lambda r: ensure_timezone_aware(r.fetched_at),
                 )
-                oldest_dt = get_fetched_at(oldest_record)
-                newest_dt = get_fetched_at(newest_record)
+                oldest_dt = ensure_timezone_aware(oldest_record.fetched_at)
+                newest_dt = ensure_timezone_aware(newest_record.fetched_at)
                 actual_days = (newest_dt - oldest_dt).days
                 if actual_days > 0:
                     days = actual_days
@@ -572,8 +543,7 @@ class HistoryService:
             PlayerNotFoundError: If player doesn't exist
             HistoryServiceError: For other service errors
         """
-        if not username:
-            raise PlayerNotFoundError("", detail="Username cannot be empty")
+        username = normalize_username(username)
 
         if not boss:
             raise HistoryServiceError("Boss name cannot be empty")
@@ -581,7 +551,6 @@ class HistoryService:
         if days <= 0:
             raise HistoryServiceError("Days must be positive")
 
-        username = username.strip()
         boss = boss.lower().strip()
 
         try:
@@ -628,36 +597,26 @@ class HistoryService:
                 # If we found records, calculate actual days based on oldest record
                 if boss_records:
 
-                    def get_fetched_at(record: HiscoreRecord) -> datetime:
-                        dt = record.fetched_at
-                        if dt.tzinfo is None:
-                            return dt.replace(tzinfo=timezone.utc)
-                        return dt
-
                     oldest_record = min(
-                        boss_records, key=lambda r: get_fetched_at(r)
+                        boss_records,
+                        key=lambda r: ensure_timezone_aware(r.fetched_at),
                     )
-                    oldest_dt = get_fetched_at(oldest_record)
+                    oldest_dt = ensure_timezone_aware(oldest_record.fetched_at)
                     actual_days = (datetime.now(timezone.utc) - oldest_dt).days
                     days = max(1, actual_days)
 
             # Calculate actual period based on available data
             if len(boss_records) > 0:
-                # Ensure all fetched_at are timezone-aware for comparison
-                def get_fetched_at(record: HiscoreRecord) -> datetime:
-                    dt = record.fetched_at
-                    if dt.tzinfo is None:
-                        return dt.replace(tzinfo=timezone.utc)
-                    return dt
-
                 oldest_record = min(
-                    boss_records, key=lambda r: get_fetched_at(r)
+                    boss_records,
+                    key=lambda r: ensure_timezone_aware(r.fetched_at),
                 )
                 newest_record = max(
-                    boss_records, key=lambda r: get_fetched_at(r)
+                    boss_records,
+                    key=lambda r: ensure_timezone_aware(r.fetched_at),
                 )
-                oldest_dt = get_fetched_at(oldest_record)
-                newest_dt = get_fetched_at(newest_record)
+                oldest_dt = ensure_timezone_aware(oldest_record.fetched_at)
+                newest_dt = ensure_timezone_aware(newest_record.fetched_at)
                 actual_days = (newest_dt - oldest_dt).days
                 if actual_days > 0:
                     days = actual_days

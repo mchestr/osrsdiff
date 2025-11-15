@@ -19,6 +19,7 @@ from app.services.osrs_api import (
     OSRSAPIClient,
     get_osrs_api_client,
 )
+from app.utils.common import normalize_username
 
 if TYPE_CHECKING:
     from app.services.scheduler import PlayerScheduleManager
@@ -70,19 +71,7 @@ class PlayerService:
             OSRSAPIError: If OSRS API is unavailable or other API errors
             PlayerServiceError: For other service-level errors
         """
-        if not username:
-            raise InvalidUsernameError("Username cannot be empty")
-
-        # Normalize username (strip whitespace)
-        username = username.strip()
-
-        # Validate username format
-        if not Player.validate_username(username):
-            raise InvalidUsernameError(
-                f"Invalid username format: '{username}'. "
-                "Username must be 1-12 characters, contain only letters, numbers, "
-                "spaces, hyphens, and underscores, and not start/end with spaces."
-            )
+        username = normalize_username(username)
 
         logger.info(f"Adding player: {username}")
 
@@ -182,7 +171,7 @@ class PlayerService:
         if not username:
             return None
 
-        username = username.strip()
+        username = normalize_username(username)
 
         try:
             logger.debug(f"Getting player: {username}")
@@ -222,18 +211,7 @@ class PlayerService:
             OSRSAPIError: If OSRS API is unavailable or other API errors
             PlayerServiceError: For other service-level errors
         """
-        if not username:
-            raise InvalidUsernameError("Username cannot be empty")
-
-        username = username.strip()
-
-        # Validate username format
-        if not Player.validate_username(username):
-            raise InvalidUsernameError(
-                f"Invalid username format: '{username}'. "
-                "Username must be 1-12 characters, contain only letters, numbers, "
-                "spaces, hyphens, and underscores, and not start/end with spaces."
-            )
+        username = normalize_username(username)
 
         try:
             logger.debug(f"Ensuring player exists: {username}")
@@ -343,7 +321,8 @@ class PlayerService:
         Remove a player from the tracking system.
 
         This method will delete the player and all associated hiscore records
-        due to the cascade delete relationship.
+        due to the cascade delete relationship. Player summaries are preserved
+        (player_id set to NULL) for cost analysis purposes.
 
         Args:
             username: OSRS player username to remove
@@ -357,7 +336,7 @@ class PlayerService:
         if not username:
             return False
 
-        username = username.strip()
+        username = normalize_username(username)
 
         try:
             logger.info(f"Removing player: {username}")
@@ -383,7 +362,23 @@ class PlayerService:
                         "Proceeding with player deletion."
                     )
 
-            # Delete the player (cascade will handle hiscore records)
+            # Preserve summaries for cost analysis by setting player_id to NULL
+            # This must be done before deleting the player due to foreign key constraints
+            from sqlalchemy import update
+
+            from app.models.player_summary import PlayerSummary
+
+            update_stmt = (
+                update(PlayerSummary)
+                .where(PlayerSummary.player_id == player.id)
+                .values(player_id=None)
+            )
+            await self.db_session.execute(update_stmt)
+            logger.info(
+                f"Preserved summaries for deleted player {username} (player_id set to NULL)"
+            )
+
+            # Delete the player (cascade will handle hiscore records, but summaries are preserved)
             stmt = delete(Player).where(Player.username.ilike(username))
             result = await self.db_session.execute(stmt)
             await self.db_session.commit()
@@ -424,7 +419,7 @@ class PlayerService:
         if not username:
             return False
 
-        username = username.strip()
+        username = normalize_username(username)
 
         try:
             logger.info(f"Deactivating player: {username}")
@@ -485,7 +480,7 @@ class PlayerService:
         if not username:
             return False
 
-        username = username.strip()
+        username = normalize_username(username)
 
         try:
             logger.info(f"Reactivating player: {username}")
@@ -554,7 +549,7 @@ class PlayerService:
         if not username:
             return False
 
-        username = username.strip()
+        username = normalize_username(username)
 
         # Validate the new interval
         if (

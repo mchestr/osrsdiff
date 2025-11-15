@@ -159,7 +159,11 @@ class TestAuthDependencies:
     @pytest.mark.asyncio
     async def test_require_admin_with_user_missing_is_admin(self):
         """Test require_admin with user missing is_admin field."""
-        user_data = {"sub": "test_user", "username": "testuser", "user_id": 123}
+        user_data = {
+            "sub": "test_user",
+            "username": "testuser",
+            "user_id": 123,
+        }
         token = auth_service.create_access_token(user_data)
         user = await get_current_user(token)
 

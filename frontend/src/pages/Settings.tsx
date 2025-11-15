@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { axiosInstance } from '../api/apiClient';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Modal } from '../components/Modal';
-import { useModal } from '../hooks';
+import { useNotificationContext } from '../contexts/NotificationContext';
 import { extractErrorMessage } from '../utils/errorHandler';
 import {
   type Setting,
@@ -27,7 +26,7 @@ export const Settings: React.FC = () => {
   });
   const [showEditModal, setShowEditModal] = useState(false);
 
-  const { modalState, showModal, closeModal } = useModal();
+  const { showNotification } = useNotificationContext();
 
   useEffect(() => {
     fetchSettings();
@@ -40,7 +39,7 @@ export const Settings: React.FC = () => {
       setSettings(response.data.settings);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to fetch settings');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -91,12 +90,12 @@ export const Settings: React.FC = () => {
         setting_type: formData.setting_type,
         allowed_values: formData.allowed_values.length > 0 ? formData.allowed_values : null,
       });
-      showModal('Success', 'Setting updated successfully', 'success');
+      showNotification('Setting updated successfully', 'success');
       await fetchSettings();
       handleCancelEdit();
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to update setting');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setSaving(false);
     }
@@ -110,11 +109,11 @@ export const Settings: React.FC = () => {
     setSaving(true);
     try {
       await axiosInstance.post(`/api/v1/settings/${key}/reset`);
-      showModal('Success', 'Setting reset to default successfully', 'success');
+      showNotification('Setting reset to default successfully', 'success');
       await fetchSettings();
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to reset setting');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setSaving(false);
     }
@@ -158,16 +157,6 @@ export const Settings: React.FC = () => {
           saving={saving}
         />
       )}
-
-      {/* Message Modal */}
-      <Modal
-        isOpen={modalState.isOpen}
-        onClose={closeModal}
-        title={modalState.title}
-        type={modalState.type}
-      >
-        {modalState.message}
-      </Modal>
     </div>
   );
 };

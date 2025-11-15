@@ -102,10 +102,10 @@ class TestPlayerSummaryModel:
         assert summary.player.username == test_player.username
 
     @pytest.mark.asyncio
-    async def test_player_summary_cascade_delete(
+    async def test_player_summary_preserved_on_delete(
         self, test_session: AsyncSession, test_player: Player
     ):
-        """Test that summaries are deleted when player is deleted."""
+        """Test that summaries are preserved (player_id set to NULL) when player is deleted."""
         period_start = datetime.now(timezone.utc)
         period_end = datetime.now(timezone.utc)
 
@@ -123,11 +123,14 @@ class TestPlayerSummaryModel:
         await test_session.delete(test_player)
         await test_session.commit()
 
-        # Verify summary is deleted
+        # Verify summary is preserved with player_id set to NULL
         result = await test_session.execute(
             select(PlayerSummary).where(PlayerSummary.id == summary.id)
         )
-        assert result.scalar_one_or_none() is None
+        preserved_summary = result.scalar_one_or_none()
+        assert preserved_summary is not None
+        assert preserved_summary.player_id is None
+        assert preserved_summary.summary_text == "Test summary"
 
     @pytest.mark.asyncio
     async def test_multiple_summaries_for_player(

@@ -9,7 +9,6 @@ import type { ProgressAnalysisResponse } from '../api/models/ProgressAnalysisRes
 import type { SkillProgressResponse } from '../api/models/SkillProgressResponse';
 import { ErrorDisplay } from '../components/ErrorDisplay';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { Modal } from '../components/Modal';
 import { OverallXPGraph } from '../components/OverallXPGraph';
 import {
   BossDetailModal,
@@ -25,7 +24,7 @@ import {
 import { SkillsGrid } from '../components/SkillsGrid';
 import { StatsCard } from '../components/StatsCard';
 import { useAuth } from '../contexts/AuthContext';
-import { useModal } from '../hooks';
+import { useNotificationContext } from '../contexts/NotificationContext';
 import type { BossData, OrderedBoss, OrderedSkill, PlayerSummary, SkillData } from '../types/player';
 import { extractErrorMessage } from '../utils/errorHandler';
 import { formatNumberLocale } from '../utils/formatters';
@@ -51,7 +50,7 @@ export const PlayerStats: React.FC = () => {
   const [fetching, setFetching] = useState(false);
   const [summary, setSummary] = useState<PlayerSummary | null>(null);
   const [generatingSummary, setGeneratingSummary] = useState(false);
-  const { modalState, showModal, closeModal, handleConfirm } = useModal();
+  const { showNotification } = useNotificationContext();
   const [polling, setPolling] = useState(false);
   const pollAttemptsRef = useRef(0);
   const MAX_POLL_ATTEMPTS = 15;
@@ -160,7 +159,7 @@ export const PlayerStats: React.FC = () => {
     setFetching(true);
     try {
       await api.PlayersService.triggerManualFetchApiV1PlayersUsernameFetchPost(username);
-      showModal('Success', 'Fetch task enqueued successfully. Refreshing data...', 'success');
+      showNotification('Fetch task enqueued successfully. Refreshing data...', 'success');
       setTimeout(async () => {
         try {
           const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes] = await Promise.all([
@@ -182,7 +181,7 @@ export const PlayerStats: React.FC = () => {
       }, 2000);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to trigger fetch');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setFetching(false);
     }
@@ -240,7 +239,7 @@ export const PlayerStats: React.FC = () => {
 
   const handleGenerateSummary = async () => {
     if (!metadata || !metadata.id) {
-      showModal('Error', 'Player ID not available', 'error');
+      showNotification('Player ID not available', 'error');
       return;
     }
 
@@ -251,9 +250,8 @@ export const PlayerStats: React.FC = () => {
         force_regenerate: false,
       });
 
-      showModal(
-        'Success',
-        <div className="space-y-2">
+      showNotification(
+        <div className="space-y-1">
           <p>{response.message}</p>
           <p className="text-sm text-secondary-500 dark:text-secondary-300">
             Summary generation task has been enqueued. The summary will appear here once generated.
@@ -276,7 +274,7 @@ export const PlayerStats: React.FC = () => {
       }, 5000);
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error, 'Failed to generate summary');
-      showModal('Error', errorMessage, 'error');
+      showNotification(errorMessage, 'error');
     } finally {
       setGeneratingSummary(false);
     }
@@ -569,18 +567,6 @@ export const PlayerStats: React.FC = () => {
 
       {/* Player Metadata */}
       {metadata && <PlayerMetadata metadata={metadata} />}
-
-      {/* Modal */}
-      <Modal
-        isOpen={modalState.isOpen}
-        onClose={closeModal}
-        title={modalState.title}
-        type={modalState.type}
-        showConfirm={modalState.showConfirm}
-        onConfirm={handleConfirm}
-      >
-        {modalState.message}
-      </Modal>
     </div>
   );
 };
