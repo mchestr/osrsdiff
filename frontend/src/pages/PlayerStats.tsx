@@ -58,6 +58,7 @@ export const PlayerStats: React.FC = () => {
   const pollAttemptsRef = useRef(0);
   const MAX_POLL_ATTEMPTS = 15;
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingRef = useRef(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [actionsMenuPosition, setActionsMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const actionsMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -86,13 +87,15 @@ export const PlayerStats: React.FC = () => {
       setMetadata(metadataRes);
       setSummary(summaryRes ? (summaryRes as PlayerSummary) : null);
 
-      if (statsRes.error === 'No data available' && !statsRes.fetched_at && !polling && pollAttemptsRef.current === 0) {
+      if (statsRes.error === 'No data available' && !statsRes.fetched_at && !pollingRef.current && pollAttemptsRef.current === 0) {
         setPolling(true);
+        pollingRef.current = true;
         pollAttemptsRef.current = 1;
       }
 
       if (isPolling && statsRes.fetched_at && !statsRes.error) {
         setPolling(false);
+        pollingRef.current = false;
         pollAttemptsRef.current = 0;
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
@@ -103,6 +106,7 @@ export const PlayerStats: React.FC = () => {
       const errorMessage = extractErrorMessage(err, 'Failed to load player stats');
       setError(errorMessage);
       setPolling(false);
+      pollingRef.current = false;
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
@@ -112,10 +116,11 @@ export const PlayerStats: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [username, polling]);
+  }, [username]);
 
   useEffect(() => {
     setPolling(false);
+    pollingRef.current = false;
     pollAttemptsRef.current = 0;
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -140,6 +145,7 @@ export const PlayerStats: React.FC = () => {
     pollingIntervalRef.current = setInterval(async () => {
       if (pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
         setPolling(false);
+        pollingRef.current = false;
         pollAttemptsRef.current = 0;
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
