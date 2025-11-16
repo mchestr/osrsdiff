@@ -84,17 +84,20 @@ export const ScheduledTasks: React.FC = () => {
     setTriggeringScheduleId(scheduleId);
     try {
       await api.SystemService.triggerScheduledTaskApiV1SystemTriggerTaskTaskNamePost(scheduleId);
-      const formattedName = formatTaskName(scheduleId);
-      showNotification(`${formattedName} triggered successfully`, 'success');
+      // Find the task to get its friendly name
+      const task = tasks.find(t => t.name === scheduleId);
+      const displayName = task?.friendly_name || formatTaskName(scheduleId);
+      showNotification(`${displayName} triggered successfully`, 'success');
       handleTaskTriggered();
     } catch (error: unknown) {
-      const formattedName = formatTaskName(scheduleId);
-      const errorMessage = extractErrorMessage(error, `Failed to trigger task "${formattedName}"`);
+      const task = tasks.find(t => t.name === scheduleId);
+      const displayName = task?.friendly_name || formatTaskName(scheduleId);
+      const errorMessage = extractErrorMessage(error, `Failed to trigger task "${displayName}"`);
       showNotification(errorMessage, 'error');
     } finally {
       setTriggeringScheduleId(null);
     }
-  }, [showNotification, handleTaskTriggered, formatTaskName]);
+  }, [showNotification, handleTaskTriggered, formatTaskName, tasks]);
 
   // Use tasks directly from API response, filtering out player-specific tasks that require arguments
   // and tasks without schedules (cron_expression === "N/A")
@@ -170,17 +173,7 @@ export const ScheduledTasks: React.FC = () => {
                       <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
                       {triggerableTasks.map((task) => {
                         const isTriggering = triggeringScheduleId === task.name;
-                        // Format task name for better readability
-                        const formatTaskName = (name: string): string => {
-                          // Remove module prefix (e.g., "app.workers.maintenance:")
-                          const withoutModule = name.includes(':') ? name.split(':')[1] : name;
-                          // Replace underscores with spaces and capitalize words
-                          return withoutModule
-                            .split('_')
-                            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                            .join(' ');
-                        };
-                        const formattedName = formatTaskName(task.name);
+                        const displayName = task.friendly_name || task.name;
 
                         return (
                           <button
@@ -190,7 +183,7 @@ export const ScheduledTasks: React.FC = () => {
                             className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
                           >
                             <div className="flex-1 min-w-0 pr-2">
-                              <div className="font-medium break-words">{formattedName}</div>
+                              <div className="font-medium break-words">{displayName}</div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 break-words mt-0.5">
                                 {task.description}
                               </div>

@@ -362,10 +362,10 @@ class ScheduledTaskInfo(BaseModel):
     """Information about a scheduled task."""
 
     name: str = Field(description="Task name")
+    friendly_name: str = Field(description="Human-readable task name")
     cron_expression: str = Field(description="Cron schedule expression")
     description: str = Field(description="Task description")
     last_run: Optional[str] = Field(description="Last run timestamp")
-    next_run: str = Field(description="Next scheduled run timestamp")
     should_run_now: bool = Field(description="Whether task should run now")
 
 
@@ -378,21 +378,69 @@ class ScheduledTasksResponse(BaseModel):
     total_count: int = Field(description="Total number of tasks")
 
 
+def _format_task_name(name: str) -> str:
+    """Format a task name into a friendly display name."""
+    if not name:
+        return "Unknown Task"
+    # Remove module prefix (e.g., "app.workers.maintenance:")
+    without_module = name.split(":")[-1] if ":" in name else name
+    # Replace underscores with spaces and capitalize words
+    words = without_module.split("_")
+    formatted = " ".join(word.capitalize() for word in words if word)
+    return formatted if formatted else name
+
+
+async def _get_friendly_name(
+    schedule_id: str, db_session: AsyncSession
+) -> str:
+    """Get a friendly name for a schedule ID, especially for player tasks."""
+    # Check if this is a player fetch task
+    if schedule_id.startswith("player_fetch_"):
+        try:
+            player_id_str = schedule_id.replace("player_fetch_", "")
+            player_id = int(player_id_str)
+            # Query database for player username
+            try:
+                player_stmt = select(Player.username).where(
+                    Player.id == player_id
+                )
+                player_result = await db_session.execute(player_stmt)
+                player_username = player_result.scalar_one_or_none()
+                if player_username:
+                    return f"Fetch Player: {player_username}"
+                else:
+                    return f"Fetch Player: {player_id_str} (deleted)"
+            except Exception as db_error:
+                # If database query fails (e.g., in tests with mocked sessions), fall back to formatted name
+                logger.debug(
+                    f"Could not query player name for {schedule_id}: {db_error}"
+                )
+                return _format_task_name(schedule_id)
+        except ValueError:
+            # If we can't parse the ID, return formatted name
+            return _format_task_name(schedule_id)
+    else:
+        # For non-player tasks, format the name nicely
+        return _format_task_name(schedule_id)
+
+
 @router.get("/scheduled-tasks", response_model=ScheduledTasksResponse)
 async def get_scheduled_tasks(
     current_user: Dict[str, Any] = Depends(require_auth),
+    db_session: AsyncSession = Depends(get_db_session),
 ) -> ScheduledTasksResponse:
     """
     Get information about all scheduled tasks.
 
     Returns details about each scheduled task including their cron expressions,
-    last run times, next run times, and current status.
+    last run times, and current status.
 
     Note: This endpoint now returns information about TaskIQ scheduled tasks
     managed by the TaskiqScheduler instead of the old custom scheduler.
 
     Args:
         current_user: Authenticated user information
+        db_session: Database session for querying player names
 
     Returns:
         ScheduledTasksResponse: List of scheduled tasks with their information
@@ -407,34 +455,39 @@ async def get_scheduled_tasks(
 
         # Import the TaskIQ scheduler and broker
         from app.workers.main import broker
-        from app.workers.scheduler import scheduler
+        from app.workers.scheduler import scheduler, redis_schedule_source
         from taskiq_redis import ListRedisScheduleSource
 
         tasks_info = []
 
-        # Get dynamic schedules from Redis source
-        for source in scheduler.sources:
-            if isinstance(source, ListRedisScheduleSource):
-                try:
-                    schedules = await source.get_schedules()
-                    logger.info(
-                        f"Found {len(schedules)} dynamic schedules from Redis"
-                    )
+        # Use the same redis_schedule_source instance as the worker to ensure consistency
+        # Get dynamic schedules directly from redis_schedule_source instead of scheduler.sources
+        # to ensure we're using the exact same instance
+        try:
+            schedules = await redis_schedule_source.get_schedules()
+            logger.info(f"Found {len(schedules)} dynamic schedules from Redis")
 
-                    for schedule in schedules:
-                        task_info = ScheduledTaskInfo(
-                            name=schedule.schedule_id,
-                            cron_expression=schedule.cron or "N/A",
-                            description=f"Dynamic scheduled task: {schedule.task_name}",
-                            last_run=None,  # TaskIQ doesn't track last run in schedule
-                            next_run="Managed by TaskIQ scheduler",
-                            should_run_now=False,  # TaskIQ manages this internally
-                        )
-                        tasks_info.append(task_info)
-                except Exception as e:
-                    logger.warning(
-                        f"Could not retrieve schedules from Redis source: {e}"
-                    )
+            for schedule in schedules:
+                schedule_id = getattr(schedule, "schedule_id", None)
+                if not schedule_id:
+                    # Skip schedules without schedule_id
+                    continue
+                friendly_name = await _get_friendly_name(
+                    schedule_id, db_session
+                )
+                task_info = ScheduledTaskInfo(
+                    name=schedule_id,
+                    friendly_name=friendly_name,
+                    cron_expression=getattr(schedule, "cron", None) or "N/A",
+                    description=f"Dynamic scheduled task: {getattr(schedule, 'task_name', 'unknown')}",
+                    last_run=None,  # TaskIQ doesn't track last run in schedule
+                    should_run_now=False,  # TaskIQ manages this internally
+                )
+                tasks_info.append(task_info)
+        except Exception as e:
+            logger.warning(
+                f"Could not retrieve schedules from Redis source: {e}"
+            )
 
         # Get static schedules from broker tasks (instead of LabelScheduleSource)
         try:
@@ -460,23 +513,29 @@ async def get_scheduled_tasks(
                             )
                         cron_expr = cron_expr or "N/A"
 
+                        friendly_name = await _get_friendly_name(
+                            task_name, db_session
+                        )
                         task_info = ScheduledTaskInfo(
                             name=task_name,
+                            friendly_name=friendly_name,
                             cron_expression=cron_expr,
                             description=f"Static scheduled task: {task_name}",
                             last_run=None,  # TaskIQ doesn't track last run in schedule
-                            next_run="Managed by TaskIQ scheduler",
                             should_run_now=False,  # TaskIQ manages this internally
                         )
                         tasks_info.append(task_info)
                 else:
                     # Task exists but has no schedule - still include it
+                    friendly_name = await _get_friendly_name(
+                        task_name, db_session
+                    )
                     task_info = ScheduledTaskInfo(
                         name=task_name,
+                        friendly_name=friendly_name,
                         cron_expression="N/A",
                         description=f"Static task (no schedule): {task_name}",
                         last_run=None,
-                        next_run="N/A",
                         should_run_now=False,
                     )
                     tasks_info.append(task_info)

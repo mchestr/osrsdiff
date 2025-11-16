@@ -52,6 +52,9 @@ class PlayerScheduleManager:
         and enable easy lookup/management. The schedule ID format is:
         player_fetch_{player_id}
 
+        This method checks if a schedule already exists and removes it before
+        creating a new one to prevent duplicates.
+
         Args:
             player: Player entity to schedule
 
@@ -64,6 +67,25 @@ class PlayerScheduleManager:
         try:
             # Generate deterministic schedule ID
             custom_schedule_id = f"player_fetch_{player.id}"
+
+            # Check if schedule already exists and remove it to prevent duplicates
+            try:
+                existing_schedules = await self.redis_source.get_schedules()
+                for existing_schedule in existing_schedules:
+                    if existing_schedule.schedule_id == custom_schedule_id:
+                        logger.warning(
+                            f"Schedule {custom_schedule_id} already exists for player {player.username}, "
+                            "removing existing schedule before creating new one"
+                        )
+                        await self.redis_source.delete_schedule(
+                            custom_schedule_id
+                        )
+                        break
+            except Exception as e:
+                logger.warning(
+                    f"Could not check for existing schedule {custom_schedule_id}: {e}. "
+                    "Proceeding with schedule creation."
+                )
 
             # Convert fetch interval to cron expression
             cron_expression = self._interval_to_cron(

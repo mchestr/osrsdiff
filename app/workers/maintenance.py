@@ -44,9 +44,11 @@ async def schedule_maintenance_job() -> Dict[str, Any]:
 
     async with AsyncSessionLocal() as db_session:
         try:
-            # Create maintenance service
+            # Create maintenance service with direct Redis access
+            from app.workers.scheduler import redis_schedule_source
+
             maintenance_service = ScheduleMaintenanceService(
-                get_player_schedule_manager()
+                redis_schedule_source
             )
 
             # Get schedule summary

@@ -4,9 +4,9 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from taskiq_redis import ListRedisScheduleSource
 
 from app.models.player import Player
-from app.services.scheduler import PlayerScheduleManager
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +17,18 @@ class ScheduleMaintenanceService:
 
     This service provides methods for cleaning up orphaned schedules,
     verifying consistency, and performing bulk operations on player schedules.
+
+    Works directly with Redis schedule source to avoid issues with the scheduler abstraction.
     """
 
-    def __init__(self, schedule_manager: PlayerScheduleManager):
+    def __init__(self, redis_source: ListRedisScheduleSource):
         """
         Initialize the maintenance service.
 
         Args:
-            schedule_manager: PlayerScheduleManager instance
+            redis_source: Redis schedule source for direct Redis access
         """
-        self.schedule_manager = schedule_manager
+        self.redis_source = redis_source
 
     async def cleanup_orphaned_schedules(
         self, db_session: AsyncSession, dry_run: bool = False
@@ -44,18 +46,25 @@ class ScheduleMaintenanceService:
         logger.info("Starting cleanup of orphaned schedules")
 
         try:
-            # Get all schedules from Redis
-            all_schedules = (
-                await self.schedule_manager.redis_source.get_schedules()
+            # Get all schedules from Redis directly
+            logger.debug("Fetching all schedules from Redis")
+            all_schedules = await self.redis_source.get_schedules()
+            logger.debug(
+                f"Retrieved {len(all_schedules)} total schedules from Redis"
             )
+
             player_schedules = [
                 s
                 for s in all_schedules
                 if hasattr(s, "schedule_id")
                 and s.schedule_id.startswith("player_fetch_")
             ]
+            logger.debug(
+                f"Found {len(player_schedules)} player schedules (filtered by 'player_fetch_' prefix)"
+            )
 
             if not player_schedules:
+                logger.info("No player schedules found in Redis")
                 return {
                     "status": "success",
                     "message": "No player schedules found",
@@ -65,6 +74,7 @@ class ScheduleMaintenanceService:
                 }
 
             # Get all active players with their schedule_ids
+            logger.debug("Fetching active players from database")
             active_players_stmt = select(
                 Player.id, Player.username, Player.schedule_id
             ).where(Player.is_active.is_(True))
@@ -72,6 +82,9 @@ class ScheduleMaintenanceService:
                 active_players_stmt
             )
             active_players = active_players_result.all()
+            logger.debug(
+                f"Found {len(active_players)} active players in database"
+            )
 
             # Create sets for efficient lookup
             active_player_ids = {str(player.id) for player in active_players}
@@ -80,16 +93,39 @@ class ScheduleMaintenanceService:
                 for player in active_players
                 if player.schedule_id is not None
             }
+            logger.debug(
+                f"Active player IDs: {len(active_player_ids)}, "
+                f"Active schedule IDs: {len(active_schedule_ids)}"
+            )
 
             # Find orphaned schedules
+            # Use a set to track schedule_ids we've already processed to avoid duplicates
+            orphaned_schedule_ids = set()
             orphaned_schedules = []
+            processed_count = 0
+            skipped_duplicate_count = 0
 
+            logger.debug(
+                f"Processing {len(player_schedules)} player schedules to find orphaned ones"
+            )
             for schedule in player_schedules:
                 try:
                     schedule_id = schedule.schedule_id
+                    logger.debug(f"Processing schedule: {schedule_id}")
+
+                    # Skip if we've already processed this schedule_id
+                    if schedule_id in orphaned_schedule_ids:
+                        skipped_duplicate_count += 1
+                        logger.debug(
+                            f"Skipping duplicate schedule_id: {schedule_id}"
+                        )
+                        continue
 
                     # Extract player ID from schedule ID
                     if not schedule_id.startswith("player_fetch_"):
+                        logger.debug(
+                            f"Skipping non-player schedule: {schedule_id}"
+                        )
                         continue
 
                     try:
@@ -97,7 +133,14 @@ class ScheduleMaintenanceService:
                             "player_fetch_", ""
                         )
                         player_id = int(player_id_str)
-                    except ValueError:
+                        logger.debug(
+                            f"Extracted player_id {player_id} from schedule_id {schedule_id}"
+                        )
+                    except ValueError as e:
+                        logger.warning(
+                            f"Invalid player ID format in schedule_id {schedule_id}: {e}"
+                        )
+                        orphaned_schedule_ids.add(schedule_id)
                         orphaned_schedules.append(
                             {
                                 "schedule_id": schedule_id,
@@ -108,7 +151,12 @@ class ScheduleMaintenanceService:
                         continue
 
                     # Check if player exists and is active
-                    if str(player_id) not in active_player_ids:
+                    player_id_str = str(player_id)
+                    if player_id_str not in active_player_ids:
+                        logger.debug(
+                            f"Schedule {schedule_id} is orphaned: player_id {player_id} not in active players"
+                        )
+                        orphaned_schedule_ids.add(schedule_id)
                         orphaned_schedules.append(
                             {
                                 "schedule_id": schedule_id,
@@ -117,6 +165,11 @@ class ScheduleMaintenanceService:
                             }
                         )
                     elif schedule_id not in active_schedule_ids:
+                        logger.debug(
+                            f"Schedule {schedule_id} is orphaned: schedule_id not referenced in database "
+                            f"(player_id {player_id} exists but has different schedule_id)"
+                        )
+                        orphaned_schedule_ids.add(schedule_id)
                         orphaned_schedules.append(
                             {
                                 "schedule_id": schedule_id,
@@ -124,44 +177,90 @@ class ScheduleMaintenanceService:
                                 "player_id": str(player_id),
                             }
                         )
+                    else:
+                        logger.debug(
+                            f"Schedule {schedule_id} is valid (player_id {player_id} exists and is active)"
+                        )
+
+                    processed_count += 1
 
                 except Exception as e:
+                    schedule_id_value = getattr(
+                        schedule, "schedule_id", "unknown"
+                    )
                     logger.error(
-                        f"Error processing schedule {getattr(schedule, 'schedule_id', 'unknown')}: {e}"
+                        f"Error processing schedule {schedule_id_value}: {e}",
+                        exc_info=True,
                     )
-                    orphaned_schedules.append(
-                        {
-                            "schedule_id": getattr(
-                                schedule, "schedule_id", "unknown"
-                            ),
-                            "reason": f"Processing error: {str(e)}",
-                            "player_id": None,
-                        }
-                    )
+                    if schedule_id_value not in orphaned_schedule_ids:
+                        orphaned_schedule_ids.add(schedule_id_value)
+                        orphaned_schedules.append(
+                            {
+                                "schedule_id": schedule_id_value,
+                                "reason": f"Processing error: {str(e)}",
+                                "player_id": None,
+                            }
+                        )
+
+            logger.info(
+                f"Processed {processed_count} schedules, skipped {skipped_duplicate_count} duplicates, "
+                f"found {len(orphaned_schedules)} orphaned schedules"
+            )
 
             # Remove orphaned schedules if not dry run
             removed_count = 0
             removal_errors = []
 
             if not dry_run:
+                logger.info(
+                    f"Starting removal of {len(orphaned_schedules)} orphaned schedules"
+                )
                 for orphan in orphaned_schedules:
                     try:
                         schedule_id_value = orphan.get("schedule_id")
+                        reason = orphan.get("reason", "Unknown reason")
+                        orphan_player_id = orphan.get("player_id", "unknown")
+
+                        logger.debug(
+                            f"Attempting to remove orphaned schedule: {schedule_id_value} "
+                            f"(reason: {reason}, player_id: {orphan_player_id})"
+                        )
+
                         if (
                             schedule_id_value is not None
                             and schedule_id_value != "unknown"
                         ):
-                            await self.schedule_manager.redis_source.delete_schedule(
+                            await self.redis_source.delete_schedule(
                                 str(schedule_id_value)
                             )
+                            logger.debug(
+                                f"Successfully deleted schedule {schedule_id_value} from Redis"
+                            )
+                        else:
+                            logger.warning(
+                                f"Skipping removal of schedule with invalid ID: {schedule_id_value}"
+                            )
+
                         removed_count += 1
                         logger.info(
-                            f"Removed orphaned schedule: {orphan['schedule_id']} ({orphan['reason']})"
+                            f"Removed orphaned schedule: {schedule_id_value} ({reason})"
                         )
                     except Exception as e:
                         error_msg = f"Failed to remove {orphan['schedule_id']}: {str(e)}"
                         removal_errors.append(error_msg)
-                        logger.error(error_msg)
+                        logger.error(
+                            f"Error removing orphaned schedule {orphan['schedule_id']}: {e}",
+                            exc_info=True,
+                        )
+
+                logger.info(
+                    f"Completed removal: {removed_count} schedules removed, "
+                    f"{len(removal_errors)} errors"
+                )
+            else:
+                logger.info(
+                    f"DRY RUN: Would remove {len(orphaned_schedules)} orphaned schedules"
+                )
 
             result = {
                 "status": "success",
@@ -202,10 +301,8 @@ class ScheduleMaintenanceService:
         logger.info("Starting schedule consistency verification")
 
         try:
-            # Get all schedules from Redis
-            all_schedules = (
-                await self.schedule_manager.redis_source.get_schedules()
-            )
+            # Get all schedules from Redis directly
+            all_schedules = await self.redis_source.get_schedules()
             player_schedules = [
                 s
                 for s in all_schedules
@@ -256,10 +353,23 @@ class ScheduleMaintenanceService:
                         )
                         continue
 
-                    # Verify schedule configuration
-                    is_valid = await self.schedule_manager._verify_schedule_exists_and_valid(
-                        player
-                    )
+                    # Verify schedule configuration by checking if schedule exists in Redis
+                    is_valid = False
+                    try:
+                        redis_schedules = (
+                            await self.redis_source.get_schedules()
+                        )
+                        for redis_schedule in redis_schedules:
+                            if (
+                                redis_schedule.schedule_id
+                                == player.schedule_id
+                            ):
+                                is_valid = True
+                                break
+                    except Exception as e:
+                        logger.warning(
+                            f"Error verifying schedule for {player.username}: {e}"
+                        )
 
                     if not is_valid:
                         inconsistencies.append(
@@ -401,9 +511,7 @@ class ScheduleMaintenanceService:
 
         try:
             # Get Redis schedules
-            all_schedules = (
-                await self.schedule_manager.redis_source.get_schedules()
-            )
+            all_schedules = await self.redis_source.get_schedules()
             player_schedules = [
                 s
                 for s in all_schedules
@@ -502,7 +610,7 @@ class ScheduleMaintenanceService:
                 # Force recreation by clearing schedule_id first
                 if old_schedule_id:
                     try:
-                        await self.schedule_manager.redis_source.delete_schedule(
+                        await self.redis_source.delete_schedule(
                             old_schedule_id
                         )
                         logger.info(
@@ -515,9 +623,13 @@ class ScheduleMaintenanceService:
 
                 player.schedule_id = None
 
-            # Ensure player has a valid schedule
-            new_schedule_id = (
-                await self.schedule_manager.ensure_player_scheduled(player)
+            # Check if schedule exists in Redis, if not we can't recreate it here
+            # (schedule creation should be done through PlayerScheduleManager)
+            from app.services.scheduler import get_player_schedule_manager
+
+            schedule_manager = get_player_schedule_manager()
+            new_schedule_id = await schedule_manager.ensure_player_scheduled(
+                player
             )
 
             # Update database
@@ -654,6 +766,10 @@ class ScheduleMaintenanceService:
         """
         Remove duplicate schedules, keeping only the first occurrence.
 
+        This method checks Redis directly to find duplicates, as get_schedules()
+        may deduplicate by schedule_id. It inspects the underlying Redis list
+        to detect all occurrences.
+
         Args:
             db_session: Database session
             dry_run: If True, return what would be done without making changes
@@ -664,12 +780,54 @@ class ScheduleMaintenanceService:
         logger.info("Starting cleanup of duplicate schedules")
 
         try:
-            # Get all schedules from Redis
-            all_schedules = (
-                await self.schedule_manager.redis_source.get_schedules()
+            # Get all schedules from Redis using the API (may be deduplicated)
+            all_schedules = await self.redis_source.get_schedules()
+
+            # Also check Redis directly to find actual duplicates in the list
+            # ListRedisScheduleSource stores schedules in a Redis list at prefix:cron
+            import redis.asyncio as redis
+            from app.config import settings as config_defaults
+
+            redis_client = redis.from_url(
+                config_defaults.redis.url, decode_responses=True
             )
 
-            # Track duplicates - collect all occurrences of each schedule_id
+            # Get the prefix used by the schedule source
+            prefix = config_defaults.taskiq.scheduler_prefix
+            cron_list_key = f"{prefix}:cron"
+
+            # Get all entries from the Redis list (this shows actual duplicates)
+            try:
+                redis_schedule_ids = await redis_client.lrange(
+                    cron_list_key, 0, -1
+                )
+                await redis_client.close()
+
+                # Count occurrences of each schedule_id in the Redis list
+                schedule_id_counts: Dict[str, int] = {}
+                for schedule_id in redis_schedule_ids:
+                    schedule_id_counts[schedule_id] = (
+                        schedule_id_counts.get(schedule_id, 0) + 1
+                    )
+
+                # Find duplicates (schedule_ids that appear more than once in Redis)
+                redis_duplicates = {
+                    schedule_id: count
+                    for schedule_id, count in schedule_id_counts.items()
+                    if count > 1
+                }
+
+                if redis_duplicates:
+                    logger.warning(
+                        f"Found {len(redis_duplicates)} schedule IDs with duplicates in Redis list: {redis_duplicates}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Could not check Redis list directly for duplicates: {e}"
+                )
+                redis_duplicates = {}
+
+            # Track duplicates from get_schedules() API (may already be deduplicated)
             schedule_ids_seen: Dict[str, List[Any]] = {}
             for schedule in all_schedules:
                 schedule_id = schedule.schedule_id
@@ -684,6 +842,68 @@ class ScheduleMaintenanceService:
                 if len(occurrences) > 1
             }
 
+            # If we found duplicates in Redis but not in get_schedules(), use Redis data
+            if redis_duplicates and not duplicate_schedules:
+                logger.info(
+                    f"Found duplicates in Redis list but not in get_schedules() API. "
+                    f"Redis duplicates: {redis_duplicates}"
+                )
+                # Create duplicate entries based on Redis counts
+                for schedule_id, count in redis_duplicates.items():
+                    # Find the schedule object for this schedule_id
+                    matching_schedule = next(
+                        (
+                            s
+                            for s in all_schedules
+                            if s.schedule_id == schedule_id
+                        ),
+                        None,
+                    )
+                    if matching_schedule:
+                        # Create a list with the schedule repeated 'count' times
+                        duplicate_schedules[schedule_id] = [
+                            matching_schedule
+                        ] * count
+                    else:
+                        # Schedule not found in get_schedules() - it's orphaned
+                        logger.warning(
+                            f"Schedule {schedule_id} found in Redis list but not in get_schedules() - orphaned"
+                        )
+                        # We'll handle this in orphaned cleanup, but log it here
+                        duplicate_schedules[schedule_id] = []
+
+            # If we found duplicates in Redis list, we need to clean them up
+            # even if get_schedules() doesn't show them
+            if redis_duplicates:
+                logger.info(
+                    f"Found {len(redis_duplicates)} schedule IDs with duplicates in Redis: {redis_duplicates}"
+                )
+                # Add Redis duplicates to our tracking
+                for schedule_id, count in redis_duplicates.items():
+                    if schedule_id not in duplicate_schedules:
+                        # Find matching schedule or mark as orphaned
+                        matching_schedule = next(
+                            (
+                                s
+                                for s in all_schedules
+                                if s.schedule_id == schedule_id
+                            ),
+                            None,
+                        )
+                        if matching_schedule:
+                            duplicate_schedules[schedule_id] = [
+                                matching_schedule
+                            ] * count
+                        else:
+                            # Orphaned schedule found in Redis but not in get_schedules()
+                            # We still need to clean it up - delete all occurrences from Redis
+                            logger.warning(
+                                f"Schedule {schedule_id} has {count} duplicates in Redis but not found in get_schedules() - will clean up"
+                            )
+                            # Mark for cleanup even though we don't have the schedule object
+                            # We'll handle this specially in the cleanup loop
+                            duplicate_schedules[schedule_id] = []
+
             if not duplicate_schedules:
                 return {
                     "status": "success",
@@ -692,18 +912,64 @@ class ScheduleMaintenanceService:
                     "duplicates_found": 0,
                     "duplicates_removed": 0,
                     "duplicate_schedules": {},
+                    "redis_duplicates_checked": (
+                        len(redis_duplicates) if redis_duplicates else 0
+                    ),
                 }
 
             # Remove duplicates (keep first occurrence, remove the rest)
             # Note: delete_schedule removes all occurrences of a schedule_id,
             # so we delete all and then recreate the first one if it's a player schedule
+            # But only if the player exists and is active
             removed_count = 0
             removal_errors = []
             duplicate_details = {}
             player_schedules_to_recreate = []
 
             if not dry_run:
+                # First, check which players exist before processing duplicates
+                from app.models.player import Player
+
+                all_players_stmt = select(Player.id, Player.is_active).where(
+                    Player.is_active.is_(True)
+                )
+                all_players_result = await db_session.execute(all_players_stmt)
+                active_player_ids = {
+                    player.id for player in all_players_result.all()
+                }
+
                 for schedule_id, occurrences in duplicate_schedules.items():
+                    # Handle orphaned schedules found in Redis but not in get_schedules()
+                    if not occurrences:
+                        # This schedule exists in Redis but not in get_schedules()
+                        # We need to delete all occurrences from Redis directly
+                        try:
+                            # Delete all occurrences of this schedule_id from Redis
+                            await self.redis_source.delete_schedule(
+                                schedule_id
+                            )
+                            # Get count from redis_duplicates if available
+                            duplicate_count = redis_duplicates.get(
+                                schedule_id, 1
+                            )
+                            removed_count += (
+                                duplicate_count  # Count all removed
+                            )
+                            logger.info(
+                                f"Removed {duplicate_count} orphaned duplicate schedule(s) from Redis: {schedule_id}"
+                            )
+                            duplicate_details[schedule_id] = {
+                                "total_occurrences": duplicate_count,
+                                "kept": 0,
+                                "removed": duplicate_count,
+                                "reason": "Orphaned schedule (not in get_schedules())",
+                            }
+                        except Exception as e:
+                            error_msg = f"Failed to remove orphaned duplicate schedule {schedule_id}: {str(e)}"
+                            removal_errors.append(error_msg)
+                            logger.error(error_msg)
+                        continue
+
                     first_schedule = occurrences[0]
                     total_duplicates = (
                         len(occurrences) - 1
@@ -716,24 +982,54 @@ class ScheduleMaintenanceService:
                     }
 
                     try:
+                        # Check if this is a player schedule and if the player exists
+                        should_recreate = False
+                        if schedule_id.startswith("player_fetch_"):
+                            try:
+                                player_id_str = schedule_id.replace(
+                                    "player_fetch_", ""
+                                )
+                                player_id = int(player_id_str)
+                                should_recreate = (
+                                    player_id in active_player_ids
+                                )
+                            except ValueError:
+                                # Invalid player ID format - don't recreate
+                                should_recreate = False
+
                         # Delete all occurrences (delete_schedule removes all with this schedule_id)
-                        await self.schedule_manager.redis_source.delete_schedule(
-                            schedule_id
-                        )
+                        await self.redis_source.delete_schedule(schedule_id)
                         removed_count += total_duplicates
                         logger.info(
                             f"Removed {total_duplicates} duplicate(s) for schedule: {schedule_id}"
                         )
 
-                        # If this is a player schedule, we need to recreate it from the database
-                        if schedule_id.startswith("player_fetch_"):
+                        # Only recreate if player exists and is active
+                        if should_recreate:
                             player_schedules_to_recreate.append(schedule_id)
+                        elif schedule_id.startswith("player_fetch_"):
+                            # Log that we're skipping recreation for non-existent/inactive player
+                            try:
+                                player_id_str = schedule_id.replace(
+                                    "player_fetch_", ""
+                                )
+                                player_id = int(player_id_str)
+                                logger.info(
+                                    f"Skipping recreation of duplicate schedule {schedule_id}: "
+                                    f"player {player_id} not found or inactive (orphaned schedule)"
+                                )
+                            except ValueError:
+                                logger.info(
+                                    f"Skipping recreation of duplicate schedule {schedule_id}: "
+                                    "invalid player ID format"
+                                )
                     except Exception as e:
                         error_msg = f"Failed to remove duplicate {schedule_id}: {str(e)}"
                         removal_errors.append(error_msg)
                         logger.error(error_msg)
 
                 # Recreate player schedules that were deleted
+                # Only recreate if the player exists and is active
                 for schedule_id in player_schedules_to_recreate:
                     try:
                         # Extract player_id from schedule_id
@@ -753,16 +1049,32 @@ class ScheduleMaintenanceService:
 
                         if player and player.is_active:
                             # Recreate the schedule using the schedule manager
-                            new_schedule_id = await self.schedule_manager.ensure_player_scheduled(
-                                player
+                            from app.services.scheduler import (
+                                get_player_schedule_manager,
+                            )
+
+                            schedule_manager = get_player_schedule_manager()
+                            new_schedule_id = (
+                                await schedule_manager.ensure_player_scheduled(
+                                    player
+                                )
                             )
                             logger.info(
                                 f"Recreated schedule for player {player_id}: {new_schedule_id}"
                             )
                         else:
-                            logger.warning(
-                                f"Could not recreate schedule {schedule_id}: player {player_id} not found or inactive"
+                            # Player doesn't exist or is inactive - this is expected for orphaned schedules
+                            # The orphaned cleanup should handle these, but we log it here for visibility
+                            logger.info(
+                                f"Skipping recreation of schedule {schedule_id}: player {player_id} not found or inactive "
+                                "(will be cleaned up by orphaned schedule cleanup)"
                             )
+                            # Don't treat this as an error - it's expected behavior
+                    except ValueError as e:
+                        # Invalid player ID format - this schedule should be cleaned up by orphaned cleanup
+                        logger.info(
+                            f"Skipping recreation of schedule {schedule_id}: invalid player ID format ({str(e)})"
+                        )
                     except Exception as e:
                         error_msg = f"Failed to recreate schedule {schedule_id}: {str(e)}"
                         removal_errors.append(error_msg)
@@ -795,16 +1107,13 @@ class ScheduleMaintenanceService:
 
 
 # Dependency injection function for FastAPI
-async def get_schedule_maintenance_service(
-    schedule_manager: PlayerScheduleManager,
-) -> ScheduleMaintenanceService:
+async def get_schedule_maintenance_service() -> ScheduleMaintenanceService:
     """
     Dependency injection function for FastAPI.
-
-    Args:
-        schedule_manager: PlayerScheduleManager instance
 
     Returns:
         ScheduleMaintenanceService: Configured maintenance service instance
     """
-    return ScheduleMaintenanceService(schedule_manager)
+    from app.workers.scheduler import redis_schedule_source
+
+    return ScheduleMaintenanceService(redis_schedule_source)

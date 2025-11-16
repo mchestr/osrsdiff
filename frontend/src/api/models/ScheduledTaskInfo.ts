@@ -1,7 +1,7 @@
 /* generated using openapi-typescript-codegen -- do no edit */
 /* istanbul ignore file */
 /* tslint:disable */
- 
+
 
 /**
  * Information about a scheduled task.
@@ -11,6 +11,10 @@ export type ScheduledTaskInfo = {
      * Task name
      */
     name: string;
+    /**
+     * Human-readable task name
+     */
+    friendly_name: string;
     /**
      * Cron schedule expression
      */
@@ -23,10 +27,6 @@ export type ScheduledTaskInfo = {
      * Last run timestamp
      */
     last_run: (string | null);
-    /**
-     * Next scheduled run timestamp
-     */
-    next_run: string;
     /**
      * Whether task should run now
      */

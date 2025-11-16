@@ -171,48 +171,6 @@ class TestGetAllSettings:
         assert response.status_code in [401, 403]
 
 
-class TestGetSettingsDict:
-    """Test GET /settings/dict endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_get_settings_dict_admin_success(
-        self, admin_client, mock_db_session
-    ):
-        """Test admin can successfully get settings as dictionary."""
-        from app.services.setting import setting_service
-
-        settings_dict = {
-            "openai.api_key": "sk-test123",
-            "openai.model": "gpt-4o-mini",
-        }
-
-        with patch.object(
-            setting_service,
-            "get_all_settings_dict",
-            return_value=settings_dict,
-        ):
-            response = admin_client.get("/settings/dict")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "settings" in data
-        assert data["settings"]["openai.api_key"] == "sk-test123"
-        assert data["settings"]["openai.model"] == "gpt-4o-mini"
-
-    def test_get_settings_dict_non_admin_forbidden(self, non_admin_client):
-        """Test non-admin user cannot get settings dictionary."""
-        response = non_admin_client.get("/settings/dict")
-        assert response.status_code == 403
-        assert "Admin privileges required" in response.json()["detail"]
-
-    def test_get_settings_dict_unauthenticated_forbidden(
-        self, unauthenticated_client
-    ):
-        """Test unauthenticated user cannot get settings dictionary."""
-        response = unauthenticated_client.get("/settings/dict")
-        assert response.status_code in [401, 403]
-
-
 class TestGetSetting:
     """Test GET /settings/{key} endpoint."""
 
@@ -476,7 +434,6 @@ class TestSettingsSecurity:
         """Test that all settings endpoints reject non-admin users."""
         endpoints = [
             ("GET", "/settings"),
-            ("GET", "/settings/dict"),
             ("GET", "/settings/test.key"),
             ("PUT", "/settings/test.key"),
             ("POST", "/settings/test.key/reset"),
@@ -503,7 +460,6 @@ class TestSettingsSecurity:
         """Test that all settings endpoints reject unauthenticated users."""
         endpoints = [
             ("GET", "/settings"),
-            ("GET", "/settings/dict"),
             ("GET", "/settings/test.key"),
             ("PUT", "/settings/test.key"),
             ("POST", "/settings/test.key/reset"),

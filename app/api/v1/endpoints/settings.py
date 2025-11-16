@@ -118,12 +118,6 @@ class SettingUpdateRequest(BaseModel):
     )
 
 
-class SettingDictResponse(BaseModel):
-    """Response model for settings as dictionary."""
-
-    settings: Dict[str, str] = Field(description="Settings as key-value pairs")
-
-
 # Router
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -162,38 +156,6 @@ async def get_all_settings(
             _setting_to_response(setting) for setting in filtered_settings
         ]
     )
-
-
-@router.get("/dict", response_model=SettingDictResponse)
-async def get_all_settings_dict(
-    db_session: AsyncSession = Depends(get_db_session),
-    current_user: Dict[str, Any] = Depends(require_admin),
-) -> SettingDictResponse:
-    """
-    Get all settings as a dictionary.
-
-    Returns all settings as key-value pairs. Admin only.
-
-    Args:
-        db_session: Database session dependency
-        current_user: Authenticated admin user information
-
-    Returns:
-        SettingDictResponse: Settings as dictionary
-
-    Raises:
-        403 Forbidden: User is not an admin
-    """
-    settings_dict = await setting_service.get_all_settings_dict(db_session)
-    # Filter out Redis, database, and TaskIQ settings as they're not easily changeable
-    filtered_dict = {
-        key: value
-        for key, value in settings_dict.items()
-        if not key.startswith("redis_")
-        and not key.startswith("database_")
-        and not key.startswith("taskiq_")
-    }
-    return SettingDictResponse(settings=filtered_dict)
 
 
 @router.get("/{key}", response_model=SettingResponse)

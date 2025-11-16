@@ -290,7 +290,8 @@ class TestPlayerScheduleManager:
         result = await schedule_manager.ensure_player_scheduled(sample_player)
 
         assert result == "player_fetch_123"
-        mock_redis_source.get_schedules.assert_called_once()
+        # get_schedules is called once in ensure_player_scheduled and once in _verify_schedule_exists_and_valid
+        assert mock_redis_source.get_schedules.call_count == 2
 
     @pytest.mark.asyncio
     async def test_ensure_player_scheduled_missing_from_redis(

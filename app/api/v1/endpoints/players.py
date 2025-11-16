@@ -55,32 +55,6 @@ class PlayerUpdateIntervalRequest(BaseModel):
     )
 
 
-class PlayerScheduleStatusResponse(BaseModel):
-    """Response model for player schedule status."""
-
-    id: int
-    username: str
-    is_active: bool
-    fetch_interval_minutes: int
-    schedule_id: str | None
-    schedule_status: str = Field(
-        description="Status of the schedule: 'scheduled', 'missing', 'invalid', 'not_scheduled'"
-    )
-    last_verified: str | None = Field(
-        description="Timestamp when schedule was last verified"
-    )
-
-
-class ScheduleListResponse(BaseModel):
-    """Response model for listing all player schedules."""
-
-    players: List[PlayerScheduleStatusResponse]
-    total_count: int
-    scheduled_count: int
-    missing_count: int
-    invalid_count: int
-
-
 class PlayerResponse(BaseModel):
     """Response model for player data."""
 
@@ -241,24 +215,9 @@ async def add_player(
         )
 
         # Add player to tracking system
+        # Note: player_service.add_player() already creates the schedule,
+        # so we don't need to create it again here
         player = await player_service.add_player(request.username)
-
-        # Schedule periodic hiscore fetches for the player
-        try:
-            from app.services.scheduler import get_player_schedule_manager
-
-            schedule_manager = get_player_schedule_manager()
-            schedule_id = await schedule_manager.schedule_player(player)
-            player.schedule_id = schedule_id
-            await player_service.db_session.commit()
-            logger.info(
-                f"Scheduled periodic fetch for player {player.username} (schedule_id: {schedule_id})"
-            )
-        except Exception as e:
-            logger.warning(
-                f"Failed to schedule periodic fetch for {player.username}: {e}"
-            )
-            # Don't fail the player creation if scheduling fails
 
         # Trigger initial fetch task
         try:
@@ -798,109 +757,6 @@ async def recalculate_player_game_mode(
             f"Error recalculating game mode for player {username}: {e}"
         )
         raise PlayerServiceError(f"Failed to recalculate game mode: {e}")
-
-
-@router.get("/schedules", response_model=ScheduleListResponse)
-async def list_player_schedules(
-    player_service: PlayerService = Depends(get_player_service),
-    current_user: Dict[str, Any] = Depends(require_auth),
-) -> ScheduleListResponse:
-    """
-    List all players with their schedule status.
-
-    This endpoint provides comprehensive information about all players and
-    their scheduling status, including whether schedules exist, are valid,
-    or are missing.
-
-    Args:
-        player_service: Player service dependency
-        current_user: Authenticated user information
-
-    Returns:
-        ScheduleListResponse: List of players with schedule status information
-
-    Raises:
-        500 Internal Server Error: Service errors
-    """
-    try:
-        logger.info(
-            f"User {current_user.get('username')} requesting player schedule list"
-        )
-
-        # Get all players
-        players = await player_service.list_players(active_only=False)
-
-        # Get schedule manager to verify schedules
-        from app.services.scheduler import get_player_schedule_manager
-
-        try:
-            schedule_manager = get_player_schedule_manager()
-        except Exception as e:
-            logger.warning(f"Failed to get schedule manager: {e}")
-            schedule_manager = None
-
-        player_statuses = []
-        scheduled_count = 0
-        missing_count = 0
-        invalid_count = 0
-
-        for player in players:
-            schedule_status = "not_scheduled"
-
-            if player.is_active and schedule_manager:
-                if player.schedule_id:
-                    # Verify if schedule exists and is valid
-                    try:
-                        is_valid = await schedule_manager._verify_schedule_exists_and_valid(
-                            player
-                        )
-                        if is_valid:
-                            schedule_status = "scheduled"
-                            scheduled_count += 1
-                        else:
-                            schedule_status = "invalid"
-                            invalid_count += 1
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to verify schedule for player {player.username}: {e}"
-                        )
-                        schedule_status = "missing"
-                        missing_count += 1
-                else:
-                    schedule_status = "missing"
-                    missing_count += 1
-            elif not player.is_active:
-                schedule_status = "not_scheduled"
-
-            player_status = PlayerScheduleStatusResponse(
-                id=player.id,
-                username=player.username,
-                is_active=player.is_active,
-                fetch_interval_minutes=player.fetch_interval_minutes,
-                schedule_id=player.schedule_id,
-                schedule_status=schedule_status,
-                last_verified=None,  # Could be enhanced to track verification timestamps
-            )
-            player_statuses.append(player_status)
-
-        response = ScheduleListResponse(
-            players=player_statuses,
-            total_count=len(player_statuses),
-            scheduled_count=scheduled_count,
-            missing_count=missing_count,
-            invalid_count=invalid_count,
-        )
-
-        logger.info(
-            f"Returning schedule status for {len(player_statuses)} players "
-            f"(scheduled: {scheduled_count}, missing: {missing_count}, invalid: {invalid_count})"
-        )
-
-        return response
-
-    except Exception as e:
-        logger.error(f"Error listing player schedules: {e}")
-        raise PlayerServiceError(f"Failed to list player schedules: {e}")
 
 
 class PlayerSummaryResponse(BaseModel):

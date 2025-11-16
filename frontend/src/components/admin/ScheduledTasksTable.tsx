@@ -73,9 +73,6 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-secondary-700 dark:text-secondary-300 uppercase tracking-wider">
                 Last Run
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-secondary-700 dark:text-secondary-300 uppercase tracking-wider">
-                Next Run
-              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-secondary-700 dark:text-secondary-300 uppercase tracking-wider">
                 Actions
               </th>
@@ -92,7 +89,7 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {task.name}
+                      {task.friendly_name || task.name}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -112,11 +109,6 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
                       ) : (
                         <span className="text-secondary-500">Never</span>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {task.next_run}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

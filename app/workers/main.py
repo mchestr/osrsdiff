@@ -45,14 +45,9 @@ from app.workers.middleware import TaskExecutionTrackingMiddleware
 
 broker.add_middlewares(TaskExecutionTrackingMiddleware())
 
-# Create a redis schedule source for use by services
-from taskiq_redis import ListRedisScheduleSource
-
-redis_schedule_source = ListRedisScheduleSource(
-    url=config_defaults.redis.url,
-    prefix=config_defaults.taskiq.scheduler_prefix,
-    max_connection_pool_size=config_defaults.redis.max_connections,
-)
+# Import redis_schedule_source from scheduler module to ensure single instance
+# This ensures FastAPI and worker processes use the same Redis connection
+from app.workers.scheduler import redis_schedule_source
 
 
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
@@ -60,13 +55,13 @@ async def startup_event(context: TaskiqState) -> None:
     """Initialize worker resources on startup."""
     logger.info("TaskIQ worker starting up...")
 
-    # Load settings from database into cache
-    await settings_cache.load_from_database()
-
     # Initialize database connection pool for workers
     from app.models.base import init_db
 
     await init_db()
+
+    # Load settings from database into cache
+    await settings_cache.load_from_database()
 
     # Note: TaskiqScheduler is run separately via CLI command
     # No need to start custom scheduler here anymore
