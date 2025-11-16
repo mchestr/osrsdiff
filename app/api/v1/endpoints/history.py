@@ -21,6 +21,10 @@ from app.services.player import (
     PlayerService,
     get_player_service,
 )
+from app.services.player.records import (
+    RecordsService,
+    get_records_service,
+)
 from app.utils.common import parse_iso_datetime
 
 logger = logging.getLogger(__name__)
@@ -31,6 +35,13 @@ async def get_history_service(
 ) -> HistoryService:
     """Dependency injection for HistoryService."""
     return HistoryService(db_session)
+
+
+async def get_records_service_dep(
+    db_session: AsyncSession = Depends(get_db_session),
+) -> RecordsService:
+    """Dependency injection for RecordsService."""
+    return RecordsService(db_session)
 
 
 # Request/Response models
@@ -159,6 +170,42 @@ class BossProgressResponse(BaseModel):
     progress: BossProgressDataResponse = Field(description="Progress data")
     timeline: List[BossTimelineEntry] = Field(
         description="Timeline of boss progress"
+    )
+
+
+class SkillRecordResponse(BaseModel):
+    """Response model for a skill record."""
+
+    skill: str = Field(description="Skill name")
+    exp_gain: int = Field(description="Experience gained on this day")
+    date: str = Field(description="Date of the record (ISO format)")
+    start_exp: int = Field(description="Starting experience")
+    end_exp: int = Field(description="Ending experience")
+
+
+class PeriodRecordsResponse(BaseModel):
+    """Response model for records in a time period."""
+
+    day: Dict[str, SkillRecordResponse] = Field(
+        description="Top exp gains in the last day"
+    )
+    week: Dict[str, SkillRecordResponse] = Field(
+        description="Top exp gains in the last week"
+    )
+    month: Dict[str, SkillRecordResponse] = Field(
+        description="Top exp gains in the last month"
+    )
+    year: Dict[str, SkillRecordResponse] = Field(
+        description="Top exp gains in the last year"
+    )
+
+
+class PlayerRecordsResponse(BaseModel):
+    """Response model for player records."""
+
+    username: str = Field(description="Player username")
+    records: PeriodRecordsResponse = Field(
+        description="Records for each time period"
     )
 
 
@@ -467,3 +514,80 @@ async def get_boss_progress(
             f"Unexpected error getting {boss} progress for {username}: {e}"
         )
         raise HistoryServiceError(f"Failed to analyze boss progress: {e}")
+
+
+@router.get("/{username}/records", response_model=PlayerRecordsResponse)
+async def get_player_records(
+    username: str,
+    records_service: RecordsService = Depends(get_records_service_dep),
+    player_service: PlayerService = Depends(get_player_service),
+) -> PlayerRecordsResponse:
+    """
+    Get top exp gains per day for a player across different time periods.
+
+    For each skill, finds the day with the highest exp gain within:
+    - Last day (24 hours)
+    - Last week (7 days)
+    - Last month (30 days)
+    - Last year (365 days)
+
+    If the player doesn't exist in the database but exists in OSRS, they will
+    be automatically added.
+
+    Args:
+        username: OSRS player username
+        records_service: Records service dependency
+        player_service: Player service dependency
+
+    Returns:
+        PlayerRecordsResponse: Records for each time period
+
+    Raises:
+        400 Bad Request: Invalid username format
+        404 Not Found: Player not found in OSRS hiscores
+        502 Bad Gateway: OSRS API unavailable
+        500 Internal Server Error: Service errors
+    """
+    try:
+        logger.debug(f"Requesting records for player: {username}")
+
+        # Ensure player exists (auto-add if they exist in OSRS)
+        await player_service.ensure_player_exists(username)
+
+        # Get records
+        records = await records_service.get_player_records(username)
+
+        # Convert to response format
+        records_dict = records.to_dict()
+
+        # Convert skill records to response models
+        def convert_period_records(
+            period_dict: Dict[str, Dict[str, Any]],
+        ) -> Dict[str, SkillRecordResponse]:
+            return {
+                skill: SkillRecordResponse(**record)
+                for skill, record in period_dict.items()
+            }
+
+        response = PlayerRecordsResponse(
+            username=records_dict["username"],
+            records=PeriodRecordsResponse(
+                day=convert_period_records(records_dict["records"]["day"]),
+                week=convert_period_records(records_dict["records"]["week"]),
+                month=convert_period_records(records_dict["records"]["month"]),
+                year=convert_period_records(records_dict["records"]["year"]),
+            ),
+        )
+
+        logger.debug(f"Successfully retrieved records for player: {username}")
+        return response
+
+    except (
+        PlayerNotFoundError,
+        OSRSPlayerNotFoundError,
+        HistoryServiceError,
+    ):
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error getting records for {username}: {e}")
+        raise HistoryServiceError(f"Failed to get records: {e}")

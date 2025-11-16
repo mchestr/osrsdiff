@@ -16,6 +16,7 @@ import {
   BossDetailModal,
   BossProgressTable,
   PlayerMetadata,
+  PlayerRecords,
   ProgressSummary,
   SkillDetailModal,
   SkillsProgressTable,
@@ -53,6 +54,12 @@ export const PlayerStats: React.FC = () => {
   const [summary, setSummary] = useState<PlayerSummary | null>(null);
   const [recalculatingGameMode, setRecalculatingGameMode] = useState(false);
   const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [records, setRecords] = useState<{
+    day: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+    week: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+    month: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+    year: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+  } | null>(null);
   const { showNotification } = useNotificationContext();
   const [polling, setPolling] = useState(false);
   const pollAttemptsRef = useRef(0);
@@ -71,13 +78,14 @@ export const PlayerStats: React.FC = () => {
       if (!isPolling) {
         setLoading(true);
       }
-      const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes, summaryRes] = await Promise.all([
+      const [statsRes, progressDayRes, progressWeekRes, progressMonthRes, metadataRes, summaryRes, recordsRes] = await Promise.all([
         api.StatisticsService.getPlayerStatsApiV1PlayersUsernameStatsGet(username),
         api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 1).catch(() => null),
         api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 7).catch(() => null),
         api.HistoryService.getPlayerHistoryApiV1PlayersUsernameHistoryGet(username, null, null, 30).catch(() => null),
         api.PlayersService.getPlayerMetadataApiV1PlayersUsernameMetadataGet(username).catch(() => null),
         api.PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username).catch(() => null),
+        api.HistoryService.getPlayerRecordsApiV1PlayersUsernameRecordsGet(username).catch(() => null),
       ]);
 
       setStats(statsRes);
@@ -86,6 +94,7 @@ export const PlayerStats: React.FC = () => {
       setProgressMonth(progressMonthRes);
       setMetadata(metadataRes);
       setSummary(summaryRes ? (summaryRes as PlayerSummary) : null);
+      setRecords(recordsRes?.records || null);
 
       if (statsRes.error === 'No data available' && !statsRes.fetched_at && !pollingRef.current && pollAttemptsRef.current === 0) {
         setPolling(true);
@@ -606,6 +615,11 @@ export const PlayerStats: React.FC = () => {
         orderedSkills={orderedSkills}
         onSkillClick={handleSkillClick}
       />
+
+      {/* Records */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PlayerRecords records={records} />
+      </div>
 
       {/* Boss Progress Summary */}
       {orderedBosses.length > 0 && (

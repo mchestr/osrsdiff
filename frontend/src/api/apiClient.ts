@@ -188,6 +188,8 @@ export const api = {
       handleTokenRefresh(() => HistoryService.getSkillProgressApiV1PlayersUsernameHistorySkillsSkillGet(username, skill, days)),
     getBossProgressApiV1PlayersUsernameHistoryBossesBossGet: (username: string, boss: string, days?: number) =>
       handleTokenRefresh(() => HistoryService.getBossProgressApiV1PlayersUsernameHistoryBossesBossGet(username, boss, days)),
+    getPlayerRecordsApiV1PlayersUsernameRecordsGet: (username: string) =>
+      handleTokenRefresh(() => HistoryService.getPlayerRecordsApiV1PlayersUsernameRecordsGet(username)),
   },
   StatisticsService: {
     ...StatisticsService,

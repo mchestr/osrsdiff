@@ -8,6 +8,7 @@ import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { PlayerStats } from './pages/PlayerStats';
+import { Leaderboard } from './pages/Leaderboard';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminPlayerList } from './pages/AdminPlayerList';
 import { Settings } from './pages/Settings';
@@ -43,6 +44,14 @@ const AppRoutes = () => {
         element={
           <Layout>
             <PlayerStats />
+          </Layout>
+        }
+      />
+      <Route
+        path="/leaderboard"
+        element={
+          <Layout>
+            <Leaderboard />
           </Layout>
         }
       />

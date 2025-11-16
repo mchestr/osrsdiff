@@ -1,6 +1,13 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import history, players, settings, statistics, system
+from app.api.v1.endpoints import (
+    history,
+    leaderboard,
+    players,
+    settings,
+    statistics,
+    system,
+)
 
 # Main API router that groups all API endpoints
 router = APIRouter(prefix="/v1")
@@ -11,3 +18,4 @@ router.include_router(statistics.router)
 router.include_router(history.router)
 router.include_router(system.router)
 router.include_router(settings.router)
+router.include_router(leaderboard.router)

@@ -22,6 +22,12 @@ from app.services.player.summary import (
     get_summary_service,
     parse_summary_text,
 )
+from app.services.player.records import (
+    PlayerRecords,
+    RecordsService,
+    SkillRecord,
+    get_records_service,
+)
 from app.services.player.type_classifier import (
     PlayerTypeClassificationError,
     PlayerTypeClassifier,
@@ -33,11 +39,14 @@ __all__ = [
     "HistoryService",
     "StatisticsService",
     "SummaryService",
+    "RecordsService",
     "PlayerTypeClassifier",
     # Data classes
     "ProgressAnalysis",
     "SkillProgress",
     "BossProgress",
+    "PlayerRecords",
+    "SkillRecord",
     # Exceptions
     "PlayerTypeClassificationError",
     "SummaryGenerationError",
@@ -47,6 +56,7 @@ __all__ = [
     "get_history_service",
     "get_statistics_service",
     "get_summary_service",
+    "get_records_service",
     # Utility functions
     "parse_summary_text",
 ]

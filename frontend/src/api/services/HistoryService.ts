@@ -1,7 +1,7 @@
 /* generated using openapi-typescript-codegen -- do no edit */
 /* istanbul ignore file */
 /* tslint:disable */
- 
+
 import type { BossProgressResponse } from '../models/BossProgressResponse';
 import type { ProgressAnalysisResponse } from '../models/ProgressAnalysisResponse';
 import type { SkillProgressResponse } from '../models/SkillProgressResponse';
@@ -160,6 +160,33 @@ export class HistoryService {
             },
             errors: {
                 422: `Validation Error`,
+            },
+        });
+    }
+
+    /**
+     * Get Player Records
+     * Get top exp gains per day for a player across different time periods.
+     * @param username
+     * @returns PlayerRecordsResponse Successful Response
+     * @throws ApiError
+     */
+    public static getPlayerRecordsApiV1PlayersUsernameRecordsGet(
+        username: string,
+    ): CancelablePromise<{
+        username: string;
+        records: {
+            day: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+            week: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+            month: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+            year: Record<string, { skill: string; exp_gain: number; date: string; start_exp: number; end_exp: number }>;
+        };
+    }> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/players/{username}/records',
+            path: {
+                'username': username,
             },
         });
     }
