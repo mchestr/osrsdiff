@@ -1,7 +1,6 @@
 import asyncio
 import logging
 
-from app.config import settings
 from app.models.base import AsyncSessionLocal
 from app.services.setting import setting_service
 from app.services.settings_cache import settings_cache

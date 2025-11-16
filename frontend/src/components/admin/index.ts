@@ -18,6 +18,7 @@ export { TaskExecutionPagination } from './TaskExecutionPagination';
 export { TaskExecutionTable } from './TaskExecutionTable';
 export { TaskExecutionRow } from './TaskExecutionRow';
 export { TaskExecutionStatusBadge } from './TaskExecutionStatusBadge';
+export { ScheduledTasksTable } from './ScheduledTasksTable';
 export * from './types';
 export * from './utils';
 export * from './hooks';

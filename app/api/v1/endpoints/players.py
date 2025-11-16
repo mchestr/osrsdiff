@@ -81,18 +81,6 @@ class ScheduleListResponse(BaseModel):
     invalid_count: int
 
 
-class ScheduleVerificationResponse(BaseModel):
-    """Response model for schedule verification results."""
-
-    total_schedules: int
-    player_fetch_schedules: int
-    other_schedules: int
-    invalid_schedules: List[Dict[str, Any]]
-    orphaned_schedules: List[str]
-    duplicate_schedules: Dict[str, Any]
-    verification_timestamp: str
-
-
 class PlayerResponse(BaseModel):
     """Response model for player data."""
 
@@ -913,86 +901,6 @@ async def list_player_schedules(
     except Exception as e:
         logger.error(f"Error listing player schedules: {e}")
         raise PlayerServiceError(f"Failed to list player schedules: {e}")
-
-
-@router.post("/schedules/verify", response_model=ScheduleVerificationResponse)
-async def verify_all_schedules(
-    current_user: Dict[str, Any] = Depends(require_auth),
-) -> ScheduleVerificationResponse:
-    """
-    Manually trigger schedule verification for all players.
-
-    This endpoint runs a comprehensive verification of all schedules in Redis
-    and returns a detailed report of any issues found.
-
-    Args:
-        current_user: Authenticated user information
-
-    Returns:
-        ScheduleVerificationResponse: Detailed verification report
-
-    Raises:
-        500 Internal Server Error: Service errors
-    """
-    try:
-        logger.info(
-            f"User {current_user.get('username')} triggering schedule verification"
-        )
-
-        # Get schedule manager
-        from app.services.scheduler import get_player_schedule_manager
-
-        try:
-            schedule_manager = get_player_schedule_manager()
-        except Exception as e:
-            logger.error(f"Failed to get schedule manager: {e}")
-            raise PlayerServiceError("Schedule management is not available")
-
-        # Run verification
-        try:
-            verification_report = await schedule_manager.verify_all_schedules()
-
-            from datetime import datetime
-
-            verification_timestamp = datetime.utcnow().isoformat()
-
-            response = ScheduleVerificationResponse(
-                total_schedules=verification_report.get("total_schedules", 0),
-                player_fetch_schedules=verification_report.get(
-                    "player_fetch_schedules", 0
-                ),
-                other_schedules=verification_report.get("other_schedules", 0),
-                invalid_schedules=verification_report.get(
-                    "invalid_schedules", []
-                ),
-                orphaned_schedules=verification_report.get(
-                    "orphaned_schedules", []
-                ),
-                duplicate_schedules=verification_report.get(
-                    "duplicate_schedules", {}
-                ),
-                verification_timestamp=verification_timestamp,
-            )
-
-            logger.info(
-                f"Schedule verification completed: {verification_report.get('total_schedules', 0)} total schedules, "
-                f"{len(verification_report.get('invalid_schedules', []))} invalid, "
-                f"{len(verification_report.get('orphaned_schedules', []))} orphaned"
-            )
-
-            return response
-
-        except Exception as e:
-            logger.error(f"Failed to verify schedules: {e}")
-            raise PlayerServiceError(f"Failed to verify schedules: {e}")
-
-    except PlayerServiceError:
-        raise
-    except Exception as e:
-        logger.error(f"Error during schedule verification: {e}")
-        raise PlayerServiceError(
-            f"Failed to perform schedule verification: {e}"
-        )
 
 
 class PlayerSummaryResponse(BaseModel):

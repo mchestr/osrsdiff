@@ -13,6 +13,7 @@ import { AdminPlayerList } from './pages/AdminPlayerList';
 import { Settings } from './pages/Settings';
 import { TaskExecutions } from './pages/TaskExecutions';
 import { TaskExecutionDetail } from './pages/TaskExecutionDetail';
+import { ScheduledTasks } from './pages/ScheduledTasks';
 
 const AppRoutes = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -91,6 +92,16 @@ const AppRoutes = () => {
           <ProtectedRoute requireAdmin>
             <Layout>
               <TaskExecutionDetail />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/scheduled-tasks"
+        element={
+          <ProtectedRoute requireAdmin>
+            <Layout>
+              <ScheduledTasks />
             </Layout>
           </ProtectedRoute>
         }

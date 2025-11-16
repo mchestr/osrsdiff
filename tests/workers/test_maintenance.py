@@ -5,18 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.workers.maintenance import (
-    cleanup_orphaned_schedules_job,
-    schedule_verification_job,
-)
+from app.workers.maintenance import schedule_maintenance_job
 
 
-class TestScheduleVerificationJob:
-    """Test cases for schedule_verification_job."""
+class TestScheduleMaintenanceJob:
+    """Test cases for schedule_maintenance_job."""
 
     @pytest.mark.asyncio
-    async def test_schedule_verification_job_success(self):
-        """Test successful schedule verification job."""
+    async def test_schedule_maintenance_job_success(self):
+        """Test successful schedule maintenance job."""
         mock_summary_result = {
             "status": "success",
             "summary": {
@@ -33,10 +30,28 @@ class TestScheduleVerificationJob:
             "inconsistency_types": {},
         }
 
-        mock_cleanup_result = {
+        mock_orphaned_result = {
             "status": "success",
-            "orphaned_schedules": [],
-            "schedules_removed": 0,
+            "orphaned_schedules": [
+                {
+                    "schedule_id": "player_fetch_999",
+                    "reason": "Player not found",
+                }
+            ],
+            "schedules_removed": 1,
+        }
+
+        mock_duplicate_result = {
+            "status": "success",
+            "duplicates_found": 2,
+            "duplicates_removed": 2,
+            "duplicate_schedules": {
+                "player_fetch_123": {
+                    "total_occurrences": 2,
+                    "kept": 1,
+                    "removed": 1,
+                }
+            },
         }
 
         with patch(
@@ -59,23 +74,61 @@ class TestScheduleVerificationJob:
                     return_value=mock_consistency_result
                 )
                 mock_service.cleanup_orphaned_schedules = AsyncMock(
-                    return_value=mock_cleanup_result
+                    return_value=mock_orphaned_result
                 )
-                mock_service.fix_player_schedule = AsyncMock()
+                mock_service.cleanup_duplicate_schedules = AsyncMock(
+                    return_value=mock_duplicate_result
+                )
 
                 with patch(
                     "app.workers.maintenance.get_player_schedule_manager"
                 ) as mock_get_manager:
-                    result = await schedule_verification_job()
+                    result = await schedule_maintenance_job()
 
-                    assert result["status"] == "healthy"
+                    # Status is "cleaned" when orphaned or duplicates are found (even if consistent)
+                    assert result["status"] == "cleaned"
+                    assert result["cleanup"]["orphaned_schedules_removed"] == 1
+                    assert result["cleanup"]["duplicates_removed"] == 2
                     assert "summary" in result
                     assert "verification" in result
                     assert "cleanup" in result
+                    assert "fixes" in result
+                    assert "orphaned_cleanup" in result
+                    assert "duplicate_cleanup" in result
+                    assert "duration_seconds" in result
 
     @pytest.mark.asyncio
-    async def test_schedule_verification_job_with_inconsistencies(self):
-        """Test schedule verification job with inconsistencies."""
+    async def test_schedule_maintenance_job_error(self):
+        """Test schedule maintenance job with error."""
+        with patch(
+            "app.workers.maintenance.AsyncSessionLocal"
+        ) as mock_session_local:
+            mock_session = AsyncMock()
+            mock_session_local.return_value.__aenter__.return_value = (
+                mock_session
+            )
+
+            with patch(
+                "app.workers.maintenance.ScheduleMaintenanceService"
+            ) as mock_service_class:
+                mock_service = MagicMock()
+                mock_service_class.return_value = mock_service
+                mock_service.get_schedule_summary = AsyncMock(
+                    side_effect=Exception("Service error")
+                )
+
+                with patch(
+                    "app.workers.maintenance.get_player_schedule_manager"
+                ) as mock_get_manager:
+                    result = await schedule_maintenance_job()
+
+                    assert result["status"] == "error"
+                    assert "error" in result
+                    assert "duration_seconds" in result
+
+    @pytest.mark.asyncio
+    async def test_schedule_maintenance_job_with_inconsistencies(self):
+        """Test schedule maintenance job with inconsistencies and fixes."""
         mock_summary_result = {
             "status": "success",
             "summary": {
@@ -98,10 +151,17 @@ class TestScheduleVerificationJob:
             "inconsistency_types": {"missing_redis_schedule": 1},
         }
 
-        mock_cleanup_result = {
+        mock_orphaned_result = {
             "status": "success",
             "orphaned_schedules": [],
             "schedules_removed": 0,
+        }
+
+        mock_duplicate_result = {
+            "status": "success",
+            "duplicates_found": 0,
+            "duplicates_removed": 0,
+            "duplicate_schedules": {},
         }
 
         mock_player = MagicMock()
@@ -129,17 +189,22 @@ class TestScheduleVerificationJob:
                     return_value=mock_consistency_result
                 )
                 mock_service.cleanup_orphaned_schedules = AsyncMock(
-                    return_value=mock_cleanup_result
+                    return_value=mock_orphaned_result
+                )
+                mock_service.cleanup_duplicate_schedules = AsyncMock(
+                    return_value=mock_duplicate_result
                 )
                 mock_service.fix_player_schedule = AsyncMock(
-                    return_value={"status": "success"}
+                    return_value={
+                        "status": "success",
+                        "new_schedule_id": "player_fetch_1",
+                    }
                 )
 
                 with patch(
                     "app.workers.maintenance.get_player_schedule_manager"
                 ) as mock_get_manager:
                     # Mock the database query that happens inside the function
-                    # The function imports select and Player inside, so we patch at the sqlalchemy level
                     with patch("sqlalchemy.select") as mock_select_module:
                         # Create a mock statement chain
                         mock_stmt = MagicMock()
@@ -155,7 +220,7 @@ class TestScheduleVerificationJob:
                             return_value=mock_result
                         )
 
-                        result = await schedule_verification_job()
+                        result = await schedule_maintenance_job()
 
                         assert result["status"] in [
                             "healthy",
@@ -164,104 +229,4 @@ class TestScheduleVerificationJob:
                         ]
                         assert "verification" in result
                         assert "fixes" in result
-
-    @pytest.mark.asyncio
-    async def test_schedule_verification_job_error(self):
-        """Test schedule verification job with error."""
-        with patch(
-            "app.workers.maintenance.AsyncSessionLocal"
-        ) as mock_session_local:
-            mock_session = AsyncMock()
-            mock_session_local.return_value.__aenter__.return_value = (
-                mock_session
-            )
-
-            with patch(
-                "app.workers.maintenance.ScheduleMaintenanceService"
-            ) as mock_service_class:
-                mock_service = MagicMock()
-                mock_service_class.return_value = mock_service
-                mock_service.get_schedule_summary = AsyncMock(
-                    side_effect=Exception("Service error")
-                )
-
-                with patch(
-                    "app.workers.maintenance.get_player_schedule_manager"
-                ) as mock_get_manager:
-                    result = await schedule_verification_job()
-
-                    assert result["status"] == "error"
-                    assert "error" in result
-
-
-class TestCleanupOrphanedSchedulesJob:
-    """Test cases for cleanup_orphaned_schedules_job."""
-
-    @pytest.mark.asyncio
-    async def test_cleanup_orphaned_schedules_job_success(self):
-        """Test successful orphaned schedule cleanup job."""
-        mock_cleanup_result = {
-            "status": "success",
-            "orphaned_schedules": [
-                {
-                    "schedule_id": "player_fetch_999",
-                    "reason": "Player not found",
-                }
-            ],
-            "schedules_removed": 1,
-        }
-
-        with patch(
-            "app.workers.maintenance.AsyncSessionLocal"
-        ) as mock_session_local:
-            mock_session = AsyncMock()
-            mock_session_local.return_value.__aenter__.return_value = (
-                mock_session
-            )
-
-            with patch(
-                "app.workers.maintenance.ScheduleMaintenanceService"
-            ) as mock_service_class:
-                mock_service = MagicMock()
-                mock_service_class.return_value = mock_service
-                mock_service.cleanup_orphaned_schedules = AsyncMock(
-                    return_value=mock_cleanup_result
-                )
-
-                with patch(
-                    "app.workers.maintenance.get_player_schedule_manager"
-                ) as mock_get_manager:
-                    result = await cleanup_orphaned_schedules_job()
-
-                    assert result["status"] == "success"
-                    assert result["schedules_removed"] == 1
-                    assert "duration_seconds" in result
-
-    @pytest.mark.asyncio
-    async def test_cleanup_orphaned_schedules_job_error(self):
-        """Test orphaned schedule cleanup job with error."""
-        with patch(
-            "app.workers.maintenance.AsyncSessionLocal"
-        ) as mock_session_local:
-            mock_session = AsyncMock()
-            mock_session_local.return_value.__aenter__.return_value = (
-                mock_session
-            )
-
-            with patch(
-                "app.workers.maintenance.ScheduleMaintenanceService"
-            ) as mock_service_class:
-                mock_service = MagicMock()
-                mock_service_class.return_value = mock_service
-                mock_service.cleanup_orphaned_schedules = AsyncMock(
-                    side_effect=Exception("Cleanup error")
-                )
-
-                with patch(
-                    "app.workers.maintenance.get_player_schedule_manager"
-                ) as mock_get_manager:
-                    result = await cleanup_orphaned_schedules_job()
-
-                    assert result["status"] == "error"
-                    assert "error" in result
-                    assert "duration_seconds" in result
+                        assert result["fixes"]["schedules_fixed"] == 1

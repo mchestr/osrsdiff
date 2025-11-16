@@ -25,7 +25,7 @@ redis_schedule_source = ListRedisScheduleSource(
 )
 
 # Label-based schedule source for static schedules
-label_schedule_source = LabelScheduleSource(broker)  # type: ignore[has-type]
+label_schedule_source = LabelScheduleSource(broker)
 
 
 def create_scheduler_sources() -> List[Any]:

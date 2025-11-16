@@ -648,6 +648,151 @@ class ScheduleMaintenanceService:
                 "timestamp": datetime.now(UTC).isoformat(),
             }
 
+    async def cleanup_duplicate_schedules(
+        self, db_session: AsyncSession, dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Remove duplicate schedules, keeping only the first occurrence.
+
+        Args:
+            db_session: Database session
+            dry_run: If True, return what would be done without making changes
+
+        Returns:
+            Dict with cleanup results and statistics
+        """
+        logger.info("Starting cleanup of duplicate schedules")
+
+        try:
+            # Get all schedules from Redis
+            all_schedules = (
+                await self.schedule_manager.redis_source.get_schedules()
+            )
+
+            # Track duplicates - collect all occurrences of each schedule_id
+            schedule_ids_seen: Dict[str, List[Any]] = {}
+            for schedule in all_schedules:
+                schedule_id = schedule.schedule_id
+                if schedule_id not in schedule_ids_seen:
+                    schedule_ids_seen[schedule_id] = []
+                schedule_ids_seen[schedule_id].append(schedule)
+
+            # Find duplicates (schedule_ids that appear more than once)
+            duplicate_schedules = {
+                schedule_id: occurrences
+                for schedule_id, occurrences in schedule_ids_seen.items()
+                if len(occurrences) > 1
+            }
+
+            if not duplicate_schedules:
+                return {
+                    "status": "success",
+                    "message": "No duplicate schedules found",
+                    "schedules_processed": len(all_schedules),
+                    "duplicates_found": 0,
+                    "duplicates_removed": 0,
+                    "duplicate_schedules": {},
+                }
+
+            # Remove duplicates (keep first occurrence, remove the rest)
+            # Note: delete_schedule removes all occurrences of a schedule_id,
+            # so we delete all and then recreate the first one if it's a player schedule
+            removed_count = 0
+            removal_errors = []
+            duplicate_details = {}
+            player_schedules_to_recreate = []
+
+            if not dry_run:
+                for schedule_id, occurrences in duplicate_schedules.items():
+                    first_schedule = occurrences[0]
+                    total_duplicates = (
+                        len(occurrences) - 1
+                    )  # Number of duplicates (excluding first)
+
+                    duplicate_details[schedule_id] = {
+                        "total_occurrences": len(occurrences),
+                        "kept": 1,
+                        "removed": total_duplicates,
+                    }
+
+                    try:
+                        # Delete all occurrences (delete_schedule removes all with this schedule_id)
+                        await self.schedule_manager.redis_source.delete_schedule(
+                            schedule_id
+                        )
+                        removed_count += total_duplicates
+                        logger.info(
+                            f"Removed {total_duplicates} duplicate(s) for schedule: {schedule_id}"
+                        )
+
+                        # If this is a player schedule, we need to recreate it from the database
+                        if schedule_id.startswith("player_fetch_"):
+                            player_schedules_to_recreate.append(schedule_id)
+                    except Exception as e:
+                        error_msg = f"Failed to remove duplicate {schedule_id}: {str(e)}"
+                        removal_errors.append(error_msg)
+                        logger.error(error_msg)
+
+                # Recreate player schedules that were deleted
+                for schedule_id in player_schedules_to_recreate:
+                    try:
+                        # Extract player_id from schedule_id
+                        player_id_str = schedule_id.replace(
+                            "player_fetch_", ""
+                        )
+                        player_id = int(player_id_str)
+
+                        # Get the player from database
+                        from app.models.player import Player
+
+                        player_stmt = select(Player).where(
+                            Player.id == player_id
+                        )
+                        player_result = await db_session.execute(player_stmt)
+                        player = player_result.scalar_one_or_none()
+
+                        if player and player.is_active:
+                            # Recreate the schedule using the schedule manager
+                            new_schedule_id = await self.schedule_manager.ensure_player_scheduled(
+                                player
+                            )
+                            logger.info(
+                                f"Recreated schedule for player {player_id}: {new_schedule_id}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Could not recreate schedule {schedule_id}: player {player_id} not found or inactive"
+                            )
+                    except Exception as e:
+                        error_msg = f"Failed to recreate schedule {schedule_id}: {str(e)}"
+                        removal_errors.append(error_msg)
+                        logger.error(error_msg)
+
+            result = {
+                "status": "success",
+                "message": f"Cleanup completed: {len(duplicate_schedules)} duplicate schedule IDs found",
+                "schedules_processed": len(all_schedules),
+                "duplicates_found": len(duplicate_schedules),
+                "duplicates_removed": removed_count if not dry_run else 0,
+                "duplicate_schedules": duplicate_details,
+                "dry_run": dry_run,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+
+            if removal_errors:
+                result["removal_errors"] = removal_errors
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error during duplicate schedule cleanup: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "message": f"Cleanup failed: {str(e)}",
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+
 
 # Dependency injection function for FastAPI
 async def get_schedule_maintenance_service(

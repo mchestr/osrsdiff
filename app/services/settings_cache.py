@@ -1,6 +1,5 @@
 """Settings cache service for accessing settings from database."""
 
-import json
 import logging
 from typing import Any, Dict, Optional
 

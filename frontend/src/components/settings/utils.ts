@@ -54,21 +54,8 @@ export const groupSettingsBySection = (settings: Setting[]): SettingSection[] =>
     });
   }
 
-  if (sections.database.length > 0) {
-    result.push({
-      title: 'Database Settings',
-      description: 'Configure database connection and pool settings',
-      settings: sections.database.sort((a, b) => a.key.localeCompare(b.key)),
-    });
-  }
-
-  if (sections.redis.length > 0) {
-    result.push({
-      title: 'Redis Settings',
-      description: 'Configure Redis connection settings',
-      settings: sections.redis.sort((a, b) => a.key.localeCompare(b.key)),
-    });
-  }
+  // Database and Redis settings are excluded from UI as they're not easily changeable
+  // They're filtered out before grouping in the Settings page
 
   if (sections.jwt.length > 0) {
     result.push({

@@ -235,39 +235,6 @@ class TestBasicSchedulerIntegration:
         with pytest.raises(ValueError, match="Fetch interval too large"):
             manager._interval_to_cron(max_minutes + 1)
 
-    @pytest.mark.asyncio
-    async def test_verify_all_schedules_mock(self):
-        """Test verify_all_schedules with mocked Redis data."""
-        mock_redis_source = AsyncMock()
-        manager = PlayerScheduleManager(mock_redis_source)
-
-        # Mock schedules data
-        mock_schedule1 = MagicMock()
-        mock_schedule1.schedule_id = "player_fetch_123"
-        mock_schedule1.labels = {"player_id": "123"}
-
-        mock_schedule2 = MagicMock()
-        mock_schedule2.schedule_id = "player_fetch_456"
-        mock_schedule2.labels = {"player_id": "456"}
-
-        mock_schedule3 = MagicMock()
-        mock_schedule3.schedule_id = "other_task_789"
-        mock_schedule3.labels = {}
-
-        mock_redis_source.get_schedules.return_value = [
-            mock_schedule1,
-            mock_schedule2,
-            mock_schedule3,
-        ]
-
-        result = await manager.verify_all_schedules()
-
-        assert result["total_schedules"] == 3
-        assert result["player_fetch_schedules"] == 2
-        assert result["other_schedules"] == 1
-        assert len(result["invalid_schedules"]) == 0
-        assert len(result["duplicate_schedules"]) == 0
-
     def test_deterministic_schedule_id_generation(self):
         """Test that schedule IDs are deterministic based on player ID."""
         redis_source = ListRedisScheduleSource(

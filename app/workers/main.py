@@ -17,19 +17,6 @@ dictConfig(LogConfig().model_dump())
 logger = logging.getLogger(__name__)
 
 
-def _get_broker_config() -> dict:
-    """Get broker configuration from settings cache."""
-    return {
-        "redis_url": settings_cache.redis_url,
-        "max_connections": settings_cache.redis_max_connections,
-        "retry_count": settings_cache.taskiq_default_retry_count,
-        "retry_delay": settings_cache.taskiq_default_retry_delay,
-        "use_jitter": settings_cache.taskiq_use_jitter,
-        "use_delay_exponent": settings_cache.taskiq_use_delay_exponent,
-        "max_delay_exponent": settings_cache.taskiq_max_delay_exponent,
-    }
-
-
 # Create Redis result backend (will be reconfigured after cache loads)
 result_backend: RedisAsyncResultBackend = RedisAsyncResultBackend(
     redis_url=config_defaults.redis.url,
@@ -60,9 +47,6 @@ broker.add_middlewares(TaskExecutionTrackingMiddleware())
 
 # Create a redis schedule source for use by services
 from taskiq_redis import ListRedisScheduleSource
-
-# Import scheduler from dedicated configuration module
-from app.workers.scheduler import scheduler
 
 redis_schedule_source = ListRedisScheduleSource(
     url=config_defaults.redis.url,

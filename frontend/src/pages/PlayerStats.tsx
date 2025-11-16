@@ -51,8 +51,8 @@ export const PlayerStats: React.FC = () => {
   const [bossProgressLoading, setBossProgressLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [summary, setSummary] = useState<PlayerSummary | null>(null);
-  const [generatingSummary, setGeneratingSummary] = useState(false);
   const [recalculatingGameMode, setRecalculatingGameMode] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
   const { showNotification } = useNotificationContext();
   const [polling, setPolling] = useState(false);
   const pollAttemptsRef = useRef(0);
@@ -232,6 +232,36 @@ export const PlayerStats: React.FC = () => {
     }
   };
 
+  const handleGenerateSummary = async () => {
+    if (!username || !metadata) return;
+
+    setGeneratingSummary(true);
+    try {
+      await api.SystemService.generateSummariesApiV1SystemGenerateSummariesPost({
+        player_id: metadata.id,
+        force_regenerate: false,
+      });
+      showNotification('Summary generation task enqueued successfully', 'success');
+
+      // Refresh summary after a delay
+      setTimeout(async () => {
+        try {
+          const summaryRes = await api.PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username).catch(() => null);
+          if (summaryRes) {
+            setSummary(summaryRes as PlayerSummary);
+          }
+        } catch (err) {
+          // Silently fail - summary refresh is optional
+        }
+      }, 5000);
+    } catch (error: unknown) {
+      const errorMessage = extractErrorMessage(error, 'Failed to generate summary');
+      showNotification(errorMessage, 'error');
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
   const handleTriggerFetch = async () => {
     if (!username) return;
 
@@ -316,48 +346,6 @@ export const PlayerStats: React.FC = () => {
     setBossProgress(null);
   };
 
-  const handleGenerateSummary = async () => {
-    if (!metadata || !metadata.id) {
-      showNotification('Player ID not available', 'error');
-      return;
-    }
-
-    setGeneratingSummary(true);
-    try {
-      const response = await api.SystemService.generateSummariesApiV1SystemGenerateSummariesPost({
-        player_id: metadata.id,
-        force_regenerate: false,
-      });
-
-      showNotification(
-        <div className="space-y-1">
-          <p>{response.message}</p>
-          <p className="text-sm text-secondary-500 dark:text-secondary-300">
-            Summary generation task has been enqueued. The summary will appear here once generated.
-          </p>
-        </div>,
-        'success'
-      );
-
-      setTimeout(async () => {
-        if (username) {
-          try {
-            const summaryRes = await api.PlayersService.getPlayerSummaryApiV1PlayersUsernameSummaryGet(username).catch(() => null);
-            if (summaryRes) {
-              setSummary(summaryRes as PlayerSummary);
-            }
-          } catch (err) {
-            // Silently fail - summary refresh is optional
-          }
-        }
-      }, 5000);
-    } catch (error: unknown) {
-      const errorMessage = extractErrorMessage(error, 'Failed to generate summary');
-      showNotification(errorMessage, 'error');
-    } finally {
-      setGeneratingSummary(false);
-    }
-  };
 
   if (loading) {
     return <LoadingSpinner message={polling ? 'Fetching player stats...' : 'Loading...'} fullScreen />;

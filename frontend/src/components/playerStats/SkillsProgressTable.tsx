@@ -12,7 +12,7 @@ interface SkillsProgressTableProps {
   onSkillClick: (skillName: string) => void;
 }
 
-interface SkillWithProgress extends OrderedSkill {
+interface SkillWithProgress extends OrderedSkill, Record<string, unknown> {
   experienceGained: number;
   levelsGained: number;
 }

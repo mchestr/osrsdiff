@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -317,87 +317,6 @@ class SettingService:
                 "number",
                 None,
             ),
-            # TaskIQ settings
-            (
-                "taskiq_default_retry_count",
-                "taskiq.default_retry_count",
-                "TaskIQ Default Retry Count",
-                "Default number of task retries",
-                "number",
-                None,
-            ),
-            (
-                "taskiq_default_retry_delay",
-                "taskiq.default_retry_delay",
-                "TaskIQ Default Retry Delay",
-                "Default retry delay in seconds (base for exponential backoff)",
-                "number",
-                None,
-            ),
-            (
-                "taskiq_max_retry_delay",
-                "taskiq.max_retry_delay",
-                "TaskIQ Max Retry Delay",
-                "Maximum retry delay in seconds",
-                "number",
-                None,
-            ),
-            (
-                "taskiq_task_timeout",
-                "taskiq.task_timeout",
-                "TaskIQ Task Timeout",
-                "Default task timeout in seconds",
-                "number",
-                None,
-            ),
-            (
-                "taskiq_result_ttl",
-                "taskiq.result_ttl",
-                "TaskIQ Result TTL",
-                "Task result TTL in seconds",
-                "number",
-                None,
-            ),
-            (
-                "taskiq_worker_concurrency",
-                "taskiq.worker_concurrency",
-                "TaskIQ Worker Concurrency",
-                "Number of concurrent tasks per worker",
-                "number",
-                None,
-            ),
-            (
-                "taskiq_scheduler_prefix",
-                "taskiq.scheduler_prefix",
-                "TaskIQ Scheduler Prefix",
-                "Redis prefix for TaskIQ schedules",
-                "string",
-                None,
-            ),
-            (
-                "taskiq_use_jitter",
-                "taskiq.use_jitter",
-                "TaskIQ Use Jitter",
-                "Enable jitter to distribute retries evenly",
-                "boolean",
-                None,
-            ),
-            (
-                "taskiq_use_delay_exponent",
-                "taskiq.use_delay_exponent",
-                "TaskIQ Use Delay Exponent",
-                "Enable exponential backoff for retries",
-                "boolean",
-                None,
-            ),
-            (
-                "taskiq_max_delay_exponent",
-                "taskiq.max_delay_exponent",
-                "TaskIQ Max Delay Exponent",
-                "Maximum delay exponent in seconds for exponential backoff",
-                "number",
-                None,
-            ),
             # Admin settings
             (
                 "admin_username",
@@ -522,37 +441,6 @@ class SettingService:
                 f"Initialized {initialized_count} settings from config"
             )
 
-    async def load_settings_to_config(self, db: AsyncSession) -> None:
-        """Load settings from database and apply them to the config object."""
-        settings_dict = await self.get_all_settings_dict(db)
-
-        if not settings_dict:
-            logger.debug(
-                "No settings found in database, using config defaults"
-            )
-            return
-
-        applied_count = 0
-        for key, value in settings_dict.items():
-            try:
-                # Map setting keys to config paths
-                config_path = self._get_config_path_for_key(key)
-                if config_path:
-                    self._set_nested_config_value(
-                        app_settings, config_path, value
-                    )
-                    applied_count += 1
-                    logger.debug(f"Applied setting '{key}' to config")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to apply setting '{key}' to config: {e}"
-                )
-
-        if applied_count > 0:
-            logger.info(
-                f"Applied {applied_count} settings from database to config"
-            )
-
     def _get_config_path_for_key(self, key: str) -> Optional[str]:
         """Get the config path for a setting key."""
         # Map keys to config paths
@@ -571,16 +459,6 @@ class SettingService:
             "jwt_algorithm": "jwt.algorithm",
             "jwt_access_token_expire_minutes": "jwt.access_token_expire_minutes",
             "jwt_refresh_token_expire_days": "jwt.refresh_token_expire_days",
-            "taskiq_default_retry_count": "taskiq.default_retry_count",
-            "taskiq_default_retry_delay": "taskiq.default_retry_delay",
-            "taskiq_max_retry_delay": "taskiq.max_retry_delay",
-            "taskiq_task_timeout": "taskiq.task_timeout",
-            "taskiq_result_ttl": "taskiq.result_ttl",
-            "taskiq_worker_concurrency": "taskiq.worker_concurrency",
-            "taskiq_scheduler_prefix": "taskiq.scheduler_prefix",
-            "taskiq_use_jitter": "taskiq.use_jitter",
-            "taskiq_use_delay_exponent": "taskiq.use_delay_exponent",
-            "taskiq_max_delay_exponent": "taskiq.max_delay_exponent",
             "admin_username": "admin.username",
             "admin_password": "admin.password",
             "admin_email": "admin.email",
@@ -602,43 +480,6 @@ class SettingService:
                 return None
             current = getattr(current, part)
         return current
-
-    def _set_nested_config_value(
-        self, config_obj: object, path: str, value: Any
-    ) -> None:
-        """Set a nested config value by dot-separated path."""
-        parts = path.split(".")
-        current = config_obj
-
-        # Navigate to the parent object
-        for part in parts[:-1]:
-            if not hasattr(current, part):
-                raise ValueError(f"Config path '{path}' is invalid")
-            current = getattr(current, part)
-
-        # Set the value on the final object
-        final_key = parts[-1]
-        if not hasattr(current, final_key):
-            raise ValueError(f"Config path '{path}' is invalid")
-
-        # Convert value to appropriate type based on current value
-        current_value = getattr(current, final_key)
-        if isinstance(current_value, bool):
-            value = value.lower() in ("true", "1", "yes", "on")
-        elif isinstance(current_value, int):
-            value = int(value)
-        elif isinstance(current_value, float):
-            value = float(value)
-        elif isinstance(current_value, str):
-            value = str(value)
-        # For Optional types, handle None
-        elif current_value is None:
-            if value.lower() in ("none", "null", ""):
-                value = None
-            else:
-                value = str(value)
-
-        setattr(current, final_key, value)
 
 
 # Global setting service instance

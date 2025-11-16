@@ -344,6 +344,12 @@ async def get_player_distribution(
         )
 
 
+class MessageResponse(BaseModel):
+    """Generic message response."""
+
+    message: str
+
+
 class TaskTriggerResponse(BaseModel):
     """Response model for task trigger operations."""
 
@@ -399,33 +405,85 @@ async def get_scheduled_tasks(
             f"User {current_user.get('username')} requesting scheduled tasks info"
         )
 
-        # Import the TaskIQ scheduler
-        from app.workers.main import scheduler
+        # Import the TaskIQ scheduler and broker
+        from app.workers.main import broker
+        from app.workers.scheduler import scheduler
+        from taskiq_redis import ListRedisScheduleSource
 
-        # Get schedules from Redis schedule source
         tasks_info = []
 
-        # Get schedules from the Redis schedule source
-        redis_source = scheduler.sources[
-            0
-        ]  # First source is RedisScheduleSource
+        # Get dynamic schedules from Redis source
+        for source in scheduler.sources:
+            if isinstance(source, ListRedisScheduleSource):
+                try:
+                    schedules = await source.get_schedules()
+                    logger.info(
+                        f"Found {len(schedules)} dynamic schedules from Redis"
+                    )
+
+                    for schedule in schedules:
+                        task_info = ScheduledTaskInfo(
+                            name=schedule.schedule_id,
+                            cron_expression=schedule.cron or "N/A",
+                            description=f"Dynamic scheduled task: {schedule.task_name}",
+                            last_run=None,  # TaskIQ doesn't track last run in schedule
+                            next_run="Managed by TaskIQ scheduler",
+                            should_run_now=False,  # TaskIQ manages this internally
+                        )
+                        tasks_info.append(task_info)
+                except Exception as e:
+                    logger.warning(
+                        f"Could not retrieve schedules from Redis source: {e}"
+                    )
+
+        # Get static schedules from broker tasks (instead of LabelScheduleSource)
         try:
-            schedules = await redis_source.get_schedules()
+            all_tasks = broker.get_all_tasks()
+            logger.info(f"Found {len(all_tasks)} total tasks in broker")
 
-            for schedule in schedules:
-                # Convert TaskIQ schedule to our response format
-                task_info = ScheduledTaskInfo(
-                    name=schedule.schedule_id,
-                    cron_expression=schedule.cron or "N/A",
-                    description=f"TaskIQ scheduled task: {schedule.task_name}",
-                    last_run=None,  # TaskIQ doesn't track last run in schedule
-                    next_run="Managed by TaskIQ scheduler",
-                    should_run_now=False,  # TaskIQ manages this internally
-                )
-                tasks_info.append(task_info)
+            for task_name, task in all_tasks.items():
+                # Get schedule information from task.labels["schedule"] (as per LabelScheduleSource)
+                task_labels = getattr(task, "labels", {})
+                schedule_list = task_labels.get("schedule", [])
 
+                # If task has schedules, create entries for each schedule
+                if schedule_list:
+                    for schedule_config in schedule_list:
+                        if not isinstance(schedule_config, dict):
+                            continue
+
+                        # Extract cron expression (can be "cron" or "time" for one-time schedules)
+                        cron_expr = schedule_config.get("cron")
+                        if not cron_expr and schedule_config.get("time"):
+                            cron_expr = (
+                                f"One-time: {schedule_config.get('time')}"
+                            )
+                        cron_expr = cron_expr or "N/A"
+
+                        task_info = ScheduledTaskInfo(
+                            name=task_name,
+                            cron_expression=cron_expr,
+                            description=f"Static scheduled task: {task_name}",
+                            last_run=None,  # TaskIQ doesn't track last run in schedule
+                            next_run="Managed by TaskIQ scheduler",
+                            should_run_now=False,  # TaskIQ manages this internally
+                        )
+                        tasks_info.append(task_info)
+                else:
+                    # Task exists but has no schedule - still include it
+                    task_info = ScheduledTaskInfo(
+                        name=task_name,
+                        cron_expression="N/A",
+                        description=f"Static task (no schedule): {task_name}",
+                        last_run=None,
+                        next_run="N/A",
+                        should_run_now=False,
+                    )
+                    tasks_info.append(task_info)
         except Exception as e:
-            logger.warning(f"Could not retrieve schedules from Redis: {e}")
+            logger.warning(
+                f"Could not retrieve static schedules from broker: {e}"
+            )
 
         response = ScheduledTasksResponse(
             tasks=tasks_info,
@@ -453,11 +511,11 @@ async def trigger_scheduled_task(
     Manually trigger any scheduled task.
 
     This endpoint allows administrators to manually trigger any scheduled task
-    without waiting for its scheduled time. Currently supports triggering
-    TaskIQ tasks directly.
+    without waiting for its scheduled time. Supports triggering TaskIQ tasks
+    by their schedule_id.
 
     Args:
-        task_name: Name of the task to trigger (e.g., "check_game_mode_downgrades_task")
+        task_name: Schedule ID of the task to trigger (e.g., "player_fetch_123" or schedule_id)
         current_user: Authenticated user information
 
     Returns:
@@ -472,13 +530,123 @@ async def trigger_scheduled_task(
             f"User {current_user.get('username')} manually triggering task: {task_name}"
         )
 
-        # No scheduled tasks currently supported for manual triggering
-        raise NotFoundError(f"Task '{task_name}' not found")
+        # Import the TaskIQ scheduler
+        from app.workers.scheduler import scheduler
+
+        # Import all available maintenance/scheduled task functions
+        # Exclude player-specific tasks (fetch_player_hiscores_task, generate_player_summary_task)
+        # as they require player-specific arguments
+        from app.workers.summaries import daily_summary_generation_job
+        from app.workers.maintenance import schedule_maintenance_job
+
+        # Map all available general maintenance task functions by their function names
+        # Also include module-prefixed names for compatibility
+        task_map = {
+            "daily_summary_generation_job": daily_summary_generation_job,
+            "app.workers.summaries:daily_summary_generation_job": daily_summary_generation_job,
+            "schedule_maintenance_job": schedule_maintenance_job,
+            "app.workers.maintenance:schedule_maintenance_job": schedule_maintenance_job,
+        }
+
+        # Try to find task by schedule_id or task_name in both Redis and Label sources
+        from taskiq.schedule_sources import LabelScheduleSource
+
+        redis_source = scheduler.sources[
+            0
+        ]  # First source is RedisScheduleSource
+        redis_schedules = await redis_source.get_schedules()
+
+        # Find Label source
+        label_source = None
+        for source in scheduler.sources:
+            if isinstance(source, LabelScheduleSource):
+                label_source = source
+                break
+
+        label_schedules = []
+        if label_source:
+            try:
+                label_schedules = await label_source.get_schedules()
+            except Exception as e:
+                logger.warning(
+                    f"Could not retrieve schedules from Label source: {e}"
+                )
+
+        # Search for schedule in both sources
+        schedule = None
+        for s in redis_schedules + label_schedules:
+            schedule_id = (
+                s.schedule_id
+                if hasattr(s, "schedule_id")
+                else getattr(s, "task_name", None)
+            )
+            if schedule_id == task_name or s.task_name == task_name:
+                schedule = s
+                break
+
+        task_func = None
+        task_args = ()
+        task_display_name = task_name
+
+        if schedule:
+            # Found a schedule - use its task name and arguments
+            schedule_task_name = schedule.task_name
+            task_display_name = schedule_task_name
+
+            # Extract function name if it's in "module:function" format
+            if ":" in schedule_task_name:
+                function_name = schedule_task_name.split(":")[-1]
+            else:
+                function_name = schedule_task_name
+
+            task_func = task_map.get(schedule_task_name) or task_map.get(
+                function_name
+            )
+            task_args = (
+                tuple(schedule.args)
+                if hasattr(schedule, "args") and schedule.args
+                else ()
+            )
+        else:
+            # No schedule found - try to trigger directly by function name
+            # Extract function name if it's in "module:function" format
+            if ":" in task_name:
+                function_name = task_name.split(":")[-1]
+            else:
+                function_name = task_name
+
+            task_func = task_map.get(task_name) or task_map.get(function_name)
+            # For direct task triggering, use empty args for tasks that don't require them
+            # Tasks that require args will need to be triggered via schedule_id
+            task_args = ()
+
+        if not task_func:
+            available_tasks = [
+                k for k in task_map.keys() if not k.startswith("app.workers.")
+            ]
+            raise NotFoundError(
+                f"Task '{task_name}' not found. "
+                f"Available tasks: {', '.join(available_tasks)}"
+            )
+
+        # Trigger the task
+        task_result = await task_func.kiq(*task_args)
+
+        logger.info(
+            f"Successfully triggered task '{task_display_name}' "
+            f"(schedule_id: {task_name if schedule else 'direct'}, task_id: {task_result.task_id})"
+        )
+
+        return TaskTriggerResponse(
+            task_name=task_display_name,
+            message=f"Task '{task_display_name}' triggered successfully",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
 
     except NotFoundError:
         raise
     except Exception as e:
-        logger.error(f"Error triggering task {task_name}: {e}")
+        logger.error(f"Error triggering task {task_name}: {e}", exc_info=True)
         raise InternalServerError("Failed to trigger task", detail=str(e))
 
 
@@ -739,30 +907,6 @@ class PlayerSummaryResponse(BaseModel):
         )
 
 
-class GenerateSummaryRequest(BaseModel):
-    """Request model for generating summaries."""
-
-    player_id: Optional[int] = Field(
-        None,
-        description="Specific player ID to generate summary for (optional)",
-    )
-    force_regenerate: bool = Field(
-        False, description="Force regeneration even if recent summary exists"
-    )
-
-
-class GenerateSummaryResponse(BaseModel):
-    """Response model for summary generation."""
-
-    message: str = Field(description="Success message")
-    tasks_triggered: int = Field(
-        description="Number of summary generation tasks triggered"
-    )
-    task_ids: List[str] = Field(
-        description="List of task IDs for triggered tasks"
-    )
-
-
 class CostStatsResponse(BaseModel):
     """Response model for cost statistics."""
 
@@ -789,107 +933,6 @@ class CostStatsResponse(BaseModel):
     by_model: Dict[str, Dict[str, Any]] = Field(
         description="Cost breakdown by model"
     )
-
-
-@router.post("/generate-summaries", response_model=GenerateSummaryResponse)
-async def generate_summaries(
-    request: GenerateSummaryRequest,
-    db_session: AsyncSession = Depends(get_db_session),
-    current_user: Dict[str, Any] = Depends(require_admin),
-) -> GenerateSummaryResponse:
-    """
-    Trigger AI-powered progress summary generation for players.
-
-    This endpoint triggers asynchronous background tasks to generate summaries
-    using OpenAI API that analyze player progress over the last day and week.
-    Admins can trigger this for all players or a specific player. The API returns
-    immediately after enqueuing tasks without waiting for summary generation.
-
-    Args:
-        request: Summary generation request with optional player_id
-        db_session: Database session dependency
-        current_user: Authenticated admin user information
-
-    Returns:
-        GenerateSummaryResponse: Number of tasks triggered and their IDs
-
-    Raises:
-        403 Forbidden: User is not an admin
-        404 Not Found: Player not found (if player_id specified)
-        500 Internal Server Error: Task enqueue errors
-    """
-    try:
-        logger.info(
-            f"Admin {current_user.get('username')} triggering summary generation tasks "
-            f"(player_id={request.player_id}, force={request.force_regenerate})"
-        )
-
-        from app.workers.tasks import generate_player_summary_task
-
-        task_ids = []
-
-        if request.player_id:
-            # Verify player exists
-            player_result = await db_session.execute(
-                select(Player).where(Player.id == request.player_id)
-            )
-            player = player_result.scalar_one_or_none()
-            if not player:
-                raise NotFoundError(
-                    f"Player with ID {request.player_id} not found"
-                )
-
-            # Trigger task for specific player
-            task_result = await generate_player_summary_task.kiq(
-                request.player_id, force_regenerate=request.force_regenerate
-            )
-            task_ids.append(task_result.task_id)
-            logger.info(
-                f"Triggered summary generation task for player {request.player_id} "
-                f"(task ID: {task_result.task_id})"
-            )
-        else:
-            # Get all active players and trigger a task for each
-            players_stmt = select(Player).where(Player.is_active.is_(True))
-            players_result = await db_session.execute(players_stmt)
-            players = list(players_result.scalars().all())
-
-            logger.info(
-                f"Triggering summary generation tasks for {len(players)} active players"
-            )
-
-            for player in players:
-                try:
-                    task_result = await generate_player_summary_task.kiq(
-                        player.id, force_regenerate=request.force_regenerate
-                    )
-                    task_ids.append(task_result.task_id)
-                except Exception as e:
-                    logger.error(
-                        f"Failed to enqueue summary task for player {player.id} ({player.username}): {e}"
-                    )
-                    # Continue with other players even if one fails
-
-        response = GenerateSummaryResponse(
-            message=f"Successfully triggered {len(task_ids)} summary generation tasks",
-            tasks_triggered=len(task_ids),
-            task_ids=task_ids,
-        )
-
-        logger.info(
-            f"Successfully triggered {len(task_ids)} summary generation tasks"
-        )
-        return response
-
-    except NotFoundError:
-        raise
-    except Exception as e:
-        logger.error(
-            f"Error triggering summary generation tasks: {e}", exc_info=True
-        )
-        raise InternalServerError(
-            "Failed to trigger summary generation tasks", detail=str(e)
-        )
 
 
 # AI model pricing per 1M tokens (as of 2024)

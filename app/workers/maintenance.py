@@ -17,26 +17,29 @@ from app.workers.main import broker
 logger = logging.getLogger(__name__)
 
 
-# Daily schedule verification job - runs at 3 AM UTC
+# Daily schedule maintenance job - runs at 4 AM UTC
 @broker.task(
-    schedule=[{"cron": "0 3 * * *"}],
+    schedule=[{"cron": "0 4 * * *"}],
     retry_on_error=True,
     max_retries=2,
     delay=30.0,
     task_timeout=1800.0,
 )
-async def schedule_verification_job() -> Dict[str, Any]:
+async def schedule_maintenance_job() -> Dict[str, Any]:
     """
-    Periodic job to verify schedule consistency between database and Redis.
+    Comprehensive schedule maintenance job.
 
-    This task runs periodically to ensure that all active players have valid
-    schedules and that there are no orphaned schedules in Redis. It performs
-    automatic cleanup and fixes where possible.
+    This task performs complete schedule maintenance including:
+    - Getting schedule summary and statistics
+    - Verifying consistency between database and Redis
+    - Cleaning up orphaned schedules (for deleted or inactive players)
+    - Removing duplicate schedules (keeping only the first occurrence)
+    - Automatically fixing missing or invalid schedules
 
     Returns:
-        Dict containing verification results and any actions taken
+        Dict containing comprehensive maintenance results
     """
-    logger.info("Starting periodic schedule verification job")
+    logger.info("Starting comprehensive schedule maintenance job")
     start_time = datetime.now(UTC)
 
     async with AsyncSessionLocal() as db_session:
@@ -109,19 +112,34 @@ async def schedule_verification_job() -> Dict[str, Any]:
             else:
                 logger.info("No schedule inconsistencies found")
 
-            # Perform automatic cleanup of orphaned schedules
-            cleanup_result = (
+            # Cleanup orphaned schedules
+            orphaned_result = (
                 await maintenance_service.cleanup_orphaned_schedules(
                     db_session, dry_run=False
                 )
             )
 
-            orphaned_count = len(cleanup_result.get("orphaned_schedules", []))
-            removed_count = cleanup_result.get("schedules_removed", 0)
+            orphaned_count = len(orphaned_result.get("orphaned_schedules", []))
+            orphaned_removed = orphaned_result.get("schedules_removed", 0)
 
             if orphaned_count > 0:
                 logger.info(
-                    f"Cleaned up {removed_count} orphaned schedules (found {orphaned_count})"
+                    f"Cleaned up {orphaned_removed} orphaned schedules (found {orphaned_count})"
+                )
+
+            # Cleanup duplicate schedules
+            duplicate_result = (
+                await maintenance_service.cleanup_duplicate_schedules(
+                    db_session, dry_run=False
+                )
+            )
+
+            duplicate_count = duplicate_result.get("duplicates_found", 0)
+            duplicate_removed = duplicate_result.get("duplicates_removed", 0)
+
+            if duplicate_count > 0:
+                logger.info(
+                    f"Cleaned up {duplicate_removed} duplicate schedules (found {duplicate_count})"
                 )
 
             # Attempt to fix players with missing schedules
@@ -191,13 +209,17 @@ async def schedule_verification_job() -> Dict[str, Any]:
             if (
                 consistency_result["is_consistent"]
                 and orphaned_count == 0
+                and duplicate_count == 0
                 and len(fix_errors) == 0
             ):
                 overall_status = "healthy"
                 message = "All schedules are consistent and healthy"
             elif len(fix_errors) == 0:
                 overall_status = "cleaned"
-                message = f"Cleaned up {removed_count} orphaned schedules, fixed {fixed_schedules} missing schedules"
+                message = (
+                    f"Maintenance completed: removed {orphaned_removed} orphaned schedules, "
+                    f"{duplicate_removed} duplicate schedules, fixed {fixed_schedules} missing schedules"
+                )
             else:
                 overall_status = "issues_remain"
                 message = f"Some issues remain: {len(fix_errors)} schedules could not be fixed"
@@ -213,103 +235,53 @@ async def schedule_verification_job() -> Dict[str, Any]:
                 },
                 "cleanup": {
                     "orphaned_schedules_found": orphaned_count,
-                    "orphaned_schedules_removed": removed_count,
+                    "orphaned_schedules_removed": orphaned_removed,
+                    "duplicates_found": duplicate_count,
+                    "duplicates_removed": duplicate_removed,
                 },
                 "fixes": {
                     "schedules_fixed": fixed_schedules,
                     "fix_errors": fix_errors,
                 },
+                "orphaned_cleanup": orphaned_result,
+                "duplicate_cleanup": duplicate_result,
                 "timestamp": datetime.now(UTC).isoformat(),
                 "duration_seconds": duration,
             }
 
+            # Check for errors in cleanup operations
+            if orphaned_result.get("status") != "success":
+                result["status"] = "partial_success"
+                result["orphaned_error"] = orphaned_result.get("error")
+                logger.warning(
+                    f"Orphaned schedule cleanup had errors: {orphaned_result.get('error')}"
+                )
+
+            if duplicate_result.get("status") != "success":
+                result["status"] = "partial_success"
+                result["duplicate_error"] = duplicate_result.get("error")
+                logger.warning(
+                    f"Duplicate schedule cleanup had errors: {duplicate_result.get('error')}"
+                )
+
             if overall_status == "issues_remain":
                 logger.warning(
-                    f"Schedule verification completed with remaining issues: {len(fix_errors)} errors"
+                    f"Schedule maintenance completed with remaining issues: {len(fix_errors)} errors"
                 )
             else:
                 logger.info(
-                    f"Schedule verification completed successfully ({overall_status})"
+                    f"Schedule maintenance completed successfully ({overall_status})"
                 )
 
             return result
 
         except Exception as e:
             duration = (datetime.now(UTC) - start_time).total_seconds()
-            logger.error(f"Fatal error during schedule verification job: {e}")
+            logger.error(f"Fatal error during schedule maintenance: {e}")
             return {
                 "status": "error",
                 "error": str(e),
-                "message": f"Schedule verification job failed: {str(e)}",
-                "timestamp": datetime.now(UTC).isoformat(),
-                "duration_seconds": duration,
-            }
-
-
-# Manual cleanup job (no schedule - triggered manually)
-@broker.task(
-    retry_on_error=True,
-    max_retries=2,
-    delay=15.0,
-    task_timeout=600.0,
-)
-async def cleanup_orphaned_schedules_job() -> Dict[str, Any]:
-    """
-    Background job to clean up orphaned schedules.
-
-    This task can be run manually or scheduled to remove schedules for
-    players that no longer exist or are inactive.
-
-    Returns:
-        Dict containing cleanup results
-    """
-    logger.info("Starting orphaned schedule cleanup job")
-    start_time = datetime.now(UTC)
-
-    async with AsyncSessionLocal() as db_session:
-        try:
-            # Create maintenance service
-            maintenance_service = ScheduleMaintenanceService(
-                get_player_schedule_manager()
-            )
-
-            # Perform cleanup
-            cleanup_result = (
-                await maintenance_service.cleanup_orphaned_schedules(
-                    db_session, dry_run=False
-                )
-            )
-
-            if cleanup_result["status"] != "success":
-                logger.error(
-                    f"Orphaned schedule cleanup failed: {cleanup_result.get('error')}"
-                )
-                return cleanup_result
-
-            orphaned_count = len(cleanup_result.get("orphaned_schedules", []))
-            removed_count = cleanup_result.get("schedules_removed", 0)
-
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-
-            if orphaned_count > 0:
-                logger.info(
-                    f"Cleanup completed: removed {removed_count} orphaned schedules"
-                )
-            else:
-                logger.info("Cleanup completed: no orphaned schedules found")
-
-            # Add duration to result
-            cleanup_result["duration_seconds"] = duration
-
-            return cleanup_result
-
-        except Exception as e:
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            logger.error(f"Fatal error during orphaned schedule cleanup: {e}")
-            return {
-                "status": "error",
-                "error": str(e),
-                "message": f"Orphaned schedule cleanup failed: {str(e)}",
+                "message": f"Schedule maintenance failed: {str(e)}",
                 "timestamp": datetime.now(UTC).isoformat(),
                 "duration_seconds": duration,
             }

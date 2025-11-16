@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from taskiq_redis import ListRedisScheduleSource
 
@@ -351,92 +351,6 @@ class PlayerScheduleManager:
                 f"Error verifying schedule for player {player.username}: {e}"
             )
             return False
-
-    async def verify_all_schedules(self) -> dict:
-        """
-        Verify all schedules in Redis and return a summary report.
-
-        This utility method can be used for maintenance and monitoring
-        to check the health of all scheduled tasks.
-
-        Returns:
-            dict: Summary report with schedule statistics and any issues found
-        """
-        try:
-            schedules = await self.redis_source.get_schedules()
-
-            report: Dict[str, Any] = {
-                "total_schedules": len(schedules),
-                "player_fetch_schedules": 0,
-                "other_schedules": 0,
-                "invalid_schedules": [],
-                "orphaned_schedules": [],
-                "duplicate_schedules": {},
-            }
-
-            schedule_ids_seen: Dict[str, Any] = {}
-
-            for schedule in schedules:
-                schedule_id = schedule.schedule_id
-
-                # Track duplicates
-                if schedule_id in schedule_ids_seen:
-                    duplicates_list = report["duplicate_schedules"]
-                    if schedule_id not in duplicates_list:
-                        duplicates_list[schedule_id] = []
-                    duplicates_list[schedule_id].append(schedule)
-                else:
-                    schedule_ids_seen[schedule_id] = schedule
-
-                # Categorize schedules
-                if schedule_id.startswith("player_fetch_"):
-                    report["player_fetch_schedules"] = (
-                        report["player_fetch_schedules"] + 1
-                    )
-
-                    # Validate player fetch schedule
-                    try:
-                        player_id_str = schedule_id.replace(
-                            "player_fetch_", ""
-                        )
-                        player_id = int(player_id_str)
-
-                        # Check if labels match
-                        if hasattr(schedule, "labels") and schedule.labels:
-                            stored_player_id = schedule.labels.get("player_id")
-                            if stored_player_id != str(player_id):
-                                invalid_list = report["invalid_schedules"]
-                                invalid_list.append(
-                                    {
-                                        "schedule_id": schedule_id,
-                                        "issue": f"Player ID mismatch: expected {player_id}, got {stored_player_id}",
-                                    }
-                                )
-
-                    except ValueError:
-                        invalid_list = report["invalid_schedules"]
-                        invalid_list.append(
-                            {
-                                "schedule_id": schedule_id,
-                                "issue": f"Invalid player ID format in schedule_id: {schedule_id}",
-                            }
-                        )
-                else:
-                    report["other_schedules"] = report["other_schedules"] + 1
-
-            return report
-
-        except Exception as e:
-            logger.error(f"Failed to verify all schedules: {e}")
-            return {
-                "error": str(e),
-                "total_schedules": 0,
-                "player_fetch_schedules": 0,
-                "other_schedules": 0,
-                "invalid_schedules": [],
-                "orphaned_schedules": [],
-                "duplicate_schedules": {},
-            }
 
     def _interval_to_cron(self, minutes: int) -> str:
         """

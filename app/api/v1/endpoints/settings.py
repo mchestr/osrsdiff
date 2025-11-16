@@ -149,8 +149,18 @@ async def get_all_settings(
         403 Forbidden: User is not an admin
     """
     settings = await setting_service.get_all_settings(db_session)
+    # Filter out Redis, database, and TaskIQ settings as they're not easily changeable
+    filtered_settings = [
+        setting
+        for setting in settings
+        if not setting.key.startswith("redis_")
+        and not setting.key.startswith("database_")
+        and not setting.key.startswith("taskiq_")
+    ]
     return SettingListResponse(
-        settings=[_setting_to_response(setting) for setting in settings]
+        settings=[
+            _setting_to_response(setting) for setting in filtered_settings
+        ]
     )
 
 
@@ -175,7 +185,15 @@ async def get_all_settings_dict(
         403 Forbidden: User is not an admin
     """
     settings_dict = await setting_service.get_all_settings_dict(db_session)
-    return SettingDictResponse(settings=settings_dict)
+    # Filter out Redis, database, and TaskIQ settings as they're not easily changeable
+    filtered_dict = {
+        key: value
+        for key, value in settings_dict.items()
+        if not key.startswith("redis_")
+        and not key.startswith("database_")
+        and not key.startswith("taskiq_")
+    }
+    return SettingDictResponse(settings=filtered_dict)
 
 
 @router.get("/{key}", response_model=SettingResponse)
@@ -201,6 +219,14 @@ async def get_setting(
         403 Forbidden: User is not an admin
         404 Not Found: Setting not found
     """
+    # Block access to Redis, database, and TaskIQ settings
+    if (
+        key.startswith("redis_")
+        or key.startswith("database_")
+        or key.startswith("taskiq_")
+    ):
+        raise NotFoundError(f"Setting '{key}' not found")
+
     setting = await setting_service.get_setting(db_session, key)
     if not setting:
         raise NotFoundError(f"Setting '{key}' not found")
@@ -233,6 +259,14 @@ async def update_setting(
         403 Forbidden: User is not an admin
         404 Not Found: Setting not found
     """
+    # Block updates to Redis, database, and TaskIQ settings
+    if (
+        key.startswith("redis_")
+        or key.startswith("database_")
+        or key.startswith("taskiq_")
+    ):
+        raise NotFoundError(f"Setting '{key}' not found")
+
     # Check if setting exists
     existing = await setting_service.get_setting(db_session, key)
     if not existing:
@@ -283,6 +317,16 @@ async def reset_setting(
         403 Forbidden: User is not an admin
         404 Not Found: Setting not found or no default value available
     """
+    # Block reset of Redis, database, and TaskIQ settings
+    if (
+        key.startswith("redis_")
+        or key.startswith("database_")
+        or key.startswith("taskiq_")
+    ):
+        raise NotFoundError(
+            f"Setting '{key}' not found or no default value available"
+        )
+
     setting = await setting_service.reset_setting_to_default(db_session, key)
     if not setting:
         raise NotFoundError(

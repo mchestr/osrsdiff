@@ -6,6 +6,7 @@ import type { CostStatsResponse } from '../models/OpenAICostStatsResponse';
 import type { DatabaseStatsResponse } from '../models/DatabaseStatsResponse';
 import type { GenerateSummaryRequest } from '../models/GenerateSummaryRequest';
 import type { GenerateSummaryResponse } from '../models/GenerateSummaryResponse';
+import type { MessageResponse } from '../models/MessageResponse';
 import type { PlayerDistributionResponse } from '../models/PlayerDistributionResponse';
 import type { ScheduledTasksResponse } from '../models/ScheduledTasksResponse';
 import type { SystemHealthResponse } from '../models/SystemHealthResponse';
@@ -151,6 +152,43 @@ export class SystemService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/system/trigger-task/{task_name}',
+            path: {
+                'task_name': taskName,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+
+    /**
+     * Delete Scheduled Task
+     * Delete a scheduled task.
+     *
+     * This endpoint allows administrators to delete scheduled tasks from the scheduler.
+     * Note: Player fetch tasks (schedule_id starting with "player_fetch_") should be
+     * managed through the player management endpoints, not directly deleted here.
+     *
+     * Args:
+     * task_name: Schedule ID of the task to delete
+     * current_user: Authenticated user information
+     *
+     * Returns:
+     * MessageResponse: Confirmation message
+     *
+     * Raises:
+     * 404 Not Found: Task not found
+     * 500 Internal Server Error: Task deletion errors
+     * @param taskName
+     * @returns MessageResponse Successful Response
+     * @throws ApiError
+     */
+    public static deleteScheduledTaskApiV1SystemScheduledTasksTaskNameDelete(
+        taskName: string,
+    ): CancelablePromise<MessageResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/system/scheduled-tasks/{task_name}',
             path: {
                 'task_name': taskName,
             },

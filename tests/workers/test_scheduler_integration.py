@@ -318,19 +318,14 @@ class TestSchedulerIntegration:
             redis_schedule_source, "*/30 * * * *", "invalid_player"
         )
 
-        # Run verification report
-        report = await schedule_manager.verify_all_schedules()
-
-        # Verify report structure
-        assert report["total_schedules"] == 3
-        assert report["player_fetch_schedules"] == 3
-        assert report["other_schedules"] == 0
-        assert len(report["invalid_schedules"]) == 1
-
-        # Verify invalid schedule is detected
-        invalid_schedule = report["invalid_schedules"][0]
-        assert invalid_schedule["schedule_id"] == "player_fetch_9999"
-        assert "Player ID mismatch" in invalid_schedule["issue"]
+        # Verify the invalid schedule exists in Redis
+        schedules = await redis_schedule_source.get_schedules()
+        invalid_schedule = next(
+            (s for s in schedules if s.schedule_id == "player_fetch_9999"),
+            None,
+        )
+        assert invalid_schedule is not None
+        assert invalid_schedule.labels.get("player_id") == "8888"
 
     @pytest.mark.asyncio
     async def test_redis_connection_failure_handling(
@@ -553,12 +548,13 @@ class TestSchedulerMigrationIntegration:
             redis_schedule_source, "*/30 * * * *", "deleted_player"
         )
 
-        # Run verification
-        report = await schedule_manager.verify_all_schedules()
-
-        # Should detect the orphaned schedule
-        assert report["total_schedules"] == 3  # 2 valid + 1 orphaned
-        assert report["player_fetch_schedules"] == 3
+        # Verify the orphaned schedule exists in Redis
+        schedules = await redis_schedule_source.get_schedules()
+        orphaned_schedule = next(
+            (s for s in schedules if s.schedule_id == orphaned_schedule_id),
+            None,
+        )
+        assert orphaned_schedule is not None
 
         # Cleanup orphaned schedule
         await redis_schedule_source.delete_schedule(orphaned_schedule_id)

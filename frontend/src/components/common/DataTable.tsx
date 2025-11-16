@@ -377,7 +377,7 @@ export function DataTable<T extends Record<string, unknown>>({
                       key={column.key}
                       className={column.className || ''}
                     >
-                      {column.render ? column.render(item) : item[column.key]}
+                      {column.render ? column.render(item) : (item[column.key] as ReactNode)}
                     </TableCell>
                   ))}
                 </TableRow>
