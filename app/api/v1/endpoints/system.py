@@ -454,9 +454,10 @@ async def get_scheduled_tasks(
         )
 
         # Import the TaskIQ scheduler and broker
-        from app.workers.main import broker
-        from app.workers.scheduler import scheduler, redis_schedule_source
         from taskiq_redis import ListRedisScheduleSource
+
+        from app.workers.main import broker
+        from app.workers.scheduler import redis_schedule_source, scheduler
 
         tasks_info = []
 
@@ -590,13 +591,13 @@ async def trigger_scheduled_task(
         )
 
         # Import the TaskIQ scheduler
+        from app.workers.maintenance import schedule_maintenance_job
         from app.workers.scheduler import scheduler
 
         # Import all available maintenance/scheduled task functions
         # Exclude player-specific tasks (fetch_player_hiscores_task, generate_player_summary_task)
         # as they require player-specific arguments
         from app.workers.summaries import daily_summary_generation_job
-        from app.workers.maintenance import schedule_maintenance_job
 
         # Map all available general maintenance task functions by their function names
         # Also include module-prefixed names for compatibility

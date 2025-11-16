@@ -1213,6 +1213,7 @@ class ScheduleMaintenanceService:
         """Get duplicate schedule IDs from Redis list directly."""
         try:
             import redis.asyncio as redis
+
             from app.config import settings as config_defaults
 
             redis_client = redis.from_url(

@@ -10,8 +10,10 @@ from datetime import UTC, datetime
 from typing import Any, Dict
 
 from app.models.base import AsyncSessionLocal
-from app.services.scheduler import ScheduleMaintenanceService
-from app.services.scheduler import get_player_schedule_manager
+from app.services.scheduler import (
+    ScheduleMaintenanceService,
+    get_player_schedule_manager,
+)
 from app.workers.main import broker
 
 logger = logging.getLogger(__name__)

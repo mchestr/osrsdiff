@@ -14,12 +14,12 @@ from app.exceptions import (
     PlayerNotFoundError,
 )
 from app.models.base import get_db_session
-from app.services.player.history import (
-    HistoryService,
-)
 from app.services.player import (
     PlayerService,
     get_player_service,
+)
+from app.services.player.history import (
+    HistoryService,
 )
 from app.services.player.records import (
     RecordsService,

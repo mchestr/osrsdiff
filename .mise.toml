@@ -90,6 +90,7 @@ run = "uv run mypy app/"
 description = "Run CI checks (format code, typecheck, frontend lint)"
 run = """
 uv run black app/ tests/
+uv run isort --check app/ tests/
 uv run mypy app/
 cd frontend && npm run lint
 npm run build

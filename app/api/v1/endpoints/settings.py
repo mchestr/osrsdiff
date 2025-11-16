@@ -10,10 +10,8 @@ from app.api.auth_utils import require_admin
 from app.exceptions import NotFoundError
 from app.models.base import get_db_session
 from app.services.auth import auth_service
-from app.services.setting import (
-    setting_service,
-    setting_service as settings_cache,
-)
+from app.services.setting import setting_service
+from app.services.setting import setting_service as settings_cache
 from app.services.token_blacklist import token_blacklist_service
 
 logger = logging.getLogger(__name__)

@@ -14,6 +14,7 @@ from app.api.v1.endpoints.players import get_player_service
 from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
+from app.services.player import PlayerService
 from app.services.player.history import (
     BossProgress,
     HistoryService,
@@ -23,7 +24,6 @@ from app.services.player.history import (
     ProgressAnalysis,
     SkillProgress,
 )
-from app.services.player import PlayerService
 
 
 def create_test_player(id: int, username: str):
