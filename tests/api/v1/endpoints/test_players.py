@@ -18,7 +18,9 @@ from app.api.v1.endpoints.players import (
 )
 from app.exceptions import (
     BaseAPIException,
+    InvalidUsernameError,
     OSRSPlayerNotFoundError,
+    PlayerAlreadyExistsError,
     PlayerNotFoundError,
 )
 from app.models.player import Player
@@ -26,8 +28,6 @@ from app.services.osrs_api import (
     OSRSAPIError,
 )
 from app.services.player import (
-    InvalidUsernameError,
-    PlayerAlreadyExistsError,
     PlayerService,
 )
 
@@ -818,7 +818,7 @@ class TestPlayerSummary:
 
         # Patch get_summary_service at the module level where it's imported
         with patch(
-            "app.services.summary.get_summary_service"
+            "app.services.player.summary.get_summary_service"
         ) as mock_get_service:
             mock_service = MagicMock()
             mock_summary = PlayerSummary(

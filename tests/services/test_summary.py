@@ -95,7 +95,7 @@ class TestSummaryService:
 
             # Mock settings_cache
             with patch(
-                "app.services.summary.settings_cache"
+                "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
@@ -148,7 +148,7 @@ class TestSummaryService:
     ):
         """Test summary generation fails when API key is missing."""
         with patch(
-            "app.services.summary.settings_cache"
+            "app.services.player.summary.settings_cache"
         ) as mock_settings_cache:
             mock_settings_cache.openai_api_key = None
 
@@ -172,7 +172,7 @@ class TestSummaryService:
             mock_openai.return_value = mock_client
 
             with patch(
-                "app.services.summary.settings_cache"
+                "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
@@ -296,7 +296,7 @@ class TestSummaryService:
             mock_openai.return_value = mock_client
 
             with patch(
-                "app.services.summary.settings_cache"
+                "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
@@ -387,7 +387,7 @@ class TestSummaryService:
             mock_openai.return_value = mock_client
 
             with patch(
-                "app.services.summary.settings_cache"
+                "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
@@ -417,7 +417,9 @@ class TestSummaryService:
 
     def test_load_system_prompt_fallback(self, summary_service):
         """Test system prompt raises error when template fails."""
-        with patch("app.services.summary.render_template") as mock_render:
+        with patch(
+            "app.services.player.summary.render_template"
+        ) as mock_render:
             mock_render.side_effect = Exception("Template not found")
 
             with pytest.raises(SummaryGenerationError) as exc_info:
@@ -488,7 +490,9 @@ class TestSummaryService:
             }
         }
 
-        with patch("app.services.summary.render_template") as mock_render:
+        with patch(
+            "app.services.player.summary.render_template"
+        ) as mock_render:
             mock_render.side_effect = Exception("Template not found")
 
             with pytest.raises(SummaryGenerationError) as exc_info:

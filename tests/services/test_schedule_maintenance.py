@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.models.player import Player
-from app.services.schedule_maintenance import ScheduleMaintenanceService
+from app.services.scheduler import ScheduleMaintenanceService
 
 
 class TestScheduleMaintenanceService:
@@ -63,7 +63,7 @@ class TestScheduleMaintenanceService:
         )
 
         # No active players
-        with patch("app.services.schedule_maintenance.select") as mock_select:
+        with patch("app.services.scheduler.select") as mock_select:
             mock_stmt = MagicMock()
             mock_select.return_value = mock_stmt
             mock_stmt.where.return_value = mock_stmt
@@ -88,8 +88,8 @@ class TestScheduleMaintenanceService:
         """Test getting schedule summary."""
         mock_redis_source.get_schedules = AsyncMock(return_value=[])
 
-        with patch("app.services.schedule_maintenance.select") as mock_select:
-            with patch("app.services.schedule_maintenance.func") as mock_func:
+        with patch("app.services.scheduler.select") as mock_select:
+            with patch("app.services.scheduler.func") as mock_func:
                 mock_count_stmt = MagicMock()
                 mock_select.return_value = mock_count_stmt
 
@@ -165,7 +165,7 @@ class TestScheduleMaintenanceService:
         self, maintenance_service, test_session, mock_redis_source
     ):
         """Test bulk fix with no players."""
-        with patch("app.services.schedule_maintenance.select") as mock_select:
+        with patch("app.services.scheduler.select") as mock_select:
             mock_stmt = MagicMock()
             mock_select.return_value = mock_stmt
             mock_stmt.where.return_value = mock_stmt

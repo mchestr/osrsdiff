@@ -14,7 +14,6 @@ from app.exceptions import (
     PlayerAlreadyExistsError,
     PlayerNotFoundError,
     PlayerServiceError,
-    PlayerTypeClassificationError,
 )
 from app.models.base import get_db_session
 from app.models.hiscore import HiscoreRecord
@@ -27,6 +26,9 @@ from app.services.osrs_api import (
 from app.services.player import (
     PlayerService,
     get_player_service,
+)
+from app.services.player.type_classifier import (
+    PlayerTypeClassificationError,
 )
 
 logger = logging.getLogger(__name__)
