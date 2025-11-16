@@ -1,18 +1,289 @@
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings as app_settings
+from app.models.base import AsyncSessionLocal
 from app.models.setting import Setting
 
 logger = logging.getLogger(__name__)
 
 
 class SettingService:
-    """Service for managing application settings."""
+    """Service for managing application settings with caching support."""
+
+    def __init__(self) -> None:
+        """Initialize the setting service with cache."""
+        self._cache: Dict[str, str] = {}
+        self._initialized = False
+
+    async def load_cache_from_database(self) -> None:
+        """Load all settings from database into cache."""
+        try:
+            async with AsyncSessionLocal() as db:
+                self._cache = await self.get_all_settings_dict(db)
+                self._initialized = True
+                logger.info(
+                    f"Loaded {len(self._cache)} settings from database into cache"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to load settings from database: {e}")
+            logger.info("Using config.py defaults")
+            self._initialized = False
+
+    async def load_from_database(self) -> None:
+        """Alias for load_cache_from_database for backward compatibility."""
+        await self.load_cache_from_database()
+
+    def refresh(self) -> None:
+        """Mark cache as needing refresh (will reload on next access)."""
+        self._initialized = False
+
+    def refresh_cache(self) -> None:
+        """Alias for refresh for backward compatibility."""
+        self.refresh()
+
+    def _get_from_config(
+        self, key: str, default: Optional[str] = None
+    ) -> Optional[str]:
+        """Get value from config.py using nested key path."""
+        try:
+            parts = key.split(".")
+            value = app_settings
+            for part in parts:
+                value = getattr(value, part)
+            return str(value) if value is not None else default
+        except AttributeError:
+            return default
+
+    def get_cached(
+        self, key: str, default: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Get a setting value by key from cache, falling back to config.
+
+        Args:
+            key: Setting key (e.g., 'database.url', 'jwt.secret_key')
+            default: Default value if setting not found
+
+        Returns:
+            Setting value or default
+        """
+        if self._initialized and key in self._cache:
+            return self._cache[key]
+        # Fallback to config.py if not in cache
+        return self._get_from_config(key, default)
+
+    def get(self, key: str, default: Optional[str] = None) -> Optional[str]:
+        """Alias for get_cached for backward compatibility."""
+        return self.get_cached(key, default)
+
+    def get_cached_bool(self, key: str, default: bool = False) -> bool:
+        """Get a boolean setting value from cache."""
+        value = self.get_cached(key)
+        if value is None:
+            return default
+        return value.lower() in ("true", "1", "yes", "on")
+
+    def get_cached_int(self, key: str, default: int = 0) -> int:
+        """Get an integer setting value from cache."""
+        value = self.get_cached(key)
+        if value is None:
+            return default
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+
+    def get_cached_float(self, key: str, default: float = 0.0) -> float:
+        """Get a float setting value from cache."""
+        value = self.get_cached(key)
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+
+    # Convenience properties for common setting groups
+    @property
+    def database_url(self) -> str:
+        """Get database URL."""
+        return self.get_cached("database.url") or app_settings.database.url
+
+    @property
+    def database_echo(self) -> bool:
+        """Get database echo setting."""
+        return self.get_cached_bool(
+            "database.echo", app_settings.database.echo
+        )
+
+    @property
+    def database_pool_size(self) -> int:
+        """Get database pool size."""
+        return self.get_cached_int(
+            "database.pool_size", app_settings.database.pool_size
+        )
+
+    @property
+    def database_max_overflow(self) -> int:
+        """Get database max overflow."""
+        return self.get_cached_int(
+            "database.max_overflow", app_settings.database.max_overflow
+        )
+
+    @property
+    def database_pool_recycle(self) -> int:
+        """Get database pool recycle."""
+        return self.get_cached_int(
+            "database.pool_recycle", app_settings.database.pool_recycle
+        )
+
+    @property
+    def redis_url(self) -> str:
+        """Get Redis URL."""
+        return self.get_cached("redis.url") or app_settings.redis.url
+
+    @property
+    def redis_max_connections(self) -> int:
+        """Get Redis max connections."""
+        return self.get_cached_int(
+            "redis.max_connections", app_settings.redis.max_connections
+        )
+
+    @property
+    def jwt_secret_key(self) -> str:
+        """Get JWT secret key."""
+        return self.get_cached("jwt.secret_key") or app_settings.jwt.secret_key
+
+    @property
+    def jwt_algorithm(self) -> str:
+        """Get JWT algorithm."""
+        return self.get_cached("jwt.algorithm") or app_settings.jwt.algorithm
+
+    @property
+    def jwt_access_token_expire_minutes(self) -> int:
+        """Get JWT access token expire minutes."""
+        return self.get_cached_int(
+            "jwt.access_token_expire_minutes",
+            app_settings.jwt.access_token_expire_minutes,
+        )
+
+    @property
+    def jwt_refresh_token_expire_days(self) -> int:
+        """Get JWT refresh token expire days."""
+        return self.get_cached_int(
+            "jwt.refresh_token_expire_days",
+            app_settings.jwt.refresh_token_expire_days,
+        )
+
+    @property
+    def taskiq_default_retry_count(self) -> int:
+        """Get TaskIQ default retry count."""
+        return self.get_cached_int(
+            "taskiq.default_retry_count",
+            app_settings.taskiq.default_retry_count,
+        )
+
+    @property
+    def taskiq_default_retry_delay(self) -> float:
+        """Get TaskIQ default retry delay."""
+        return self.get_cached_float(
+            "taskiq.default_retry_delay",
+            app_settings.taskiq.default_retry_delay,
+        )
+
+    @property
+    def taskiq_use_jitter(self) -> bool:
+        """Get TaskIQ use jitter setting."""
+        return self.get_cached_bool(
+            "taskiq.use_jitter", app_settings.taskiq.use_jitter
+        )
+
+    @property
+    def taskiq_use_delay_exponent(self) -> bool:
+        """Get TaskIQ use delay exponent setting."""
+        return self.get_cached_bool(
+            "taskiq.use_delay_exponent",
+            app_settings.taskiq.use_delay_exponent,
+        )
+
+    @property
+    def taskiq_max_delay_exponent(self) -> int:
+        """Get TaskIQ max delay exponent."""
+        return self.get_cached_int(
+            "taskiq.max_delay_exponent",
+            int(app_settings.taskiq.max_delay_exponent),
+        )
+
+    @property
+    def taskiq_scheduler_prefix(self) -> str:
+        """Get TaskIQ scheduler prefix."""
+        return (
+            self.get_cached("taskiq.scheduler_prefix")
+            or app_settings.taskiq.scheduler_prefix
+        )
+
+    @property
+    def admin_username(self) -> str:
+        """Get admin username."""
+        return self.get_cached("admin.username") or app_settings.admin.username
+
+    @property
+    def admin_password(self) -> str:
+        """Get admin password."""
+        return self.get_cached("admin.password") or app_settings.admin.password
+
+    @property
+    def admin_email(self) -> str:
+        """Get admin email."""
+        result = self.get_cached("admin.email") or app_settings.admin.email
+        return result if result is not None else ""
+
+    @property
+    def openai_api_key(self) -> str:
+        """Get OpenAI API key."""
+        result = (
+            self.get_cached("openai.api_key") or app_settings.openai.api_key
+        )
+        return result if result is not None else ""
+
+    @property
+    def openai_model(self) -> str:
+        """Get OpenAI model."""
+        return self.get_cached("openai.model") or app_settings.openai.model
+
+    @property
+    def openai_max_tokens(self) -> int:
+        """Get OpenAI max tokens."""
+        return self.get_cached_int(
+            "openai.max_tokens", app_settings.openai.max_tokens
+        )
+
+    @property
+    def openai_temperature(self) -> float:
+        """Get OpenAI temperature."""
+        return self.get_cached_float(
+            "openai.temperature", app_settings.openai.temperature
+        )
+
+    @property
+    def debug(self) -> bool:
+        """Get debug setting."""
+        return self.get_cached_bool("debug", app_settings.debug)
+
+    @property
+    def environment(self) -> str:
+        """Get environment setting."""
+        return self.get_cached("environment") or app_settings.environment
+
+    @property
+    def log_level(self) -> str:
+        """Get log level setting."""
+        return self.get_cached("log_level") or app_settings.log_level
 
     async def get_setting(
         self, db: AsyncSession, key: str
@@ -88,6 +359,9 @@ class SettingService:
 
         await db.commit()
         await db.refresh(setting)
+        # Update cache if initialized
+        if self._initialized:
+            self._cache[setting.key] = setting.value
         return setting
 
     def _infer_setting_type(self, key: str, value: str) -> str:
@@ -159,6 +433,9 @@ class SettingService:
         if setting:
             await db.delete(setting)
             await db.commit()
+            # Remove from cache if initialized
+            if self._initialized and key in self._cache:
+                del self._cache[key]
             return True
         return False
 
@@ -484,3 +761,6 @@ class SettingService:
 
 # Global setting service instance
 setting_service = SettingService()
+
+# Alias for backward compatibility
+settings_cache = setting_service

@@ -8,7 +8,7 @@ import pytest
 from app.exceptions import InvalidUsernameError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
-from app.services.statistics import (
+from app.services.player.statistics import (
     NoDataAvailableError,
     PlayerNotFoundError,
     StatisticsService,

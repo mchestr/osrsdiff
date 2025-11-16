@@ -14,7 +14,7 @@ from app.api.v1.endpoints.players import get_player_service
 from app.exceptions import BaseAPIException
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
-from app.services.history import (
+from app.services.player.history import (
     BossProgress,
     HistoryService,
     HistoryServiceError,

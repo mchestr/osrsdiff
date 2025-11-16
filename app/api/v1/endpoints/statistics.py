@@ -15,7 +15,7 @@ from app.services.player import (
     PlayerService,
     get_player_service,
 )
-from app.services.statistics import (
+from app.services.player.statistics import (
     StatisticsService,
 )
 

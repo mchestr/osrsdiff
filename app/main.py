@@ -15,7 +15,7 @@ from app.config import LogConfig
 from app.exceptions import BaseAPIException
 from app.models.base import init_db
 from app.services.auth import auth_service
-from app.services.settings_cache import settings_cache
+from app.services.setting import setting_service as settings_cache
 from app.services.startup import startup_service
 from app.services.token_blacklist import token_blacklist_service
 

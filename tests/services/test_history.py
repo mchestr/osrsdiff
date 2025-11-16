@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import InvalidUsernameError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
-from app.services.history import (
+from app.services.player.history import (
     BossProgress,
     HistoryService,
     HistoryServiceError,

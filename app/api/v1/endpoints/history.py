@@ -14,7 +14,7 @@ from app.exceptions import (
     PlayerNotFoundError,
 )
 from app.models.base import get_db_session
-from app.services.history import (
+from app.services.player.history import (
     HistoryService,
 )
 from app.services.player import (

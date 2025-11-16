@@ -944,7 +944,7 @@ class PlayerSummaryResponse(BaseModel):
     def from_summary(cls, summary: Any) -> "PlayerSummaryResponse":
         """Create response model from PlayerSummary entity."""
         from app.models.player_summary import PlayerSummary
-        from app.services.summary import parse_summary_text
+        from app.services.player.summary import parse_summary_text
 
         summary_obj: PlayerSummary = summary
         parsed = parse_summary_text(summary_obj.summary_text)

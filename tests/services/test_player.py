@@ -356,7 +356,7 @@ class TestPlayerService:
     ):
         """Test successfully recalculating game mode."""
         from app.models.player_type import PlayerType
-        from app.services.player_type_classifier import PlayerTypeClassifier
+        from app.services.player.type_classifier import PlayerTypeClassifier
 
         username = "testplayer"
         player = Player(username=username, game_mode="regular")

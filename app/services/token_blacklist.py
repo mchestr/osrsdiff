@@ -4,7 +4,7 @@ from typing import Optional
 import redis.asyncio as redis
 from jose import jwt  # type: ignore
 
-from app.services.settings_cache import settings_cache
+from app.services.setting import setting_service as settings_cache
 
 
 class TokenBlacklistService:

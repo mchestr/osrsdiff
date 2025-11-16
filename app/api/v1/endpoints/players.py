@@ -23,11 +23,11 @@ from app.services.osrs_api import (
     OSRSAPIClient,
     get_osrs_api_client,
 )
+from app.exceptions import PlayerTypeClassificationError
 from app.services.player import (
     PlayerService,
     get_player_service,
 )
-from app.services.player_type_classifier import PlayerTypeClassificationError
 
 logger = logging.getLogger(__name__)
 
@@ -802,7 +802,7 @@ class PlayerSummaryResponse(BaseModel):
     @classmethod
     def from_summary(cls, summary: PlayerSummary) -> "PlayerSummaryResponse":
         """Create response model from PlayerSummary entity."""
-        from app.services.summary import parse_summary_text
+        from app.services.player.summary import parse_summary_text
 
         parsed = parse_summary_text(summary.summary_text)
         return cls(
@@ -931,7 +931,10 @@ async def generate_player_summary(
             raise PlayerNotFoundError(username)
 
         # Generate summary
-        from app.services.summary import SummaryService, get_summary_service
+        from app.services.player.summary import (
+            SummaryService,
+            get_summary_service,
+        )
 
         summary_service = get_summary_service(db_session)
 

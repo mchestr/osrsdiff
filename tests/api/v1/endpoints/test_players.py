@@ -902,7 +902,7 @@ class TestPlayerSummary:
         self, client, mock_player_service
     ):
         """Test handling classification errors during recalculation."""
-        from app.services.player_type_classifier import (
+        from app.services.player.type_classifier import (
             PlayerTypeClassificationError,
         )
 

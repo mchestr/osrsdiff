@@ -10,7 +10,7 @@ from app.exceptions import InsufficientDataError, PlayerNotFoundError
 from app.models.hiscore import HiscoreRecord
 from app.models.player import Player
 from app.models.player_summary import PlayerSummary
-from app.services.summary import SummaryGenerationError, SummaryService
+from app.services.player.summary import SummaryGenerationError, SummaryService
 
 
 class TestSummaryService:

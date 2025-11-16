@@ -11,7 +11,7 @@ from app.exceptions import (
 )
 from app.models.player_type import PlayerType
 from app.services.osrs_api import HiscoreData
-from app.services.player_type_classifier import (
+from app.services.player.type_classifier import (
     PlayerTypeClassificationError,
     PlayerTypeClassifier,
 )

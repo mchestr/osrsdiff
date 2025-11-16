@@ -13,7 +13,7 @@ from sqlalchemy import select
 
 from app.models.base import AsyncSessionLocal
 from app.models.player import Player
-from app.services.summary import SummaryService
+from app.services.player.summary import SummaryService
 from app.workers.main import broker
 
 logger = logging.getLogger(__name__)

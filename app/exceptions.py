@@ -202,6 +202,13 @@ class PlayerServiceError(ServiceError):
         super().__init__("Player service", message, detail)
 
 
+class PlayerTypeClassificationError(ServiceError):
+    """Raised when player type classification fails."""
+
+    def __init__(self, message: str, detail: Optional[str] = None):
+        super().__init__("Player type classification", message, detail)
+
+
 class HistoryServiceError(ServiceError):
     """Raised when a history service operation fails."""
 

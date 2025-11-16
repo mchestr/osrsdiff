@@ -10,7 +10,7 @@ from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
 from app.config import LogConfig
 from app.config import settings as config_defaults
-from app.services.settings_cache import settings_cache
+from app.services.setting import setting_service as settings_cache
 
 dictConfig(LogConfig().model_dump())
 

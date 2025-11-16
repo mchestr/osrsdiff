@@ -1,8 +1,12 @@
 """Business logic services."""
 
 from .osrs_api import OSRSAPIClient
-from .player import PlayerService, get_player_service
-from .statistics import StatisticsService, get_statistics_service
+from .player import (
+    PlayerService,
+    StatisticsService,
+    get_player_service,
+    get_statistics_service,
+)
 
 __all__ = [
     "PlayerService",

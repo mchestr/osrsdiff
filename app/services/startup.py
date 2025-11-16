@@ -3,9 +3,11 @@ import logging
 
 from app.models.base import AsyncSessionLocal
 from app.services.setting import setting_service
-from app.services.settings_cache import settings_cache
 from app.services.user import user_service
 from app.utils.migrations import run_migrations
+
+# Alias for backward compatibility
+settings_cache = setting_service
 
 logger = logging.getLogger(__name__)
 

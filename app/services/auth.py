@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import UnauthorizedError
 from app.models.user import User
-from app.services.settings_cache import settings_cache
+from app.services.setting import setting_service as settings_cache
 from app.services.token_blacklist import token_blacklist_service
 from app.services.user import user_service
 
