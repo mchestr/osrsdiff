@@ -52,8 +52,8 @@ class ProgressAnalysis:
 
         # Calculate individual skill gains
         for skill_name in end_skills.keys():
-            start_exp = start_skills.get(skill_name, {}).get("experience", 0)
-            end_exp = end_skills.get(skill_name, {}).get("experience", 0)
+            start_exp = start_skills.get(skill_name, {}).get("experience") or 0
+            end_exp = end_skills.get(skill_name, {}).get("experience") or 0
             gains[skill_name] = max(0, end_exp - start_exp)
 
         return gains
@@ -75,8 +75,8 @@ class ProgressAnalysis:
 
         # Calculate individual skill level gains
         for skill_name in end_skills.keys():
-            start_level = start_skills.get(skill_name, {}).get("level", 1)
-            end_level = end_skills.get(skill_name, {}).get("level", 1)
+            start_level = start_skills.get(skill_name, {}).get("level") or 1
+            end_level = end_skills.get(skill_name, {}).get("level") or 1
             gains[skill_name] = max(0, end_level - start_level)
 
         return gains

@@ -822,3 +822,154 @@ class TestHistoryService:
         assert result.total_kills_gained == 0
         # days should be based on days from now
         assert result.days >= 1
+
+    @pytest.mark.asyncio
+    async def test_progress_analysis_with_none_values(
+        self, history_service, test_session
+    ):
+        """Test that ProgressAnalysis handles None values in skill data without crashing."""
+        # This test covers the bug where None values in experience/level cause
+        # "unsupported operand type(s) for -: 'int' and 'NoneType'" error
+        player = Player(username="noneValuePl")
+        test_session.add(player)
+        await test_session.flush()
+
+        base_date = datetime.now(timezone.utc) - timedelta(days=2)
+
+        # Create start record with None values in some skill fields
+        start_record = HiscoreRecord(
+            player_id=player.id,
+            fetched_at=base_date,
+            overall_level=1500,
+            overall_experience=50000000,
+            skills_data={
+                "attack": {
+                    "rank": 500,
+                    "level": None,  # None value that should be handled
+                    "experience": None,  # None value that should be handled
+                },
+                "defence": {
+                    "rank": 600,
+                    "level": None,  # None value that should be handled
+                    "experience": 5346332,
+                },
+                "strength": {
+                    "rank": 400,
+                    "level": 99,
+                    "experience": 13034431,
+                },
+            },
+        )
+
+        # Create end record with valid values
+        end_record = HiscoreRecord(
+            player_id=player.id,
+            fetched_at=base_date + timedelta(days=2),
+            overall_level=1510,
+            overall_experience=50300000,
+            skills_data={
+                "attack": {
+                    "rank": 490,
+                    "level": 99,
+                    "experience": 13234431,  # Valid value
+                },
+                "defence": {
+                    "rank": 590,
+                    "level": 91,  # Valid value
+                    "experience": 5446332,
+                },
+                "strength": {
+                    "rank": 390,
+                    "level": 99,
+                    "experience": 13034431,
+                },
+            },
+        )
+
+        test_session.add_all([start_record, end_record])
+        await test_session.commit()
+
+        # This should not raise a TypeError
+        result = await history_service.get_progress_between_dates(
+            "noneValuePl", base_date, base_date + timedelta(days=2, hours=1)
+        )
+
+        assert isinstance(result, ProgressAnalysis)
+
+        # Check that None values were handled correctly
+        exp_gains = result.experience_gained
+        # Attack: None -> 13234431 should be treated as 0 -> 13234431 = 13234431
+        assert exp_gains["attack"] == 13234431
+        # Defence: 5346332 -> 5446332 = 100000
+        assert exp_gains["defence"] == 100000
+        # Strength: 13034431 -> 13034431 = 0
+        assert exp_gains["strength"] == 0
+
+        # Check level gains
+        level_gains = result.levels_gained
+        # Attack: None -> 99 should be treated as 1 -> 99 = 98 (but max(0, ...) = 98)
+        # Actually, None or 1 = 1, so 99 - 1 = 98
+        assert level_gains["attack"] == 98
+        # Defence: None -> 91 should be treated as 1 -> 91 = 90
+        assert level_gains["defence"] == 90
+        # Strength: 99 -> 99 = 0
+        assert level_gains["strength"] == 0
+
+    @pytest.mark.asyncio
+    async def test_progress_analysis_with_none_values_both_records(
+        self, history_service, test_session
+    ):
+        """Test ProgressAnalysis when both start and end records have None values."""
+        player = Player(username="noneBothPl")
+        test_session.add(player)
+        await test_session.flush()
+
+        base_date = datetime.now(timezone.utc) - timedelta(days=2)
+
+        # Create start record with None values
+        start_record = HiscoreRecord(
+            player_id=player.id,
+            fetched_at=base_date,
+            overall_level=1500,
+            overall_experience=50000000,
+            skills_data={
+                "attack": {
+                    "rank": 500,
+                    "level": 99,
+                    "experience": None,
+                },
+            },
+        )
+
+        # Create end record also with None values
+        end_record = HiscoreRecord(
+            player_id=player.id,
+            fetched_at=base_date + timedelta(days=2),
+            overall_level=1510,
+            overall_experience=50300000,
+            skills_data={
+                "attack": {
+                    "rank": 490,
+                    "level": 99,
+                    "experience": None,  # None in both records
+                },
+            },
+        )
+
+        test_session.add_all([start_record, end_record])
+        await test_session.commit()
+
+        # This should not raise a TypeError
+        result = await history_service.get_progress_between_dates(
+            "noneBothPl", base_date, base_date + timedelta(days=2, hours=1)
+        )
+
+        assert isinstance(result, ProgressAnalysis)
+
+        # Both None values should be treated as 0, so gain should be 0
+        exp_gains = result.experience_gained
+        assert exp_gains["attack"] == 0
+
+        # Level: None -> None should be treated as 1 -> 1 = 0
+        level_gains = result.levels_gained
+        assert level_gains["attack"] == 0
