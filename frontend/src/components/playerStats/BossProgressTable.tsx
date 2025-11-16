@@ -60,15 +60,41 @@ export const BossProgressTable: React.FC<BossProgressTableProps> = ({
     <div className="card bg-white dark:bg-gray-800">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-200">Boss Progress Summary</h2>
-        <select
-          value={selectedPeriod}
-          onChange={(e) => setSelectedPeriod(Number(e.target.value))}
-          className="input text-sm bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-        >
-          <option value={1} className="dark:bg-gray-700 dark:text-gray-200">Last 1 Day</option>
-          <option value={7} className="dark:bg-gray-700 dark:text-gray-200">Last 7 Days</option>
-          <option value={30} className="dark:bg-gray-700 dark:text-gray-200">Last 30 Days</option>
-        </select>
+        <div className="inline-flex rounded-md shadow-sm border border-gray-300 dark:border-gray-600 overflow-hidden" role="group">
+          <button
+            type="button"
+            onClick={() => setSelectedPeriod(1)}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors border-r border-gray-300 dark:border-gray-600 ${
+              selectedPeriod === 1
+                ? 'bg-primary-600 text-white dark:bg-primary-500'
+                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            1d
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedPeriod(7)}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors border-r border-gray-300 dark:border-gray-600 ${
+              selectedPeriod === 7
+                ? 'bg-primary-600 text-white dark:bg-primary-500'
+                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            7d
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedPeriod(30)}
+            className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+              selectedPeriod === 30
+                ? 'bg-primary-600 text-white dark:bg-primary-500'
+                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            30d
+          </button>
+        </div>
       </div>
 
       {currentProgress ? (
