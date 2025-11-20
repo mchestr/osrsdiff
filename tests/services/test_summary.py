@@ -97,6 +97,7 @@ class TestSummaryService:
             with patch(
                 "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
+                mock_settings_cache.openai_enabled = True
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
                 mock_settings_cache.openai_max_tokens = 1000
@@ -143,6 +144,22 @@ class TestSummaryService:
             await summary_service.generate_summary_for_player(player.id)
 
     @pytest.mark.asyncio
+    async def test_generate_summary_openai_disabled(
+        self, summary_service, test_player_with_history
+    ):
+        """Test summary generation returns None when OpenAI is disabled."""
+        with patch(
+            "app.services.player.summary.settings_cache"
+        ) as mock_settings_cache:
+            mock_settings_cache.openai_enabled = False
+
+            summary = await summary_service.generate_summary_for_player(
+                test_player_with_history.id
+            )
+
+            assert summary is None
+
+    @pytest.mark.asyncio
     async def test_generate_summary_no_api_key(
         self, summary_service, test_player_with_history
     ):
@@ -150,6 +167,7 @@ class TestSummaryService:
         with patch(
             "app.services.player.summary.settings_cache"
         ) as mock_settings_cache:
+            mock_settings_cache.openai_enabled = True
             mock_settings_cache.openai_api_key = None
 
             with pytest.raises(SummaryGenerationError) as exc_info:
@@ -174,6 +192,7 @@ class TestSummaryService:
             with patch(
                 "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
+                mock_settings_cache.openai_enabled = True
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
                 mock_settings_cache.openai_max_tokens = 1000
@@ -298,6 +317,7 @@ class TestSummaryService:
             with patch(
                 "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
+                mock_settings_cache.openai_enabled = True
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
                 mock_settings_cache.openai_max_tokens = 1000
@@ -389,6 +409,7 @@ class TestSummaryService:
             with patch(
                 "app.services.player.summary.settings_cache"
             ) as mock_settings_cache:
+                mock_settings_cache.openai_enabled = True
                 mock_settings_cache.openai_api_key = "test-key"
                 mock_settings_cache.openai_model = "gpt-4o-mini"
                 mock_settings_cache.openai_max_tokens = 1000

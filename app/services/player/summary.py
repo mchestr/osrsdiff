@@ -205,6 +205,13 @@ class SummaryService:
             )
             return None
 
+        # Check if OpenAI is enabled
+        if not settings_cache.openai_enabled:
+            logger.info(
+                f"OpenAI functionality is disabled, skipping summary generation for player {player.username}"
+            )
+            return None
+
         # Generate summary using OpenAI
         summary_text, openai_metadata = await self._generate_summary_text(
             player.username, day_progress, week_progress

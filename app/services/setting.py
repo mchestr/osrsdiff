@@ -72,8 +72,14 @@ class SettingService:
         Returns:
             Setting value or default
         """
-        if self._initialized and key in self._cache:
-            return self._cache[key]
+        if self._initialized:
+            # Try exact key first
+            if key in self._cache:
+                return self._cache[key]
+            # Try underscore version (for OpenAI settings stored as openai_enabled)
+            underscore_key = key.replace(".", "_")
+            if underscore_key in self._cache:
+                return self._cache[underscore_key]
         # Fallback to config.py if not in cache
         return self._get_from_config(key, default)
 
@@ -242,6 +248,13 @@ class SettingService:
         """Get admin email."""
         result = self.get_cached("admin.email") or app_settings.admin.email
         return result if result is not None else ""
+
+    @property
+    def openai_enabled(self) -> bool:
+        """Get OpenAI enabled setting."""
+        return self.get_cached_bool(
+            "openai.enabled", app_settings.openai.enabled
+        )
 
     @property
     def openai_api_key(self) -> str:
@@ -621,6 +634,14 @@ class SettingService:
             ),
             # OpenAI settings
             (
+                "openai_enabled",
+                "openai.enabled",
+                "OpenAI Enabled",
+                "Enable OpenAI functionality for summary generation",
+                "boolean",
+                None,
+            ),
+            (
                 "openai_api_key",
                 "openai.api_key",
                 "OpenAI API Key",
@@ -739,7 +760,11 @@ class SettingService:
             "admin_username": "admin.username",
             "admin_password": "admin.password",
             "admin_email": "admin.email",
+            "openai_enabled": "openai.enabled",
             "openai_api_key": "openai.api_key",
+            "openai_model": "openai.model",
+            "openai_max_tokens": "openai.max_tokens",
+            "openai_temperature": "openai.temperature",
             "openai_model": "openai.model",
             "openai_max_tokens": "openai.max_tokens",
             "openai_temperature": "openai.temperature",

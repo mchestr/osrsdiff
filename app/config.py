@@ -186,6 +186,10 @@ class AdminSettings(BaseModel):
 class OpenAISettings(BaseModel):
     """OpenAI API configuration settings."""
 
+    enabled: bool = Field(
+        default=True,
+        description="Enable OpenAI functionality for summary generation",
+    )
     api_key: Optional[str] = Field(
         default=None, description="OpenAI API key for generating summaries"
     )

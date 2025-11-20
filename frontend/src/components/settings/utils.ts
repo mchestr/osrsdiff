@@ -2,22 +2,22 @@ import type { Setting, SettingSection } from './types';
 
 // Helper function to determine section for a setting
 export const getSettingSection = (key: string): string => {
-  if (key.startsWith('openai_')) {
+  if (key.startsWith('openai_') || key.startsWith('openai.')) {
     return 'openai';
   }
-  if (key.startsWith('jwt_')) {
+  if (key.startsWith('jwt_') || key.startsWith('jwt.')) {
     return 'jwt';
   }
-  if (key.startsWith('database_')) {
+  if (key.startsWith('database_') || key.startsWith('database.')) {
     return 'database';
   }
-  if (key.startsWith('redis_')) {
+  if (key.startsWith('redis_') || key.startsWith('redis.')) {
     return 'redis';
   }
-  if (key.startsWith('taskiq_')) {
+  if (key.startsWith('taskiq_') || key.startsWith('taskiq.')) {
     return 'taskiq';
   }
-  if (key.startsWith('admin_')) {
+  if (key.startsWith('admin_') || key.startsWith('admin.')) {
     return 'admin';
   }
   if (['environment', 'debug', 'log_level'].includes(key)) {
